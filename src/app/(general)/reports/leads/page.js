@@ -1,4 +1,4 @@
-import DuplicateLayout from '@/app/duplicateLayout'
+
 import Footer from '@/components/shared/Footer'
 import PageHeader from '@/components/shared/pageHeader/PageHeader'
 import PageHeaderWidgets from '@/components/shared/pageHeader/PageHeaderWidgets'

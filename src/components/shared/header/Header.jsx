@@ -200,7 +200,7 @@ const Header = () => {
                             </div>
                         </div>
                         <TimesheetsModal /> */}
-                        <NotificationsModal />
+                        {/* <NotificationsModal /> */}
                         <ProfileModal />
                     </div>
                 </div>

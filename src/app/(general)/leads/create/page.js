@@ -1,7 +1,7 @@
-import React from 'react'
-import PageHeader from '@/components/shared/pageHeader/PageHeader'
-import LeadsCreateHeader from '@/components/leadsViewCreate/LeadsCreateHeader'
-import LeadsCreateContent from '@/components/leadsViewCreate/LeadsCreateContent'
+import React from "react";
+import PageHeader from "@/components/shared/pageHeader/PageHeader";
+import LeadsCreateHeader from "@/components/leadsViewCreate/LeadsCreateHeader";
+import LeadsCreateContent from "@/components/leadsViewCreate/LeadsCreateContent";
 
 const page = () => {
   return (
@@ -10,13 +10,13 @@ const page = () => {
         <LeadsCreateHeader />
       </PageHeader>
 
-      <div className='main-content'>
-        <div className='row'>
+      <div className="main-content">
+        <div className="row">
           <LeadsCreateContent />
         </div>
       </div>
     </>
-  )
-}
+  );
+};
 
-export default page
+export default page;
