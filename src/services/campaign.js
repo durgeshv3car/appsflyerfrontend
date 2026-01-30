@@ -88,3 +88,26 @@ export const deleteToken = async (id) => {
     throw error;
   }
 };
+
+/**
+ * Add email to campaign (assign user)
+ */
+export const addEmail = async (id, email) => {
+  try {
+    const token = await getToken();
+    const res = await axios.post(
+      `${Api_Url}/token/add-email`, 
+      { tokenId:id, email },
+      {
+        headers: {
+          Authorization: `${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    return res.data;
+  } catch (error) {
+    console.error("Error adding email:", error.response?.data || error.message);
+    throw error;
+  }
+};

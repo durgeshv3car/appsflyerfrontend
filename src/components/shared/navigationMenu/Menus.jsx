@@ -46,7 +46,7 @@ const Menus = () => {
   //     return true;
   //   });
   const filteredMenu = menuList.filter((menu) => {
-    const permissionsAdmin = ["preview"];
+    const permissionsAdmin = [""];
     if (userDetails.role === "super_admin") {
       return !permissionsAdmin.includes(menu.name);
     }

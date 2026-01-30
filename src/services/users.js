@@ -63,3 +63,25 @@ export const deleteUser = async (id) => {
     throw error;
   }
 };
+/**
+ * Remove campaign from user audience
+ */
+export const removeUserAudience = async (email, campaignId) => {
+  try {
+    const token = await getToken();
+    const res = await axios.patch(
+      `${Api_Url}/auth/audience/remove`,
+      { email, campaignId },
+      {
+        headers: {
+          Authorization: `${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    return res.data;
+  } catch (error) {
+    console.error("Error removing audience:", error.response?.data || error.message);
+    throw error;
+  }
+};

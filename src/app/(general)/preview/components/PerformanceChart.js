@@ -73,21 +73,21 @@ const PerformanceLineChart = ({ tableData }) => {
   useEffect(() => {
     if (!tableData || tableData.length === 0) return;
 
-    const labels = tableData.map((row) => row.Date || ""); // x-axis labels
+    const labels = tableData.map((row) => row.Date || "");
 
     const impressions = tableData.map((row) => row.Impressions || 0);
-    const clicks = tableData.map((row) => row.Clicks || 0);
-    const ctr = tableData.map((row) =>
-  parseFloat(String(row.CTR).replace("%", "")) || 0
-);
-
-    const cost = tableData.map((row) => row.Spent || 0);
     const engagement = tableData.map((row) => row.Engagement || 0);
+
+    // 🔧 FIXED: multiply per value
+    const clicks = tableData.map((row) => (row.Clicks || 0));
+    const ctr = tableData.map(
+      (row) => parseFloat(String(row.CTR).replace("%", "")) || 0
+    );
+    const cost = tableData.map((row) => (row.Spent || 0));
 
     if (chartRef.current) {
       const ctx = chartRef.current.getContext("2d");
 
-      // Destroy old chart instance to avoid duplication
       if (chartInstance.current) {
         chartInstance.current.destroy();
       }
@@ -100,57 +100,47 @@ const PerformanceLineChart = ({ tableData }) => {
             {
               label: "Impressions",
               data: impressions,
+              yAxisID: "yLarge",
               borderColor: "rgb(34,197,94)",
               backgroundColor: "rgba(34,197,94,0.1)",
               tension: 0.4,
               fill: true,
-              pointRadius: 4,
-              pointHoverRadius: 6,
-              borderWidth: 3,
-            },
-            {
-              label: "Clicks",
-              data: clicks,
-              borderColor: "rgb(37,99,235)",
-              backgroundColor: "rgba(37,99,235,0.1)",
-              tension: 0.4,
-              fill: true,
-              pointRadius: 4,
-              pointHoverRadius: 6,
-              borderWidth: 3,
-            },
-            {
-              label: "CTR",
-              data: ctr,
-              borderColor: "rgb(168,85,247)",
-              backgroundColor: "rgba(168,85,247,0.1)",
-              tension: 0.4,
-              fill: true,
-              pointRadius: 4,
-              pointHoverRadius: 6,
-              borderWidth: 3,
-            },
-            {
-              label: "Cost",
-              data: cost,
-              borderColor: "rgb(234,179,8)",
-              backgroundColor: "rgba(234,179,8,0.1)",
-              tension: 0.4,
-              fill: true,
-              pointRadius: 4,
-              pointHoverRadius: 6,
-              borderWidth: 3,
             },
             {
               label: "Engagement",
               data: engagement,
+              yAxisID: "yLarge",
               borderColor: "rgb(239,68,68)",
               backgroundColor: "rgba(239,68,68,0.1)",
               tension: 0.4,
               fill: true,
-              pointRadius: 4,
-              pointHoverRadius: 6,
-              borderWidth: 3,
+            },
+            {
+              label: "Clicks",
+              data: clicks,
+              yAxisID: "ySmall",
+              borderColor: "rgb(37,99,235)",
+              backgroundColor: "rgba(37,99,235,0.1)",
+              tension: 0.4,
+              fill: true,
+            },
+            {
+              label: "CTR (%)",
+              data: ctr,
+              yAxisID: "ySmall",
+              borderColor: "rgb(168,85,247)",
+              backgroundColor: "rgba(168,85,247,0.1)",
+              tension: 0.4,
+              fill: true,
+            },
+            {
+              label: "Cost",
+              data: cost,
+              yAxisID: "ySmall",
+              borderColor: "rgb(234,179,8)",
+              backgroundColor: "rgba(234,179,8,0.1)",
+              tension: 0.4,
+              fill: true,
             },
           ],
         },
@@ -165,41 +155,35 @@ const PerformanceLineChart = ({ tableData }) => {
             legend: {
               position: "top",
               align: "end",
-              labels: {
-                usePointStyle: true,
-                padding: 15,
-                font: {
-                  size: 12,
-                  weight: "500",
-                },
-              },
-            },
-            tooltip: {
-              backgroundColor: "rgba(0,0,0,0.8)",
-              padding: 12,
-              cornerRadius: 8,
             },
           },
           scales: {
             x: {
-              grid: {
-                display: false,
-              },
-              ticks: {
-                font: {
-                  size: 11,
-                },
+              grid: { display: false },
+            },
+
+            // 🔹 Large values (Impressions, Engagement)
+            yLarge: {
+              type: "linear",
+              position: "left",
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: "Impressions / Engagement",
               },
             },
-            y: {
+
+            // 🔹 Small values (Clicks, CTR, Cost)
+            ySmall: {
+              type: "linear",
+              position: "right",
               beginAtZero: true,
               grid: {
-                color: "rgba(0,0,0,0.05)",
+                drawOnChartArea: false,
               },
-              ticks: {
-                font: {
-                  size: 11,
-                },
+              title: {
+                display: true,
+                text: "Clicks / CTR / Cost",
               },
             },
           },
@@ -212,7 +196,7 @@ const PerformanceLineChart = ({ tableData }) => {
         chartInstance.current.destroy();
       }
     };
-  }, [tableData]); // 🔁 re-render chart when data changes
+  }, [tableData]);
 
   return (
     <div style={{ height: "400px" }}>
@@ -220,6 +204,7 @@ const PerformanceLineChart = ({ tableData }) => {
     </div>
   );
 };
+
 
 
 
@@ -242,7 +227,7 @@ const PerformanceDashboard = ({ tableData }) => {
       ReachPercentage:0
     };
 
-    tableData.forEach((item) => {
+    tableData?.forEach((item) => {
       total.Impressions += Number(item.Impressions) || 0;
       total.Clicks += Number(item.Clicks) || 0;
       total.Reach += Number(item.Reach) || 0;

@@ -1,6 +1,7 @@
 import Footer from "@/components/shared/Footer";
 import React from "react";
 import AdvertiseId from "./components/AdvertiseId";
+import UserPage from "./components/Table";
 
 const page = () => {
   return (
@@ -8,10 +9,10 @@ const page = () => {
 
       <div className="main-content">
         <div className="row">
-          <AdvertiseId />
+          <UserPage/>
         </div>
       </div>
-      <Footer />
+
     </>
   );
 };

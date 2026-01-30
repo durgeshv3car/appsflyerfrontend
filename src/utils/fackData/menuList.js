@@ -12,16 +12,11 @@ export const menuList = [
         icon: 'feather-users',        
     },
 
-     {
-        id: 2,
-        name: "createCampaign",
-        path: "/token",
-        icon: 'feather-briefcase',        
-    },
+
      {
         id: 3,
-        name: "campaigns",
-        path: "/campaigns",
+        name: "campaign",
+        path: "/campaign",
         icon: 'feather-settings',        
     },
 
@@ -35,14 +30,9 @@ export const menuList = [
         id: 5,
         name: "preview",
         path: `/preview`,
-        icon: 'feather-eye',        
-    },
-     {
-        id: 6,
-        name: "Lms",
-        path: `/Lms`,
         icon: 'feather-layout',        
     },
+    
        {
         id: 4,
         name: "createAccount",

@@ -15,45 +15,43 @@ import { getCreativeData } from "@/services/creativeData";
 const CampaignDashboard = () => {
   const [tableData, setTableData] = useState([]);
   const [filters, setFilters] = useState({
-    advertiser: "Intellectads- Fly Dubai (USD)",
-    campaign: "All campaigns",
-    country: "All countries",
-    sort: "View by date",
-    dateRange: "24 Sep, 2025 - 30 Sep, 2025",
+    advertiser: "",
+    campaign: [],
+    dateRange: "",
+    report_by: "byDate",
   });
+  console.log("Filters in Dashboard:", filters);
   const [CreativeTableData, setCreativeTableData] = useState([]);
   const fetchCampaignData = async () => {
     try {
-      const res = await getCampaignData("campaigns");
+      const res = await getCampaignData(filters,"campaigns");
       setTableData(res.report);
     } catch (error) {
       console.log(error);
     }
   };
 
+
   const fetchCreativeTableData = async () => {
     try {
-      const res = await getCreativeData("creatives");
-
-      // Sort the report array by impressions DESC
+      const res = await getCreativeData(filters,"creatives");
       const sorted = res.report.sort((a, b) => b.Impressions - a.Impressions);
-
       setCreativeTableData(sorted);
     } catch (error) {
       console.log(error);
     }
   };
 
-  useEffect(() => {
-    fetchCampaignData();
-    fetchCreativeTableData();
-  }, []);
+ 
+
   return (
     <div className="bg-light min-vh-100 ">
       <ReportsFilter
         tableData={tableData}
         filters={filters}
         setFilters={setFilters}
+        fetchCampaignData={fetchCampaignData}
+        fetchCreativeTableData={fetchCreativeTableData}
       />
 
       <div className="container-fluid py-4">

@@ -2,12 +2,13 @@ import axios from "axios";
 const Api_Url = process.env.NEXT_PUBLIC_API_BASE_URL;
 import { getToken } from "@/lib/getToken";
 
-export const getCampaignData = async (report_type) => {
+
+export const getCampaignData = async (filters,report_type) => {
   try {
     const token = await getToken();
     const res = await axios.post(
       `${Api_Url}/eskimi/get`,
-      {report_type},
+      {advertiserId:filters.advertiser,campaignId:filters.CampaignId,report_type,start_date:filters.dateRange.startDate,end_date:filters.dateRange.endDate,report_by:filters.report_by},
       {
         headers: {
           Authorization: `${token}`,

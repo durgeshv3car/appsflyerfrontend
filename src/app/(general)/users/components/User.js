@@ -1,9 +1,11 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { Pencil, Trash2, User } from "lucide-react";
+import { Pencil, Trash2, User, Layers, X } from "lucide-react";
 import EditUserModal from "./EditUserModal";
 import { useRouter } from "next/navigation";
-import { deleteUser, getAllUsers } from "@/services/users";
+import { deleteUser, getAllUsers, removeUserAudience } from "@/services/users";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 function UserPage() {
   const [users, setUsers] = useState([]);
@@ -24,6 +26,16 @@ function UserPage() {
       getUserData()
     },[])
 
+  const [showCampaignModal, setShowCampaignModal] = useState(false);
+  const [selectedUserCampaigns, setSelectedUserCampaigns] = useState([]);
+  const [selectedUserEmail, setSelectedUserEmail] = useState("");
+
+  const handleShowCampaigns = (user) => {
+    setSelectedUserCampaigns(user.campaignId || []);
+    setSelectedUserEmail(user.email);
+    setShowCampaignModal(true);
+  };
+
   const handleEdit = (id,user) => {
     router.push(`/users?id=${id}`)
     setEditingUser(user);
@@ -35,20 +47,43 @@ function UserPage() {
       prev.map((u) => (u._id === _id ? { ...u, ...updatedData } : u))
     );
     setShowModal(false);
+    toast.success("User updated successfully");
   };
 
-  const handleDelete =async (id) => {
-    const res=await deleteUser(id)
-    if (res.message){
-      getUserData()
+  const handleDelete = async (id) => {
+    try {
+        const res = await deleteUser(id);
+        if (res.message) {
+          getUserData();
+          toast.success("User deleted successfully");
+        }
+    } catch (error) {
+        console.error(error);
+        toast.error("Failed to delete user");
     }
+  };
 
+  const handleRemoveCampaign = async (campaignId) => {
+    if(!confirm("Are you sure you want to remove this campaign?")) return;
+    
+    try {
+        const res = await removeUserAudience(selectedUserEmail, campaignId);
+        if(res.success) {
+            setSelectedUserCampaigns(prev => prev.filter(c => c._id !== campaignId));
+            getUserData(); 
+            toast.success("Campaign removed successfully");
+        }
+    } catch (error) {
+        console.error("Failed to remove campaign", error);
+        toast.error("Failed to remove campaign");
+    }
   };
 
 
 
   return (
     <div className="container my-5">
+      <ToastContainer />
       <h2 className="mb-4">Users</h2>
       <div className="table-responsive">
         <table className="table table-hover align-middle shadow-sm rounded">
@@ -87,6 +122,12 @@ function UserPage() {
                   </td>
                   <td className="text-end d-flex justify-content-end gap-2">
                     <button
+                      className="btn btn-sm btn-outline-info"
+                      onClick={() => handleShowCampaigns(user)}
+                    >
+                      <Layers size={16} /> Campaigns
+                    </button>
+                    <button
                       className="btn btn-sm btn-outline-warning"
                       onClick={() => handleEdit(user._id,user)}
                     >
@@ -113,6 +154,60 @@ function UserPage() {
         user={editingUser}
         onSave={handleSave}
       />
+
+      {/* Campaigns Modal */}
+      {showCampaignModal && (
+        <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
+          <div className="bg-white rounded shadow p-4" style={{ width: '90%', maxWidth: '800px' }}>
+            <div className="d-flex justify-content-between align-items-center mb-4">
+              <h4 className="m-0">User Campaigns</h4>
+              <button className="btn btn-link text-dark p-0" onClick={() => setShowCampaignModal(false)}>
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="table-responsive">
+              <table className="table table-bordered table-hover">
+                <thead className="table-light">
+                  <tr>
+                    <th>Campaign Name</th>
+                    <th>Advertiser ID</th>
+                    <th>Token</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedUserCampaigns.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" className="text-center text-muted">
+                        No campaigns assigned to this user.
+                      </td>
+                    </tr>
+                  ) : (
+                    selectedUserCampaigns.map((camp) => (
+                      <tr key={camp._id}>
+                        <td>{camp.campaign_name}</td>
+                        <td>{camp.advertiseId}</td>
+                        <td className="text-truncate" style={{ maxWidth: "150px" }} title={camp.token}>
+                          {camp.token ? `${camp.token.substring(0, 20)}...` : "N/A"}
+                        </td>
+                        <td>
+                          <button 
+                            className="btn btn-sm btn-danger"
+                            onClick={() => handleRemoveCampaign(camp._id)}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
