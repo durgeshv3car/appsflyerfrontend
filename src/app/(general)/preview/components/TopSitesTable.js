@@ -1,5 +1,6 @@
 "use client";
-import React, { useEffect, useRef } from "react";
+import React from "react";
+import { FiGlobe } from "react-icons/fi";
 
 const TopSitesTable = () => {
   const sites = [
@@ -61,45 +62,40 @@ const TopSitesTable = () => {
     },
   ];
 
-  return (
-    <>
-      <h5 className="card-title mb-4">Top 10 Sites</h5>
-      <div className="table-responsive">
-        <table className="table table-hover table-striped align-middle">
-          <thead className="table-light">
-            <tr>
-              <th scope="col">#</th>
-              <th scope="col">Site</th>
-              <th scope="col" className="text-end">
-                Impressions
-              </th>
-              <th scope="col" className="text-end">
-                Clicks
-              </th>
-              <th scope="col" className="text-end">
-                CTR
-              </th>
-              <th scope="col" className="text-end">
-                Spent
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {sites.map((site, idx) => (
-              <tr key={idx}>
-                <td>{idx + 1}</td>
-                <td className="fw-medium">{site.name}</td>
-                <td className="text-end">
-                  {site.impressions.toLocaleString()}
-                </td>
-                <td className="text-end">{site.clicks.toLocaleString()}</td>
-                <td className="text-end">{site.ctr}</td>
-                <td className="text-end">{site.spent}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <div className="card border-0 shadow-sm mb-4">
+      <div className="card-header bg-white border-0 pt-4 px-4 pb-0">
+        <div className="d-flex align-items-center gap-2">
+            <FiGlobe className="text-primary" size={20} />
+            <h5 className="mb-0 fw-bold text-dark" style={{ fontSize: '1.2rem' }}>Top 10 Sites</h5>
+        </div>
       </div>
-    </>
-  );
+      <div className="card-body p-0 mt-3">
+        <div className="table-responsive">
+          <table className="table align-middle mb-0">
+            <thead className="table-light">
+              <tr className="border-bottom">
+                <th className="text-secondary fw-bold small py-3 px-4 border-0">#</th>
+                <th className="text-secondary fw-bold small py-3 px-4 border-0">Site</th>
+                <th className="text-secondary fw-bold small py-3 px-4 border-0 text-end">Impressions</th>
+                <th className="text-secondary fw-bold small py-3 px-4 border-0 text-end">Clicks</th>
+                <th className="text-secondary fw-bold small py-3 px-4 border-0 text-end">CTR</th>
+                <th className="text-secondary fw-bold small py-3 px-4 border-0 text-end">Spent</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sites.map((site, idx) => (
+                <tr key={idx} className="border-bottom">
+                  <td className="py-3 px-4 text-muted small">{idx + 1}</td>
+                  <td className="py-3 px-4 fw-medium text-dark small">{site.name}</td>
+                  <td className="py-3 px-4 text-end text-dark small">{site.impressions.toLocaleString()}</td>
+                  <td className="py-3 px-4 text-end text-dark small">{site.clicks.toLocaleString()}</td>
+                  <td className="py-3 px-4 text-end text-dark small">{site.ctr}</td>
+                  <td className="py-3 px-4 text-end text-dark small">{site.spent}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
 };

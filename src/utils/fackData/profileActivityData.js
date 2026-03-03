@@ -12,7 +12,7 @@ export const profileActivityData = [
         leadDate: '5+ friends join this group',
         date: '[April 20, 2023]',
         text: 'Joined the group',
-        linkText: '"Duralux"',
+        linkText: '"Automate"',
         linkHref: '#',
     },
     {
@@ -38,7 +38,7 @@ export const profileActivityData = [
         leadDate: 'New event are coming soon',
         date: '[April 23, 2023]',
         text: 'Attending the event ',
-        linkText: '"Duralux Event"',
+        linkText: '"Automate Event"',
         linkHref: '#',
     },
     {
@@ -46,14 +46,14 @@ export const profileActivityData = [
         leadDate: '5+ friends join this group',
         date: '[April 24, 2023]',
         text: 'Joined the group',
-        linkText: '"Duralux"',
+        linkText: '"Automate"',
         linkHref: '#',
     },
     {
         type: 'danger',
         leadDate: 'New meeting joining are pending ',
         date: '[April 25, 2023]',
-        text: 'Duralux meeting',
+        text: 'Automate meeting',
         linkText: 'Join',
         linkHref: '#',
         badge: true,
@@ -64,7 +64,7 @@ export const profileActivityData = [
         leadDate: '5+ friends join this group',
         date: '[April 25, 2023]',
         text: 'Joined the group',
-        linkText: '"Duralux"',
+        linkText: '"Automate"',
         linkHref: '#',
     },
     {
@@ -90,7 +90,7 @@ export const profileActivityData = [
         leadDate: 'New event are coming soon',
         date: '[April 23, 2023]',
         text: 'Attending the event ',
-        linkText: '"Duralux Event"',
+        linkText: '"Automate Event"',
         linkHref: '#',
     },
 ];
@@ -99,7 +99,7 @@ export const profileActivityData2 = [
     {
         color: 'primary',
         title: 'New orders placed #987456',
-        description: 'Duralux is a clean bootstrap admin dashboard, frontend and webapps template pack that built with most popular bootstrap framework and modern technology\'s.',
+        description: 'Automate is a clean bootstrap admin dashboard, frontend and webapps template pack that built with most popular bootstrap framework and modern technology\'s.',
         badges: [
             { text: 'design', color: 'success' },
             { text: 'html', color: 'danger' },
@@ -111,7 +111,7 @@ export const profileActivityData2 = [
     {
         color: 'success',
         title: 'New orders placed #987456',
-        description: 'Duralux is a clean bootstrap admin dashboard, frontend and webapps template pack that built with most popular bootstrap framework and modern technology\'s.',
+        description: 'Automate is a clean bootstrap admin dashboard, frontend and webapps template pack that built with most popular bootstrap framework and modern technology\'s.',
         badges: [
             { text: 'dashboard', color: 'teal' },
             { text: 'html', color: 'danger' },
@@ -122,8 +122,8 @@ export const profileActivityData2 = [
     },
     {
         color: 'danger',
-        title: 'Event start soon #Duralux',
-        description: 'Duralux is a clean bootstrap admin dashboard, frontend and webapps template pack that built with most popular bootstrap framework and modern technology\'s.',
+        title: 'Event start soon #Automate',
+        description: 'Automate is a clean bootstrap admin dashboard, frontend and webapps template pack that built with most popular bootstrap framework and modern technology\'s.',
         badges: [
             {
                 users: [

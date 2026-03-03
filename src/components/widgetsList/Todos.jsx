@@ -10,7 +10,7 @@ const todos = [
     { time: '03:48', title: 'Shared 2 New Project Files', dueIn: 5, badgeColor: 'dark', badgeText: 'New' },
     { time: '04:35', title: 'Project status updated', dueIn: 4, badgeColor: 'danger', badgeText: 'New' },
     { time: '05:46', title: 'Project meeting with john', dueIn: 3, badgeColor: 'success', badgeText: 'New' },
-    { time: '06:47', title: 'Create Duralux CRM Logo', dueIn: 2, badgeColor: 'warning', badgeText: 'New' },
+    { time: '06:47', title: 'Create Automate CRM Logo', dueIn: 2, badgeColor: 'warning', badgeText: 'New' },
 ];
 
 const Todos = ({ title }) => {

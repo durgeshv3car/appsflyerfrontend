@@ -9,7 +9,7 @@ const ticketData = [
     { ticketNumber: '987456', title: 'Meeting with beta testers', date: '20/02/2023', description: 'Lorem ipsum dolor, sit amet consectetur adipisicing elit.' },
     { ticketNumber: '963258', title: 'Live stream for bpl live', date: '20/02/2023', description: 'Lorem ipsum dolor, sit amet consectetur adipisicing elit.' },
     { ticketNumber: '753951', title: 'CEO\'s private party', date: '20/02/2023', description: 'Lorem ipsum dolor, sit amet consectetur adipisicing elit.' },
-    { ticketNumber: '456987', title: 'Duralux public announcement', date: '20/02/2023', description: 'Lorem ipsum dolor, sit amet consectetur adipisicing elit.' },
+    { ticketNumber: '456987', title: 'Automate public announcement', date: '20/02/2023', description: 'Lorem ipsum dolor, sit amet consectetur adipisicing elit.' },
     { ticketNumber: '369852', title: 'Marketing meeting with clients', date: '20/02/2023', description: 'Lorem ipsum dolor, sit amet consectetur adipisicing elit.' },
 ];
 

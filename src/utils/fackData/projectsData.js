@@ -246,7 +246,7 @@ export const projectsData = {
         {
             id: 1,
             project_name: "CRM Dashboard Redesign",
-            project_info: `Management of project under "Duralux" brand`,
+            project_info: `Management of project under "Automate" brand`,
             status: "In Prograss",
             remaining_time: "",
             badgeColor:"primary"
@@ -254,8 +254,8 @@ export const projectsData = {
 
         {
             id: 2,
-            project_name: "Duralux CRM Admin Project",
-            project_info: `Duralux CRM Admin Project`,
+            project_name: "Automate CRM Admin Project",
+            project_info: `Automate CRM Admin Project`,
             status: "Updading",
             remaining_time: "",
             badgeColor:"info"
@@ -271,8 +271,8 @@ export const projectsData = {
         },
         {
             id: 4,
-            project_name: "Duralux CRM Dashbaord Project",
-            project_info: `Duralux CRM Dashbaord Project`,
+            project_name: "Automate CRM Dashbaord Project",
+            project_info: `Automate CRM Dashbaord Project`,
             status: "Submitted",
             remaining_time: "",
             badgeColor:"teal"

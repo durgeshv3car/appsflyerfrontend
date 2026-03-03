@@ -32,7 +32,7 @@ const MegaMenuComponentsTab = () => {
                         <img src="/images/banner/1.jpg" alt="" className="img-fluid" />
                     </div>
                     <div className="mt-4">
-                        <Link href="mailto:wrapcoders@gmail.com" className="fs-13 fw-bold">View all resources on Duralux &rarr;</Link>
+                        <Link href="mailto:wrapcoders@gmail.com" className="fs-13 fw-bold">View all resources on Automate &rarr;</Link>
                     </div>
                 </div>
             </div>

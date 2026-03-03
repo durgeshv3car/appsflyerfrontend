@@ -20,7 +20,7 @@ const FeaturesTab = () => {
                         <img src="/images/banner/1.jpg" alt="" className="img-fluid" />
                     </div>
                     <div className="mt-4">
-                        <a href="mailto:wrapcoders@gmail.com" className="fs-13 fw-bold">View all features on Duralux &rarr;</a>
+                        <a href="mailto:wrapcoders@gmail.com" className="fs-13 fw-bold">View all features on Automate &rarr;</a>
                     </div>
                 </div>
             </div>

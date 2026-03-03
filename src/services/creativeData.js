@@ -7,7 +7,7 @@ export const getCreativeData = async (filters,report_type) => {
     const token = await getToken();
     const res = await axios.post(
       `${Api_Url}/eskimi/get/creative`,
-       {advertiserId:filters.advertiser,campaignId:filters.CampaignId,report_type,start_date:filters.dateRange.startDate,end_date:filters.dateRange.endDate,report_by:filters.report_by},
+       {advertiserId:filters.advertiser,campaignId:filters.campaign,report_type,start_date:filters.dateRange.startDate,end_date:filters.dateRange.endDate,report_by:filters.report_by},
       {
         headers: {
           Authorization: `${token}`,
@@ -22,12 +22,14 @@ export const getCreativeData = async (filters,report_type) => {
   }
 };
 
-export const getCampaignIdData = async (report_type) => {
+export const getCampaignIdData = async (filters) => {
   try {
     const token = await getToken();
+    const payload = { advertiserId: filters.advertiser };
+
     const res = await axios.post(
       `${Api_Url}/eskimi/get/campaigns`,
-      {advertiserId:report_type},
+      payload,
       {
         headers: {
           Authorization: `${token}`,
@@ -37,7 +39,28 @@ export const getCampaignIdData = async (report_type) => {
     );
     return res.data;
   } catch (error) {
-    console.error("Error creating token:", error.response?.data || error.message);
+    console.error("Error fetching campaign IDs:", error.response?.data || error.message);
+    throw error;
+  }
+};
+export const getSiteIdData = async (filters) => {
+  try {
+    const token = await getToken();
+    const payload = { advertiserId: filters.advertiser };
+
+    const res = await axios.post(
+      `${Api_Url}/eskimi/get/sites`,
+      payload,
+      {
+        headers: {
+          Authorization: `${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    return res.data;
+  } catch (error) {
+    console.error("Error fetching site IDs:", error.response?.data || error.message);
     throw error;
   }
 };

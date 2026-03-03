@@ -1,13 +1,7 @@
 'use client'
 import React, { useContext, useEffect, useRef, useState } from 'react'
 import { FiAlignLeft, FiArrowLeft, FiArrowRight, FiMaximize, FiMinimize, FiMoon, FiSun, } from "react-icons/fi";
-import LanguagesModal from './LanguagesModal';
-import NotificationsModal from './NotificationsModal';
 import ProfileModal from './ProfileModal';
-import SearchModal from './SearchModal';
-import TimesheetsModal from './TimesheetsModal';
-import HeaderDropDownModal from './HeaderDropDownModal';
-import MegaMenu from './megaManu/MegaMenu';
 import { NavigationContext } from '@/contentApi/navigationProvider';
 
 
@@ -62,6 +56,10 @@ const Header = () => {
 
         handleResize();
 
+        // Enforce mini menu by default as requested
+        document.documentElement.classList.add('minimenu');
+        setNavigationExpend(false);
+
         const savedSkinTheme = localStorage.getItem("skinTheme");
         handleThemeMode(savedSkinTheme)
 
@@ -74,11 +72,11 @@ const Header = () => {
         e.preventDefault()
         if (pram === "show") {
             setNavigationExpend(true);
-            document.documentElement.classList.add('minimenu')
+            document.documentElement.classList.remove('minimenu')
         }
         else {
             setNavigationExpend(false);
-            document.documentElement.classList.remove('minimenu')
+            document.documentElement.classList.add('minimenu')
         }
     }
 
@@ -127,33 +125,33 @@ const Header = () => {
     }
 
     return (
-        <header className="nxl-header">
+        <header className="nxl-header" style={{ background: '#031035', color: '#fff' }}>
             <div className="header-wrapper">
                 {/* <!--! [Start] Header Left !--> */}
-                <div className="header-left d-flex align-items-center gap-4">
+                <div className="header-left d-flex align-items-center gap-4" style={{ background: '#031035' }}>
                     {/* <!--! [Start] nxl-head-mobile-toggler !--> */}
-                    <a href="#" className="nxl-head-mobile-toggler" onClick={(e) => {e.preventDefault(), setNavigationOpen(true)}} id="mobile-collapse">
-                        <div className={`hamburger hamburger--arrowturn ${navigationOpen ? "is-active" : ""}`}>
+                    <a href="#" className="nxl-head-mobile-toggler" onClick={(e) => {e.preventDefault(), setNavigationOpen(true)}} id="mobile-collapse" style={{ background: '#031035', color: '#fff' }}>
+                        <div className={`hamburger hamburger--arrowturn ${navigationOpen ? "is-active" : ""}`} style={{ background: '#031035' }}>
                             <div className="hamburger-box">
-                                <div className="hamburger-inner"></div>
+                                <div className="hamburger-inner" style={{ backgroundColor: '#fff' }}></div>
                             </div>
                         </div>
                     </a>
                     {/* <!--! [Start] nxl-head-mobile-toggler !-->
                     <!--! [Start] nxl-navigation-toggle !--> */}
                     <div className="nxl-navigation-toggle navigation-up-1600">
-                        <a href="#" onClick={(e) => handleNavigationExpendUp(e, "show")} id="menu-mini-button" ref={miniButtonRef} style={{ display: navigationExpend ? "none" : "block" }}>
+                        <a href="#" onClick={(e) => handleNavigationExpendUp(e, "show")} id="menu-mini-button" ref={miniButtonRef} style={{ display: navigationExpend ? "none" : "block", color: '#fff' }}>
                             <FiAlignLeft size={24} />
                         </a>
-                        <a href="#" onClick={(e) => handleNavigationExpendUp(e, "hide")} id="menu-expend-button" ref={expendButtonRef} style={{ display: navigationExpend ? "block" : "none" }}>
+                        <a href="#" onClick={(e) => handleNavigationExpendUp(e, "hide")} id="menu-expend-button" ref={expendButtonRef} style={{ display: navigationExpend ? "block" : "none", color: '#fff' }}>
                             <FiArrowRight size={24} />
                         </a>
                     </div>
                     <div className="nxl-navigation-toggle navigation-down-1600">
-                        <a href="#" onClick={(e) => handleNavigationExpendDown(e, "hide")} id="menu-mini-button" ref={miniButtonRef} style={{ display: navigationExpend ? "block" : "none" }}>
+                        <a href="#" onClick={(e) => handleNavigationExpendDown(e, "hide")} id="menu-mini-button" ref={miniButtonRef} style={{ display: navigationExpend ? "block" : "none", color: '#fff' }}>
                             <FiAlignLeft size={24} />
                         </a>
-                        <a href="#" onClick={(e) => handleNavigationExpendDown(e, "show")} id="menu-expend-button" ref={expendButtonRef} style={{ display: navigationExpend ? "none" : "block" }}>
+                        <a href="#" onClick={(e) => handleNavigationExpendDown(e, "show")} id="menu-expend-button" ref={expendButtonRef} style={{ display: navigationExpend ? "none" : "block", color: '#fff' }}>
                             <FiArrowRight size={24} />
                         </a>
                     </div>
@@ -181,30 +179,11 @@ const Header = () => {
                 <!--! [Start] Header Right !--> */}
                 <div className="header-right ms-auto">
                     <div className="d-flex align-items-center">
-                        {/* <SearchModal /> */}
-                        {/* <LanguagesModal /> */}
-                        {/* <div className="nxl-h-item d-none d-sm-flex" >
-                            <div className="full-screen-switcher">
-                                <span className="nxl-head-link me-0">
-                                    <FiMaximize size={20} className="maximize" onClick={fullScreenMaximize} />
-                                    <FiMinimize size={20} className="minimize" onClick={fullScreenMinimize} />
-                                </span>
-                            </div>
-                        </div> */}
-                        {/* <div className="nxl-h-item dark-light-theme">
-                            <div className="nxl-head-link me-0 dark-button" onClick={() => handleThemeMode("dark")}>
-                                <FiMoon size={20} />
-                            </div>
-                            <div className="nxl-head-link me-0 light-button" onClick={() => handleThemeMode("light")} style={{ display: "none" }}>
-                                <FiSun size={20} />
-                            </div>
-                        </div>
-                        <TimesheetsModal /> */}
-                        {/* <NotificationsModal /> */}
+           
                         <ProfileModal />
                     </div>
                 </div>
-                {/* <!--! [End] Header Right !--> */}
+       
             </div>
         </header>
     )

@@ -6,8 +6,8 @@ const MegaMenuGeneralTab = () => {
             <div className="mb-4 rounded-3 border">
                 <img src="/images/banner/mockup.png" alt="" className="img-fluid rounded-3" />
             </div>
-            <h6 className="fw-bolder">Duralux - Admin Dashboard UiKit</h6>
-            <p className="fs-12 fw-normal text-muted text-truncate-3-line">Get started Duralux with Duralux up and running. Duralux bootstrap template docs helps you to get started with simple html codes.</p>
+            <h6 className="fw-bolder">Automate - Admin Dashboard UiKit</h6>
+            <p className="fs-12 fw-normal text-muted text-truncate-3-line">Get started Automate with Automate up and running. Automate bootstrap template docs helps you to get started with simple html codes.</p>
             <a href="#" className="fs-13 fw-bold text-primary">Get Started &rarr;</a>
         </div>
     )

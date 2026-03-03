@@ -46,12 +46,7 @@ const RegisterForm = ({ path }) => {
   return (
     <>
       <ToastContainer />
-      <h2 className="fs-20 fw-bolder mb-4">Register</h2>
-      <h4 className="fs-13 fw-bold mb-2">Manage all your Duralux CRM</h4>
-      <p className="fs-12 fw-medium text-muted">
-        Let's get you all setup, so you can verify your personal account and
-        begin setting up your profile.
-      </p>
+      <h2 className="fs-20 fw-bolder mb-4">Register for account</h2>
 
       <form onSubmit={formik.handleSubmit} className="w-100 mt-4 pt-2">
         {/* Full Name */}
@@ -89,24 +84,27 @@ const RegisterForm = ({ path }) => {
 
 
         {/* Password with show/hide */}
-        <div className="mb-4 position-relative">
+          <div className="mb-3 position-relative">
           <input
             type={showPassword ? "text" : "password"}
             name="password"
-            className="form-control"
+            className="form-control pe-5"
             placeholder="Password"
             value={formik.values.password}
             onChange={formik.handleChange}
             onBlur={formik.handleBlur}
           />
+
           <span
-            className="position-absolute top-50 end-3 translate-middle-y c-pointer"
+            className="position-absolute top-50 translate-middle-y c-pointer"
+            style={{ right: "12px" }}
             onClick={() => setShowPassword(!showPassword)}
           >
-            {showPassword ? <FiEyeOff /> : <FiEye />}
+            {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
           </span>
+
           {formik.touched.password && formik.errors.password && (
-            <div className="text-danger">{formik.errors.password}</div>
+            <div className="text-danger fs-12">{formik.errors.password}</div>
           )}
         </div>
 

@@ -8,9 +8,11 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useState } from "react";
 import { FiEye, FiEyeOff } from "react-icons/fi";
+import { useRouter } from "next/navigation";
 
 const LoginForm = ({ registerPath, resetPath }) => {
   const [showPassword, setShowPassword] = useState(false);
+  const router = useRouter();
 
   const formik = useFormik({
     initialValues: {
@@ -28,10 +30,13 @@ const LoginForm = ({ registerPath, resetPath }) => {
     }),
     onSubmit: async (values) => {
       try {
-        const res = await loginUser({ email: values.email, password: values.password });
+        const res = await loginUser({
+          email: values.email,
+          password: values.password,
+        });
         if (res.ok) {
           toast.success(res.message || "Login successful");
-          localStorage.clear()
+          router.push("/reports/overview");
         } else {
           toast.error(res.error || "Login failed");
         }
@@ -44,11 +49,8 @@ const LoginForm = ({ registerPath, resetPath }) => {
   return (
     <>
       <ToastContainer />
-      <h2 className="fs-20 fw-bolder mb-4">Login</h2>
-      <h4 className="fs-13 fw-bold mb-2">Login to your account</h4>
-      <p className="fs-12 fw-medium text-muted">
-        Welcome back! Access your Nelel web applications and recommendations.
-      </p>
+      <h2 className="fs-20 fw-bolder mb-4 text-center">Login to your account</h2>
+
 
       <form onSubmit={formik.handleSubmit} className="w-100 mt-4 pt-2">
         {/* Email */}
@@ -72,18 +74,21 @@ const LoginForm = ({ registerPath, resetPath }) => {
           <input
             type={showPassword ? "text" : "password"}
             name="password"
-            className="form-control"
+            className="form-control pe-5"
             placeholder="Password"
             value={formik.values.password}
             onChange={formik.handleChange}
             onBlur={formik.handleBlur}
           />
+
           <span
-            className="position-absolute top-50 end-3 translate-middle-y c-pointer"
+            className="position-absolute top-50 translate-middle-y c-pointer"
+            style={{ right: "12px" }}
             onClick={() => setShowPassword(!showPassword)}
           >
-            {showPassword ? <FiEyeOff /> : <FiEye />}
+            {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
           </span>
+
           {formik.touched.password && formik.errors.password && (
             <div className="text-danger fs-12">{formik.errors.password}</div>
           )}
@@ -124,14 +129,6 @@ const LoginForm = ({ registerPath, resetPath }) => {
         </div>
       </form>
 
-      {/* Register */}
-      <div className="mt-5 text-muted">
-        <span>Don't have an account?</span>
-        <Link href={registerPath} className="fw-bold">
-          {" "}
-          Create an Account
-        </Link>
-      </div>
     </>
   );
 };

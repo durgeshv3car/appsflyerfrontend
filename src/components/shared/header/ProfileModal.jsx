@@ -40,8 +40,9 @@ const ProfileModal = () => {
         type="button"
         data-bs-toggle="dropdown"
         aria-expanded="false"
+        style={{ color: '#fff' }}
       >
-        <span className="me-2 fw-medium">{userDetails.name}</span>
+        <span className="me-2 fw-medium text-white">{userDetails.name}</span>
         <FiChevronDown />
       </button>
       <div className="dropdown-menu dropdown-menu-end nxl-h-dropdown nxl-user-dropdown">

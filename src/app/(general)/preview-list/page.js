@@ -61,7 +61,7 @@ const ItemManager = () => {
   };
 
   return (
-    <div className="container my-5">
+    <div className="container-fluid py-4">
       <div className="d-flex justify-content-between mb-3">
         <h4 className="mb-3">Preview Campaign</h4>
         <button

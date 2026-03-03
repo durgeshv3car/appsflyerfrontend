@@ -8,12 +8,12 @@ import { getToken } from "@/lib/getToken";
 /**
  * Create a new token
  */
-export const createToken = async (campaign_name, advertiseId) => {
+export const createToken = async (reportName, advertiseId,campaignId,insertionOrderId,cpm) => {
   try {
     const token = await getToken();
     const res = await axios.post(
       `${Api_Url}/token/create`,
-      { campaign_name, advertiseId },
+      { reportName, advertiseId,campaignId,insertionOrderId,cpm },
       {
         headers: {
           Authorization: `${token}`,

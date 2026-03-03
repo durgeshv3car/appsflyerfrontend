@@ -63,6 +63,25 @@ export const deleteUser = async (id) => {
     throw error;
   }
 };
+
+/**
+ * Update user by ID
+ */
+export const updateUser = async (id, data) => {
+  try {
+    const token = await getToken();
+    const res = await axios.put(`${Api_Url}/auth/update/${id}`, data, {
+      headers: {
+        Authorization: `${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+    return res.data; 
+  } catch (error) {
+    console.error("Error updating user:", error.response?.data || error.message);
+    throw error;
+  }
+};
 /**
  * Remove campaign from user audience
  */
@@ -71,7 +90,7 @@ export const removeUserAudience = async (email, campaignId) => {
     const token = await getToken();
     const res = await axios.patch(
       `${Api_Url}/auth/audience/remove`,
-      { email, campaignId },
+      { email, audienceId:campaignId },
       {
         headers: {
           Authorization: `${token}`,
@@ -85,3 +104,22 @@ export const removeUserAudience = async (email, campaignId) => {
     throw error;
   }
 };
+
+export const forgotPassword = async (email) => {
+  try {
+    const token = await getToken();
+    const res = await axios.post(
+      `${Api_Url}/auth/forgot-password`,
+      { email },
+      {
+        headers: {
+          Authorization: `${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    return res.data;
+  } catch (error) {
+    
+  }
+}

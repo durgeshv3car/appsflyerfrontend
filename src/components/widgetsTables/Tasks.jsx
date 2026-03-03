@@ -11,7 +11,7 @@ const tasksData = [
     { taskNumber: '01', taskName: 'Meeting with beta testers ', taskDate: '20/02/2023', taskDescription: 'Lorem ipsum dolor, sit amet consectetur adipisicing elit.', status: taskStatusOptions, priority: taskPriorityOptions, assignee: taskAssigneeOptions },
     { taskNumber: '02', taskName: 'Live stream for bpl live ', taskDate: '20/02/2023', taskDescription: 'Lorem ipsum dolor, sit amet consectetur adipisicing elit.', status: taskStatusOptions, priority: taskPriorityOptions, assignee: taskAssigneeOptions },
     { taskNumber: '03', taskName: "CEO's private party ", taskDate: '20/02/2023', taskDescription: 'Lorem ipsum dolor, sit amet consectetur adipisicing elit.', status: taskStatusOptions, priority: taskPriorityOptions, assignee: taskAssigneeOptions },
-    { taskNumber: '04', taskName: 'Duralux public pnnouncement ', taskDate: '20/02/2023', taskDescription: 'Lorem ipsum dolor, sit amet consectetur adipisicing elit.', status: taskStatusOptions, priority: taskPriorityOptions, assignee: taskAssigneeOptions },
+    { taskNumber: '04', taskName: 'Automate public pnnouncement ', taskDate: '20/02/2023', taskDescription: 'Lorem ipsum dolor, sit amet consectetur adipisicing elit.', status: taskStatusOptions, priority: taskPriorityOptions, assignee: taskAssigneeOptions },
     { taskNumber: '05', taskName: 'Marketing meeting with clients ', taskDate: '20/02/2023', taskDescription: 'Lorem ipsum dolor, sit amet consectetur adipisicing elit.', status: taskStatusOptions, priority: taskPriorityOptions, assignee: taskAssigneeOptions },
 ];
 const Tasks = ({ title }) => {

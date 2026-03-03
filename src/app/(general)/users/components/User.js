@@ -1,9 +1,10 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { Pencil, Trash2, User, Layers, X } from "lucide-react";
+import { Pencil, Trash2, User, Layers, X, Shield } from "lucide-react";
 import EditUserModal from "./EditUserModal";
+import PermissionModal from "./PermissionModal";
 import { useRouter } from "next/navigation";
-import { deleteUser, getAllUsers, removeUserAudience } from "@/services/users";
+import { deleteUser, getAllUsers, removeUserAudience, updateUser } from "@/services/users";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -13,6 +14,8 @@ function UserPage() {
 
   const [editingUser, setEditingUser] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [showPermissionModal, setShowPermissionModal] = useState(false);
+  const [selectedPermissionUser, setSelectedPermissionUser] = useState(null);
 
     const getUserData = async () => {
 
@@ -31,7 +34,7 @@ function UserPage() {
   const [selectedUserEmail, setSelectedUserEmail] = useState("");
 
   const handleShowCampaigns = (user) => {
-    setSelectedUserCampaigns(user.campaignId || []);
+    setSelectedUserCampaigns(user.audienceId || []);
     setSelectedUserEmail(user.email);
     setShowCampaignModal(true);
   };
@@ -42,12 +45,39 @@ function UserPage() {
     setShowModal(true);
   };
 
-  const handleSave = (_id, updatedData) => {
-    setUsers((prev) =>
-      prev.map((u) => (u._id === _id ? { ...u, ...updatedData } : u))
-    );
-    setShowModal(false);
-    toast.success("User updated successfully");
+  const handleSave = async (_id, updatedData) => {
+    try {
+      const res = await updateUser(_id, updatedData);
+      if (res.message || res.success || res) {
+        setUsers((prev) =>
+          prev.map((u) => (u._id === _id ? { ...u, ...updatedData } : u))
+        );
+        setShowModal(false);
+        toast.success("User updated successfully");
+      }
+    } catch (error) {
+      toast.error("Failed to update user");
+    }
+  };
+
+  const handleShowPermissions = (user) => {
+    setSelectedPermissionUser(user);
+    setShowPermissionModal(true);
+  };
+
+  const handlePermissionSave = async (_id, updatedData) => {
+    try {
+      const res = await updateUser(_id, updatedData);
+      if (res.message || res.success || res) {
+        setUsers((prev) =>
+          prev.map((u) => (u._id === _id ? { ...u, ...updatedData } : u))
+        );
+        setShowPermissionModal(false);
+        toast.success("Permissions updated successfully");
+      }
+    } catch (error) {
+      toast.error("Failed to update permissions");
+    }
   };
 
   const handleDelete = async (id) => {
@@ -82,7 +112,7 @@ function UserPage() {
 
 
   return (
-    <div className="container my-5">
+    <div className="container-fluid py-4">
       <ToastContainer />
       <h2 className="mb-4">Users</h2>
       <div className="table-responsive">
@@ -127,6 +157,14 @@ function UserPage() {
                     >
                       <Layers size={16} /> Campaigns
                     </button>
+                    {user.role === "user" && (
+                      <button
+                        className="btn btn-sm btn-outline-success"
+                        onClick={() => handleShowPermissions(user)}
+                      >
+                        <Shield size={16} /> Permissions
+                      </button>
+                    )}
                     <button
                       className="btn btn-sm btn-outline-warning"
                       onClick={() => handleEdit(user._id,user)}
@@ -155,6 +193,14 @@ function UserPage() {
         onSave={handleSave}
       />
 
+      {/* Permission Modal */}
+      <PermissionModal
+        show={showPermissionModal}
+        onClose={() => setShowPermissionModal(false)}
+        user={selectedPermissionUser}
+        onSave={handlePermissionSave}
+      />
+
       {/* Campaigns Modal */}
       {showCampaignModal && (
         <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
@@ -170,27 +216,37 @@ function UserPage() {
               <table className="table table-bordered table-hover">
                 <thead className="table-light">
                   <tr>
-                    <th>Campaign Name</th>
+                    <th>Report Name</th>
+                    <th>Source</th>
                     <th>Advertiser ID</th>
-                    <th>Token</th>
+                    <th>Campaign ID</th>
+                    <th>Insertion Order ID</th>
+                    <th>CPM</th>
+                    <th>Currency</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {selectedUserCampaigns.length === 0 ? (
                     <tr>
-                      <td colSpan="4" className="text-center text-muted">
+                      <td colSpan="8" className="text-center text-muted">
                         No campaigns assigned to this user.
                       </td>
                     </tr>
                   ) : (
                     selectedUserCampaigns.map((camp) => (
                       <tr key={camp._id}>
-                        <td>{camp.campaign_name}</td>
-                        <td>{camp.advertiseId}</td>
-                        <td className="text-truncate" style={{ maxWidth: "150px" }} title={camp.token}>
-                          {camp.token ? `${camp.token.substring(0, 20)}...` : "N/A"}
+                        <td>{camp.reportName}</td>
+                        <td>
+                          <span className={`badge ${camp.source === 'Eskimi' ? 'bg-info' : 'bg-primary'}`}>
+                            {camp.source || 'DV360'}
+                          </span>
                         </td>
+                        <td>{camp.advertiserId}</td>
+                        <td>{camp.campaignId || '-'}</td>
+                        <td>{camp.insertionOrderId || '-'}</td>
+                        <td>{camp.cpm}</td>
+                        <td>{camp.currency || '-'}</td>
                         <td>
                           <button 
                             className="btn btn-sm btn-danger"

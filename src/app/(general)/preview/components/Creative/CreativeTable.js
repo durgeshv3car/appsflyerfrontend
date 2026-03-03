@@ -1,7 +1,7 @@
 "use client";
-import React, { useState, useMemo,useEffect } from "react";
+import React, { useState } from "react";
 import { Modal, Button, Form } from "react-bootstrap";
-
+import { FiChevronLeft, FiChevronRight, FiChevronDown, FiPlus } from "react-icons/fi";
 
 const columnsList = [
   { name: "Title", defaultVisible: true },
@@ -10,498 +10,277 @@ const columnsList = [
   { name: "Reach", defaultVisible: true },
   { name: "CTR", defaultVisible: true },
   { name: "CPM", defaultVisible: true },
-  { name: "CPC", defaultVisible: false },
+  { name: "CPC", defaultVisible: true },
   { name: "Spent", defaultVisible: true },
-  { name: "ViewableImpressions", defaultVisible: false },
-  { name: "Viewability", defaultVisible: false },
-  { name: "Engagement", defaultVisible: true },
-  { name: "ER", defaultVisible: false },
-  { name: "CPE", defaultVisible: false },
+  { name: "Total Conversions", defaultVisible: true },
 ];
 
-const CreativeTable = ({CreativeTableData}) => {
-     
-   
-  // Initialize with only columns that have defaultVisible: true
+const CreativePerformanceTable = ({ CreativeTableData = [], currencySymbol = "$" }) => {
   const [visibleColumns, setVisibleColumns] = useState(
     columnsList.filter((col) => col.defaultVisible).map((col) => col.name)
   );
-  const [search, setSearch] = useState("");
   const [show, setShow] = useState(false);
-
+  const [search, setSearch] = useState("");
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
-
-  const toggleColumn = (colName) => {
-    if (visibleColumns.includes(colName)) {
-      setVisibleColumns(visibleColumns.filter((c) => c !== colName));
-    } else {
-      setVisibleColumns([...visibleColumns, colName]);
-    }
-  };
-
-  const selectAll = () => {
-    setVisibleColumns(columnsList.map((col) => col.name));
-  };
-
-  const deselectAll = () => {
-    setVisibleColumns([]);
-  };
 
   const filteredColumns = columnsList.filter((col) =>
     col.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  // Calculate pagination
-  const totalPages = Math.ceil(CreativeTableData.length / rowsPerPage);
+  const toggleColumn = (colName) => {
+    setVisibleColumns(prev => 
+      prev.includes(colName) ? prev.filter(c => c !== colName) : [...prev, colName]
+    );
+  };
+
+  const totalPages = Math.ceil((CreativeTableData?.length || 0) / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
-  const endIndex = startIndex + rowsPerPage;
-  const paginatedData = CreativeTableData.slice(startIndex, endIndex);
+  const paginatedData = CreativeTableData?.slice(startIndex, startIndex + rowsPerPage) || [];
 
-  const handleNext = () => {
-    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
-  };
+  const totals = CreativeTableData?.reduce((acc, row) => {
+    const imp = Number(row.Impressions || row.impressions || 0);
+    const clicks = Number(row.Clicks || row.clicks || 0);
+    const reach = Number(row.Reach || row.reach || row.total_reach || row.uniqueReachImpressionReach || 0);
+    const spent = Number(row.mediaCost || row.mediaCostAdvertiserCurrency || row.Spent || row.spent || row.cost || 0);
+    const totalConversions = Number(row.TotalConversions || row.totalConversions || row.total_conversions || 0);
+    
+    // Prioritize provided CPM/CPC for weighted aggregate
+    let cpm = Number(row.CPM || row.cpm || 0);
+    if (!cpm && imp > 0) cpm = (spent / imp) * 1000;
+    
+    let cpc = Number(row.CPC || row.cpc || 0);
+    if (!cpc && clicks > 0) cpc = (spent / clicks);
 
-  const handlePrev = () => {
-    if (currentPage > 1) setCurrentPage(currentPage - 1);
-  };
+    return {
+      Impressions: acc.Impressions + imp,
+      Clicks: acc.Clicks + clicks,
+      Reach: acc.Reach + reach,
+      Spent: acc.Spent + spent,
+      "Total Conversions": (acc["Total Conversions"] || 0) + totalConversions,
+      SumCPM: (acc.SumCPM || 0) + (cpm * imp),
+      SumCPC: (acc.SumCPC || 0) + (cpc * clicks),
+    };
+  }, { Impressions: 0, Clicks: 0, Reach: 0, Spent: 0, "Total Conversions": 0, SumCPM: 0, SumCPC: 0 });
 
-  const handleRowsChange = (e) => {
-    setRowsPerPage(Number(e.target.value));
-    setCurrentPage(1);
+  const formatValue = (col, value) => {
+    if (col === "Title") return value || "-";
+    if (value === undefined || value === null) return "0";
+    if (col === "Impressions" || col === "Clicks" || col === "Reach" || col === "Total Conversions") {
+      return isNaN(Number(value)) ? (value || "0") : Number(value).toLocaleString();
+    }
+    if (col === "Spent" || col === "CPM" || col === "CPC") {
+      const rawNum = typeof value === "string"
+        ? parseFloat(value.replace(/[^0-9.-]/g, "")) || 0
+        : Number(value || 0);
+      return currencySymbol + rawNum.toFixed(2);
+    }
+    if (col === "CTR") {
+      return typeof value === "string" && value.includes("%") ? value : Number(value || 0).toFixed(2) + "%";
+    }
+    return value;
   };
 
   return (
-    <div className="">
-      <div className="container-fluid py-4">
-        {/* Header Card */}
-        <div className="card shadow-sm border-0 mb-4">
-          <div className="card-body">
-            <div className="d-flex justify-content-between align-items-center">
-              <div>
-                <h2 className="h4 mb-1 fw-bold text-dark">Creative Table</h2>
-                <p className="text-muted small mb-0">
-                  <svg
-                    width="14"
-                    height="14"
-                    fill="currentColor"
-                    className="me-1"
-                    viewBox="0 0 16 16"
-                  >
-                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
-                    <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z" />
-                  </svg>
-                  Showing {CreativeTableData.length} rows with {visibleColumns.length}{" "}
-                  columns
-                </p>
-              </div>
-              <div className="d-flex gap-2">
-                <Button
-                  variant="outline-primary"
-                  size="sm"
-                  className="d-flex align-items-center gap-2"
-                  onClick={() => setShow(true)}
-                >
-                  <svg
-                    width="16"
-                    height="16"
-                    fill="currentColor"
-                    viewBox="0 0 16 16"
-                  >
-                    <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z" />
-                  </svg>
-                  Manage Columns
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Table Card */}
-        <div className="card shadow-sm border-0">
-          <div className="card-body p-0">
-            <div className="table-responsive">
-              <table className="table table-hover align-middle mb-0">
-                <thead className="table-light">
-                  <tr>
-                    {visibleColumns.map((col) => (
-                      <th
-                        key={col}
-                        className="px-4 py-3 text-nowrap fw-semibold"
-                      >
-                        {col}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedData.map((row, idx) => (
-                    <tr key={idx} className="border-bottom">
-                      {visibleColumns.map((col) => (
-                        <td key={col} className="px-4 py-3">
-                          {col === "Title" && (
-                            <span className="text-dark fw-medium">
-                              {row[col]}
-                            </span>
-                          )}
-                          {col === "Impressions" && (
-                            <span className="badge bg-primary bg-opacity-10 fw-semibold px-3 py-2">
-                              {row[col]?.toLocaleString()}
-                            </span>
-                          )}
-                          {col === "Clicks" && (
-                            <span className="badge bg-success bg-opacity-10 fw-semibold px-3 py-2">
-                              {row[col]?.toLocaleString()}
-                            </span>
-                          )}
-                          {col === "Reach" && (
-                            <span className="badge bg-info bg-opacity-10 fw-semibold px-3 py-2">
-                              {row[col]?.toLocaleString()}
-                            </span>
-                          )}
-                          {col === "CTR" && (
-                            <span className="badge bg-warning bg-opacity-10 fw-semibold px-3 py-2">
-                              {row[col]}
-                            </span>
-                          )}
-                          {col === "CPM" && (
-                            <span className="text-dark fw-semibold">
-                              {row[col]}
-                            </span>
-                          )}
-                          {col === "CPC" && (
-                            <span className="text-dark fw-semibold">
-                              {row[col]}
-                            </span>
-                          )}
-                          {col === "Spent" && (
-                            <span className="text-primary fw-bold">
-                              {row[col]}
-                            </span>
-                          )}
-                          {col === "ViewableImpressions" && (
-                            <span className="text-primary fw-bold">
-                              {row[col]}
-                            </span>
-                          )}
-                          {col === "Viewability" && (
-                            <span className="text-primary fw-bold">
-                              {row[col]}
-                            </span>
-                          )}
-                          {col === "Engagement" && (
-                            <span className="text-primary fw-bold">
-                              {row[col]}
-                            </span>
-                          )}
-                          {col === "ER" && (
-                            <span className="text-primary fw-bold">
-                              {row[col]}
-                            </span>
-                          )}
-                          {col === "CPE" && (
-                            <span className="text-primary fw-bold">
-                              {row[col]}
-                            </span>
-                          )}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Table Footer */}
-          <div className="card-footer bg-white border-top">
-            <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
-              <div className="d-flex align-items-center gap-3 bg-light bg-opacity-50 rounded px-3 py-2 shadow-sm">
-                <span className="text-dark fw-semibold small d-flex align-items-center">
-                  <svg
-                    width="14"
-                    height="14"
-                    fill="currentColor"
-                    className="me-1 text-primary"
-                    viewBox="0 0 16 16"
-                  >
-                    <path d="M3 2.5A.5.5 0 0 1 3.5 2h9a.5.5 0 0 1 .5.5v.5H3v-.5zM2 4h12v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4zm3 2v7h1V6H5zm3 0v7h1V6H8zm3 0v7h1V6h-1z" />
-                  </svg>
-                  Rows per page:
-                </span>
-                <select
-                  value={rowsPerPage}
-                  onChange={handleRowsChange}
-                  className="form-select form-select-sm border-0 shadow-sm fw-semibold text-dark"
-                  style={{
-                    width: "80px",
-                    backgroundColor: "#fff",
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                  }}
-                >
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                </select>
-              </div>
-
-              <span className="text-muted small">
-                Showing {startIndex + 1}-{Math.min(endIndex, CreativeTableData.length)}{" "}
-                of {CreativeTableData.length} entries
-              </span>
-
-              <nav>
-                <ul className="pagination pagination-sm mb-0">
-                  <li
-                    className={`page-item ${
-                      currentPage === 1 ? "disabled" : ""
-                    }`}
-                  >
-                    <button className="page-link" onClick={handlePrev}>
-                      Previous
-                    </button>
-                  </li>
-
-                  {Array.from({ length: totalPages }, (_, i) => (
-                    <li
-                      key={i}
-                      className={`page-item ${
-                        currentPage === i + 1 ? "active" : ""
-                      }`}
-                    >
-                      <button
-                        className="page-link"
-                        onClick={() => setCurrentPage(i + 1)}
-                      >
-                        {i + 1}
-                      </button>
-                    </li>
-                  ))}
-
-                  <li
-                    className={`page-item ${
-                      currentPage === totalPages ? "disabled" : ""
-                    }`}
-                  >
-                    <button className="page-link" onClick={handleNext}>
-                      Next
-                    </button>
-                  </li>
-                </ul>
-              </nav>
-            </div>
-          </div>
+    <div className="card border-0 shadow-sm mb-4">
+      <div className="card-header bg-white border-0 pt-4 px-4 pb-3">
+        <div className="d-flex justify-content-between align-items-center w-100">
+            <h5 className="mb-0 fw-bold text-dark" style={{ fontSize: '1.2rem' }}>Creative Performance</h5>
+            <button className="btn btn-primary d-flex align-items-center gap-2" onClick={() => setShow(true)} style={{ borderRadius: '8px', padding: '8px 16px', fontSize: '14px' }}>
+                <FiPlus size={18} />
+                <span>Columns</span>
+            </button>
         </div>
       </div>
+      <div className="card-body p-0 mt-2">
+        <div className="table-responsive">
+          <table className="table align-middle mb-0 mt-3">
+            <thead className="table-light">
+              <tr className="border-bottom">
+                {visibleColumns.map(col => (
+                  <th key={col} className="text-secondary fw-bold small py-3 px-4" style={{ borderBottom: '1px solid #eee' }}>{col}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedData.map((row, idx) => (
+                <tr key={idx} className="border-bottom">
+                  {visibleColumns.map(col => {
+                    // Base metrics normalization
+                    const imp = Number(row.Impressions || row.impressions || 0);
+                    const cks = Number(row.Clicks || row.clicks || 0);
+                    const rch = Number(row.Reach || row.reach || row.total_reach || row.uniqueReachImpressionReach || 0);
+                    const spt = Number(row.mediaCost || row.mediaCostAdvertiserCurrency || row.Spent || row.spent || row.cost || 0);
+                    const cnv = Number(row.TotalConversions || row.totalConversions || row.total_conversions || 0);
 
-      {/* Enhanced Modal */}
+                    const rawCPM = row.CPM || row.cpm;
+                    const rawCPC = row.CPC || row.cpc;
+
+                    let val = row[col] || row[col.toLowerCase()] || row[col.charAt(0).toLowerCase() + col.slice(1)];
+                    
+                    // Priority mappings
+                    if (col === "Impressions") val = imp;
+                    if (col === "Clicks") val = cks;
+                    if (col === "Reach") val = rch;
+                    if (col === "Spent") val = spt;
+                    if (col === "Total Conversions") val = cnv;
+                    
+                    // Force consistent derived metrics
+                    if (col === "CTR") val = imp > 0 ? (cks / imp) * 100 : 0;
+                    if (col === "CPM") {
+                      const definedCPM = Number(rawCPM || 0);
+                      val = definedCPM > 0 ? definedCPM : (imp > 0 ? (spt / imp) * 1000 : 0);
+                    }
+                    if (col === "CPC") {
+                      const definedCPC = Number(rawCPC || 0);
+                      val = definedCPC > 0 ? definedCPC : (cks > 0 ? (spt / cks) : 0);
+                    }
+                    
+                    // Fallback for Title
+                    if (col === "Title" && !val) {
+                      val = row.creative_name || row.Creative || row.name || row.creative || row.line_item_name || "-";
+                    }
+
+                    return (
+                      <td key={col} className="py-3 px-4">
+                        <span className="text-dark small">{formatValue(col, val)}</span>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+              {CreativeTableData?.length > 0 && (
+                <tr className="bg-white">
+                  {visibleColumns.map(col => (
+                    <td key={col} className="py-3 px-4 fw-bold">
+                       <span className="small">
+                        {col === "Title" ? "Total:" : 
+                         col === "CTR" ? (totals.Impressions ? ((totals.Clicks / totals.Impressions) * 100).toFixed(2) + "%" : "0.00%") :
+                         col === "CPM" ? (totals.Impressions ? currencySymbol + (totals.SumCPM / totals.Impressions).toFixed(2) : currencySymbol + "0.00") :
+                         col === "CPC" ? (totals.Clicks ? currencySymbol + (totals.SumCPC / totals.Clicks).toFixed(2) : currencySymbol + "0.00") :
+                         formatValue(col, totals[col])}
+                       </span>
+                    </td>
+                  ))}
+                </tr>
+              )}
+            </tbody>
+          </table>
+          {(!CreativeTableData || CreativeTableData.length === 0) && (
+            <div className="text-center py-5 text-muted">No creative data available</div>
+          )}
+        </div>
+        
+        {CreativeTableData?.length > 0 && (
+          <div className="d-flex justify-content-end align-items-center gap-4 py-3 px-4 text-muted border-top bg-light-subtle" style={{ borderBottomLeftRadius: '12px', borderBottomRightRadius: '12px' }}>
+              <div className="d-flex align-items-center gap-3">
+                  <span style={{ fontSize: '13px', fontWeight: '500' }}>Rows per page:</span>
+                  <div className="position-relative">
+                    <select 
+                      value={rowsPerPage} 
+                      onChange={(e) => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                      className="form-select form-select-sm border shadow-sm" 
+                      style={{ 
+                        width: '80px', 
+                        height: '36px', 
+                        borderRadius: '8px', 
+                        fontSize: '14px',
+                        padding: '0 24px 0 12px',
+                        cursor: 'pointer',
+                        appearance: 'none',
+                        backgroundColor: '#fff',
+                        lineHeight: '36px'
+                      }}
+                    >
+                        <option value={10}>10</option>
+                        <option value={20}>20</option>
+                        <option value={50}>50</option>
+                    </select>
+                    <FiChevronDown className="position-absolute text-muted" style={{ top: '50%', right: '10px', transform: 'translateY(-50%)', pointerEvents: 'none' }} size={14} />
+                  </div>
+              </div>
+              
+              <div className="d-flex align-items-center gap-3">
+                <span style={{ fontSize: '13px', fontWeight: '500', minWidth: '80px', textAlign: 'center' }}>
+                  {startIndex + 1}-{Math.min(startIndex + rowsPerPage, CreativeTableData.length)} of {CreativeTableData.length}
+                </span>
+                
+                <div className="d-flex gap-2">
+                    <button 
+                      className="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center p-0 shadow-sm"
+                      style={{ 
+                        width: '32px', 
+                        height: '32px', 
+                        borderRadius: '6px',
+                        backgroundColor: '#fff',
+                        cursor: currentPage > 1 ? 'pointer' : 'not-allowed', 
+                        opacity: currentPage > 1 ? 1 : 0.4 
+                      }}
+                      disabled={currentPage <= 1}
+                      onClick={() => setCurrentPage(currentPage - 1)}
+                    >
+                      <FiChevronLeft size={18} />
+                    </button>
+                    
+                    <button 
+                      className="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center p-0 shadow-sm"
+                      style={{ 
+                        width: '32px', 
+                        height: '32px', 
+                        borderRadius: '6px',
+                        backgroundColor: '#fff',
+                        cursor: currentPage < totalPages ? 'pointer' : 'not-allowed', 
+                        opacity: currentPage < totalPages ? 1 : 0.4 
+                      }}
+                      disabled={currentPage >= totalPages}
+                      onClick={() => setCurrentPage(currentPage + 1)}
+                    >
+                      <FiChevronRight size={18} />
+                    </button>
+                </div>
+              </div>
+          </div>
+        )}
+      </div>
+
       <Modal show={show} onHide={() => setShow(false)} centered>
         <Modal.Header closeButton className="border-0 pb-0">
-          <Modal.Title className="fw-bold">
-            <svg
-              width="20"
-              height="20"
-              fill="currentColor"
-              className="me-2 text-primary"
-              viewBox="0 0 16 16"
-            >
-              <path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5v-3zm8 0A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5v-3zm-8 8A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5v-3zm8 0A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 13.5v-3z" />
-            </svg>
-            Manage Columns
-          </Modal.Title>
+          <Modal.Title className="fw-bold fs-5">Manage Columns</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <p className="text-muted small mb-3">
-            Select which columns to display in your table
-          </p>
-
-          {/* Search Input */}
-          <div className="mb-3">
-            <div className="input-group">
-              <span className="input-group-text bg-light border-end-0">
-                <svg
-                  width="16"
-                  height="16"
-                  fill="currentColor"
-                  viewBox="0 0 16 16"
-                >
-                  <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z" />
-                </svg>
-              </span>
-              <Form.Control
-                type="text"
-                placeholder="Search columns..."
-                className="border-start-0 ps-0"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+          <Form.Control
+            type="text"
+            placeholder="Search columns..."
+            className="mb-3"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <div className="border rounded p-3 bg-light" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+            {filteredColumns.map((col) => (
+              <Form.Check
+                key={col.name}
+                type="checkbox"
+                id={`creative-check-${col.name}`}
+                label={col.name}
+                checked={visibleColumns.includes(col.name)}
+                onChange={() => toggleColumn(col.name)}
+                className="mb-2"
               />
-            </div>
-          </div>
-
-          {/* Select All / Deselect All Buttons */}
-          <div className="d-flex gap-2 mb-3">
-            <Button
-              variant="outline-primary"
-              size="sm"
-              onClick={selectAll}
-              className="flex-fill"
-            >
-              <svg
-                width="14"
-                height="14"
-                fill="currentColor"
-                className="me-1"
-                viewBox="0 0 16 16"
-              >
-                <path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z" />
-              </svg>
-              Select All
-            </Button>
-            <Button
-              variant="outline-secondary"
-              size="sm"
-              onClick={deselectAll}
-              className="flex-fill"
-            >
-              <svg
-                width="14"
-                height="14"
-                fill="currentColor"
-                className="me-1"
-                viewBox="0 0 16 16"
-              >
-                <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854Z" />
-              </svg>
-              Deselect All
-            </Button>
-          </div>
-
-          {/* Column Checkboxes */}
-          <div
-            className="border rounded p-3 bg-light"
-            style={{ maxHeight: "300px", overflowY: "auto" }}
-          >
-            {filteredColumns.length > 0 ? (
-              filteredColumns.map((col) => (
-                <div key={col.name} className="mb-2">
-                  <Form.Check
-                    type="checkbox"
-                    id={`check-${col.name}`}
-                    className="user-select-none"
-                    label={
-                      <span className="d-flex align-items-center gap-2">
-                        <span className="fw-medium">{col.name}</span>
-                        {visibleColumns.includes(col.name) && (
-                          <span
-                            className="badge bg-success bg-opacity-10 text-white"
-                            style={{ fontSize: "10px" }}
-                          >
-                            Visible
-                          </span>
-                        )}
-                      </span>
-                    }
-                    checked={visibleColumns.includes(col.name)}
-                    onChange={() => toggleColumn(col.name)}
-                  />
-                </div>
-              ))
-            ) : (
-              <div className="text-center text-muted py-4">
-                <svg
-                  width="32"
-                  height="32"
-                  fill="currentColor"
-                  className="mb-2"
-                  viewBox="0 0 16 16"
-                >
-                  <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
-                  <path d="M8 4a.905.905 0 0 0-.9.995l.35 3.507a.552.552 0 0 0 1.1 0l.35-3.507A.905.905 0 0 0 8 4zm.002 6a1 1 0 1 0 0 2 1 1 0 0 0 0-2z" />
-                </svg>
-                <p className="mb-0">No columns found</p>
-              </div>
-            )}
-          </div>
-
-          {/* Column Count */}
-          <div className="mt-3 p-3 bg-primary bg-opacity-10 rounded">
-            <div className="d-flex justify-content-between align-items-center">
-              <span className="text-dark fw-semibold">Selected Columns</span>
-              <span className="badge bg-primary">
-                {visibleColumns.length} of {columnsList.length}
-              </span>
-            </div>
+            ))}
           </div>
         </Modal.Body>
-        <Modal.Footer className="border-0 pt-0">
-          <Button variant="outline-secondary" onClick={() => setShow(false)}>
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={() => setShow(false)}>
-            Apply Changes
-          </Button>
-        </Modal.Footer>
       </Modal>
 
-      <style>{`
-        .table > :not(caption) > * > * {
-          padding: 1rem;
+      <style jsx>{`
+        .table thead th {
+          border-top: none;
         }
-        
-        .table tbody tr {
-          transition: all 0.2s ease;
-        }
-        
-        .table tbody tr:hover {
-          background-color: rgba(13, 110, 253, 0.03);
-          transform: translateY(-1px);
-          box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        
-        .badge {
-          font-weight: 500;
-          letter-spacing: 0.3px;
-        }
-        
-        .form-check-input:checked {
-          background-color: #0d6efd;
-          border-color: #0d6efd;
-        }
-        
-        .form-check {
-          padding: 0.5rem;
-          border-radius: 0.375rem;
-          transition: background-color 0.2s;
-        }
-        
-        .form-check:hover {
-          background-color: white;
-        }
-        
-        .modal-content {
+        .table td {
           border: none;
-          box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-        }
-        
-        .input-group-text {
-          background-color: #f8f9fa;
-          border-right: 0;
-        }
-        
-        .page-link {
-          color: #0d6efd;
-        }
-        
-        .page-item.active .page-link {
-          background-color: #0d6efd;
-          border-color: #0d6efd;
         }
       `}</style>
     </div>
   );
 };
 
-
-
-export default CreativeTable;
+export default CreativePerformanceTable;

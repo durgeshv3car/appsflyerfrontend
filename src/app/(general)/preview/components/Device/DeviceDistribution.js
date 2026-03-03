@@ -1,199 +1,105 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useMemo } from "react";
 import * as Chart from "chart.js";
 
-const DeviceDistribution = () => {
+const DeviceDistribution = ({ deviceData = [] }) => {
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
-  const [hoveredSegment, setHoveredSegment] = useState(null);
+
+  const processedData = useMemo(() => {
+    const totalImpressions = deviceData.reduce((acc, item) => acc + Number(item.Impressions || item.impressions || 0), 0);
+    
+    // Vibrant Palette
+    const palette = ["#3B82F6", "#6366F1", "#8B5CF6", "#EC4899", "#F43F5E", "#10B981", "#F59E0B", "#34D399"];
+
+    return deviceData.map((item, idx) => {
+      const imp = Number(item.Impressions || item.impressions || 0);
+      const percentage = totalImpressions > 0 ? ((imp / totalImpressions) * 100).toFixed(2) : 0;
+      return {
+        label: item.name || item.device || item.Device || "",
+        value: imp,
+        percentage: parseFloat(percentage),
+        color: palette[idx % palette.length]
+      };
+    }).sort((a, b) => b.value - a.value);
+  }, [deviceData]);
 
   useEffect(() => {
-    if (chartRef.current) {
+    if (chartRef.current && processedData.length > 0) {
       const ctx = chartRef.current.getContext("2d");
 
       if (chartInstance.current) {
         chartInstance.current.destroy();
       }
 
-      const gradient1 = ctx.createLinearGradient(0, 0, 0, 400);
-      gradient1.addColorStop(0, "rgb(59, 130, 246)");
-      gradient1.addColorStop(1, "rgb(37, 99, 235)");
-
-      const gradient2 = ctx.createLinearGradient(0, 0, 0, 400);
-      gradient2.addColorStop(0, "rgb(236, 72, 153)");
-      gradient2.addColorStop(1, "rgb(219, 39, 119)");
-
-      const gradient3 = ctx.createLinearGradient(0, 0, 0, 400);
-      gradient3.addColorStop(0, "rgb(168, 85, 247)");
-      gradient3.addColorStop(1, "rgb(147, 51, 234)");
-
       chartInstance.current = new Chart.Chart(ctx, {
         type: "doughnut",
         data: {
-          labels: ["Smartphone", "Personal Computer", "Tablet"],
+          labels: processedData.map(d => d.label),
           datasets: [
             {
-              data: [52, 47, 1],
-              backgroundColor: [gradient1, gradient2, gradient3],
-              borderWidth: 3,
-              borderColor: "#ffffff",
-              hoverBorderWidth: 4,
-              hoverBorderColor: "#ffffff",
-              hoverOffset: 15,
-              spacing: 3,
+              data: processedData.map(d => d.value),
+              backgroundColor: processedData.map(d => d.color),
+              borderWidth: 0,
+              hoverOffset: 10,
+              cutout: "70%"
             },
           ],
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          cutout: "72%",
-          animation: {
-            animateRotate: true,
-            animateScale: true,
-            duration: 1500,
-            easing: "easeInOutQuart",
-          },
           plugins: {
-            legend: {
-              display: true,
-              position: "right",
-              labels: {
-                usePointStyle: true,
-                pointStyle: "circle",
-                boxWidth: 12,
-                boxHeight: 12,
-                padding: 20,
-                font: {
-                  size: 14,
-                  weight: "500",
-                  family: "system-ui, -apple-system, sans-serif",
-                },
-                color: "#374151",
-                generateLabels: function (chart) {
-                  const data = chart.data;
-                  if (data.labels.length && data.datasets.length) {
-                    return data.labels.map((label, i) => {
-                      const value = data.datasets[0].data[i];
-                      return {
-                        text: `${label}  ${value}%`,
-                        fillStyle: [
-                          "rgb(59, 130, 246)",
-                          "rgb(236, 72, 153)",
-                          "rgb(168, 85, 247)",
-                        ][i],
-                        hidden: false,
-                        index: i,
-                      };
-                    });
-                  }
-                  return [];
-                },
-              },
-            },
-
-            title: {
-              display: true,
-              text: "Device Type Used",
-              align: "start",
-              font: {
-                size: 16,
-                weight: "700",
-                family: "system-ui, -apple-system, sans-serif",
-              },
-              padding: {
-                top: 15,
-                bottom: 25,
-                left: 15,
-              },
-              color: "#111827",
-            },
-
+            legend: { display: false },
             tooltip: {
-              enabled: true,
-              backgroundColor: "rgba(0, 0, 0, 0.85)",
-              titleColor: "#ffffff",
-              bodyColor: "#ffffff",
-              padding: 12,
-              borderColor: "rgba(255, 255, 255, 0.2)",
+              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+              titleColor: '#333',
+              bodyColor: '#666',
+              borderColor: '#eee',
               borderWidth: 1,
-              cornerRadius: 8,
-              displayColors: true,
-              bodyFont: {
-                size: 14,
-                weight: "500",
-              },
-              titleFont: {
-                size: 15,
-                weight: "600",
-              },
-              callbacks: {
-                label: function (context) {
-                  return " " + context.parsed + "%";
-                },
-                afterLabel: function (context) {
-                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                  const value = context.parsed;
-                  const count = Math.round((value / 100) * 10000);
-                  return `≈ ${count.toLocaleString()} devices`;
-                },
-              },
-            },
-
-            // ✅ ADDED THIS PLUGIN FOR UNDERLINE
-            afterDraw: (chart) => {
-              const { ctx, chartArea, options } = chart;
-              const title = options.plugins.title;
-
-              if (!title.display) return;
-
-              // Title block height from Chart.js internal layout
-              const titleHeight = chart.titleBlock.height;
-              const underlineY =
-                chart.chartArea.top - title.padding.bottom + titleHeight;
-
-              ctx.save();
-              ctx.beginPath();
-              ctx.lineWidth = 2;
-              ctx.moveTo(chartArea.left, underlineY);
-              ctx.lineTo(chartArea.right, underlineY);
-              ctx.strokeStyle = "#271711ff"; 
-              ctx.stroke();
-              ctx.restore();
-            },
-          },
-
-          layout: {
-            padding: {
-              left: 10,
-              right: 10,
-              top: 5,
-              bottom: 10,
-            },
-          },
-          onHover: (event, activeElements) => {
-            event.native.target.style.cursor =
-              activeElements.length > 0 ? "pointer" : "default";
-          },
+              padding: 12,
+            }
+          }
         },
       });
     }
 
     return () => {
-      if (chartInstance.current) {
-        chartInstance.current.destroy();
-      }
+      if (chartInstance.current) chartInstance.current.destroy();
     };
-  }, []);
+  }, [processedData]);
 
   return (
-    <div
-      className="bg-gradient-to-br from-white to-gray-50 p-8 rounded-2xl shadow-xl border border-gray-100 transition-all duration-300 hover:shadow-2xl"
-      style={{ borderRadius: "12px" }}
-    >
-      <div className="relative" style={{ height: "520px" }}>
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 to-pink-50/30 rounded-xl blur-3xl -z-10"></div>
-        <canvas ref={chartRef}></canvas>
+    <div className="card border-0 shadow-sm mb-4">
+      <div className="card-header bg-white border-0 pt-4 px-4 pb-3">
+        <div className="d-flex justify-content-between align-items-center w-100">
+            <h5 className="mb-0 fw-bold text-dark" style={{ fontSize: '1.2rem' }}>Devices</h5>
+        </div>
+      </div>
+      <div className="card-body p-4 pt-1">
+        <div className="row align-items-center">
+            {/* Left side: Vertical List of Metrics */}
+            <div className="col-md-5">
+                <div className="row g-4 py-3">
+                    {processedData.slice(0, 8).map((item, idx) => (
+                        <div key={idx} className="col-6 mb-2">
+                            <div className="fw-bold text-dark small mb-1" style={{ wordBreak: 'break-word', minHeight: '1.2em' }}>{item.label}</div>
+                            <div className="d-flex flex-column">
+                                <span className="text-primary fw-bold" style={{ fontSize: '13px' }}>{item.percentage}%</span>
+                                <span className="text-secondary" style={{ fontSize: '11px' }}>{item.value.toLocaleString()}</span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Right side: Doughnut Chart */}
+            <div className="col-md-7 d-flex justify-content-center">
+                <div style={{ height: "400px", width: "100%", maxWidth: "400px" }}>
+                    <canvas ref={chartRef}></canvas>
+                </div>
+            </div>
+        </div>
       </div>
     </div>
   );

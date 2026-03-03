@@ -1,377 +1,726 @@
 "use client";
-import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { createReportsDataCity } from "@/services/city";
+// import { createReportsDataContext } from "@/services/context";
 import {
-  Trash2,
-  AlertCircle,
-  ArrowRight,
-  Search,
-  Plus,
-  Pen,
-  X,
-  Mail,
-  UserPlus,
-} from "lucide-react";
-import {
-  deleteToken,
-  getAllToken,
-  createToken,
-  updateToken,
-  addEmail,
-} from "@/services/campaign";
+  addAudienceToUser,
+  createAudience,
+  deleteAudience,
+  getAudience,
+  updateAudience,
+} from "@/services/createaudience";
+import { createReportsDataAge } from "@/services/demographics";
+import { createReportsDataDevice } from "@/services/device";
+import { createReportsData } from "@/services/reports";
+import { createReportsDataBrowser } from "@/services/browser";
+import { createReportsDataOs } from "@/services/os";
+import { createReportsDataOperator } from "@/services/operator";
+import { createReportsDataAdPos } from "@/services/ad-pos";
+import { createReportsDataAdType } from "@/services/ad-type";
+import { createReportsDataCreative } from "@/services/creative";
+import { createReportsDataCreativeSize } from "@/services/creative-size";
+import { getSearchJobStatus } from "@/services/youtube";
+import Image from "next/image";
+import { Search, Loader2, CheckCircle2, Layout, Database, BarChart3, PieChart, MapPin } from "lucide-react";
 
-const CampaignTable = () => {
-  const router = useRouter();
-  const [tokenData, setTokenData] = useState([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
+import React, { useState, useEffect } from "react";
 
-  // Modal State
-  const [showModal, setShowModal] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({
-    id: "",
-    campaign_name: "",
-    advertiseId: "",
-  });
+const emptyCampaign = {
+  reportName: "",
+  advertiserId: "",
+  campaignId: "",
+  insertionOrderId: "",
+  cpm: "",
+  currency: "",
+  source: "DV360", // Default source
+};
+
+const CampaignLoader = ({ progress, status }) => {
+  return (
+    <div className="d-flex flex-column justify-content-center align-items-center vh-100" style={{ background: "#f8f9fa" }}>
+      <div style={{ width: "100%", maxWidth: "450px", padding: "40px", textAlign: "center" }}>
+        {/* Animated Icon */}
+        <div style={{ marginBottom: "30px", position: "relative" }}>
+           <div className="ai-loader-pulse" style={{
+             width: "80px",
+             height: "80px",
+             borderRadius: "20px",
+             background: "linear-gradient(135deg, #031035 0%, #081947 100%)",
+             display: "flex",
+             alignItems: "center",
+             justifyContent: "center",
+             margin: "0 auto",
+             boxShadow: "0 10px 25px rgba(3, 16, 53, 0.2)"
+           }}>
+             <Database color="white" size={32} />
+           </div>
+        </div>
+
+        <h4 style={{ fontWeight: "700", color: "#031035", marginBottom: "10px" }}>
+          Creating Campaign Reports
+        </h4>
+        <p style={{ color: "#64748b", fontSize: "0.95rem", marginBottom: "25px", height: "1.5rem" }}>
+          {status}
+        </p>
+
+        {/* Progress Bar Container */}
+        <div style={{
+          width: "100%",
+          height: "10px",
+          backgroundColor: "#e9ecef",
+          borderRadius: "10px",
+          overflow: "hidden",
+          marginBottom: "15px",
+          position: "relative"
+        }}>
+          {/* Progress Bar Fill */}
+          <div style={{
+            width: `${progress}%`,
+            height: "100%",
+            background: "linear-gradient(90deg, #031035, #081947)",
+            borderRadius: "10px",
+            transition: "width 0.5s ease-in-out",
+            position: "relative"
+          }}>
+            {/* Shimmer effect */}
+            <div className="ai-loader-shimmer" style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)"
+            }} />
+          </div>
+        </div>
+
+        <div className="d-flex justify-content-between" style={{ fontSize: "0.85rem", fontWeight: "600", color: "#6c757d" }}>
+          <span>{Math.round(progress)}% Complete</span>
+          <span>Please wait...</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+const Campaign = () => {
+  const [campaigns, setCampaigns] = useState([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingIndex, setEditingIndex] = useState(null);
+  const [campaignData, setCampaignData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  // Modal State for Add Email
+  const [progress, setProgress] = useState(0);
+  const [loadingStatus, setLoadingStatus] = useState("");
+  const [search, setSearch] = useState("");
   const [showEmailModal, setShowEmailModal] = useState(false);
-  const [emailData, setEmailData] = useState({ id: "", email: "" });
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
+  const [audienceId, setAudienceId] = useState(null);
 
-  const handleOpenEmailModal = (id) => {
-    setEmailData({ id, email: "" });
-    setError("");
-    setShowEmailModal(true);
-  };
-
-  const handleEmailSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    try {
-        await addEmail(emailData.id, emailData.email);
-        setShowEmailModal(false);
-        toast.success("Email added successfully!");
-    } catch (err) {
-        setError("Failed to add email.");
-        console.error(err);
-        toast.error("Failed to add email.");
-    } finally {
-        setLoading(false);
-    }
-  };
-
-  const getTokenData = async () => {
-    try {
-      const res = await getAllToken();
-      console.log("API Response:", res); // Debugging log
-
-      if (res?.tokenData) {
-        setTokenData(res.tokenData);
-      } else if (res?.campaignData) {
-        setTokenData(res.campaignData);
-      } else if (Array.isArray(res)) {
-        setTokenData(res);
-      } else {
-        console.warn("Unexpected response format:", res);
-        // Fallback: check if it's an object with a data property that is an array
-        if (res?.data && Array.isArray(res.data)) {
-           setTokenData(res.data);
-        }
-      }
-    } catch (err) {
-      console.error("Error fetching token data:", err);
-    }
-  };
 
   useEffect(() => {
-    getTokenData();
-  }, []);
+    const fetchAudiences = async () => {
+      setLoading(true);
+      setProgress(10);
+      setLoadingStatus("Fetching campaigns...");
+      try {
+        const res = await getAudience(search);
+        setCampaigns(res.data);
+        setProgress(100);
+      } catch (error) {
+        console.log("Error fetching audience:", error);
+      } finally {
+        setTimeout(() => setLoading(false), 500);
+      }
+    };
 
-  const handleDelete = async (id) => {
-    try {
-        const res = await deleteToken(id);
-        if (res) {
-          setDeleteConfirm(null);
-          toast.success("Campaign deleted successfully");
-          getTokenData();
+    fetchAudiences();
+  }, [search]);
+
+  const openAddModal = () => {
+    setCampaignData(emptyCampaign);
+    setEditingIndex(null);
+    setModalOpen(true);
+  };
+
+  const openEditModal = (index) => {
+    setCampaignData(campaigns[index]);
+    setEditingIndex(index);
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setCampaignData(emptyCampaign);
+    setEditingIndex(null);
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setCampaignData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSearchChange = (e) => {
+    setSearch(e.target.value);
+  };
+
+  const pollJob = async (jobId, type) => {
+    const POLLING_INTERVAL = 3000;
+    const MAX_ATTEMPTS = 200; // Total ~10 minutes
+
+    for (let i = 0; i < MAX_ATTEMPTS; i++) {
+      try {
+        const statusData = await getSearchJobStatus(jobId);
+        const status = statusData.status || statusData.job?.status;
+
+        if (status === "completed") {
+          return statusData;
         }
-    } catch (error) {
-        console.error(error);
-        toast.error("Failed to delete campaign");
+
+        if (status === "failed") {
+          throw new Error(
+            `${type} job failed: ${statusData.error?.message || "Internal processing error"}`
+          );
+        }
+      } catch (err) {
+        console.warn(`Polling error for ${type}:`, err);
+        // Only throw if it's a structural failure, otherwise continue polling
+        if (err.message.includes("job failed")) throw err;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, POLLING_INTERVAL));
     }
+    throw new Error(`${type} job timed out after 10 minutes`);
   };
 
-  const handleNavigate = (id) => {
-    router.push(`/campaign-details?id=${id}`);
-  };
-
-  // Modal Handlers
-  const handleAdd = () => {
-    setFormData({ id: "", campaign_name: "", advertiseId: "" });
-    setIsEditing(false);
-    setError("");
-    setShowModal(true);
-  };
-
-  const handleEdit = (item) => {
-    setFormData({
-      id: item._id,
-      campaign_name: item.campaign_name,
-      advertiseId: item.advertiseId || "",
-    });
-    setIsEditing(true);
-    setError("");
-    setShowModal(true);
-  };
 
   const handleSave = async (e) => {
     e.preventDefault();
+    const isValid =
+      campaignData?.reportName?.trim() &&
+      campaignData?.advertiserId?.trim() &&
+      campaignData?.cpm?.toString().trim();
+
+    if (!isValid) return;
     setLoading(true);
+    setProgress(5);
+    setLoadingStatus("Initializing campaign...");
+    try {
+      let res;
+      if (editingIndex !== null) {
+        const id = campaignData._id || campaigns[editingIndex]?._id;
+        setLoadingStatus("Updating campaign details...");
+        res = await updateAudience(id, campaignData);
+        setProgress(20);
+      } else {
+        setLoadingStatus("Creating active audience...");
+        res = await createAudience(campaignData);
+        setProgress(20);
+      }
+
+      if (res.audience?._id && campaignData.source === "DV360") {
+        const params = {
+          audienceId: res.audience._id,
+          dataRange: "ALL_TIME",
+        };
+
+        const reportTasks = [
+          { name: "Overview", fn: createReportsData, params: params },
+          { name: "Device", fn: createReportsDataDevice, params: params },
+          { name: "Demographics", fn: createReportsDataAge, params: { ...params, dataRange: "LAST_365_DAYS" } },
+          { name: "City", fn: createReportsDataCity, params: params },
+          { name: "Browser", fn: createReportsDataBrowser, params: params },
+          { name: "OS", fn: createReportsDataOs, params: params },
+          { name: "Operator", fn: createReportsDataOperator, params: params },
+          { name: "AdPos", fn: createReportsDataAdPos, params: params },
+          { name: "AdType", fn: createReportsDataAdType, params: params },
+          { name: "Creative", fn: createReportsDataCreative, params: params },
+          { name: "CreativeSize", fn: createReportsDataCreativeSize, params: params },
+        ];
+
+        let completedCount = 0;
+        const totalTasks = reportTasks.length;
+
+        setLoadingStatus(`Initializing ${totalTasks} report streams...`);
+
+        // Run all tasks in parallel
+        await Promise.all(
+          reportTasks.map(async (task) => {
+            try {
+              const taskParams = task.params || params;
+              const taskRes = await task.fn(taskParams);
+              if (taskRes.jobId) {
+                await pollJob(taskRes.jobId, task.name);
+              }
+              completedCount++;
+              // Scale progress from 20% to 95%
+              const currentProgress = 20 + Math.floor((completedCount / totalTasks) * 75);
+              setProgress(currentProgress);
+              setLoadingStatus(`Verified ${task.name} data (${completedCount}/${totalTasks})`);
+            } catch (err) {
+              console.error(`Task ${task.name} failed:`, err);
+              completedCount++; // Still count towards progress to avoid UI hang
+            }
+          })
+        );
+        
+        setProgress(95);
+      } else if (res.audience?._id) {
+        setLoadingStatus("Campaign saved for live connection...");
+        setProgress(90);
+      }
+
+
+      setLoadingStatus("Refreshing campaign list...");
+      const all = await getAudience();
+      setCampaigns(all?.data || []);
+      setProgress(100);
+      setTimeout(() => closeModal(), 500);
+    } catch (err) {
+      console.error("Error saving campaign:", err);
+      closeModal();
+    } finally {
+      setTimeout(() => setLoading(false), 800);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await deleteAudience(id);
+      const all = await getAudience();
+      setCampaigns(all?.data || []);
+    } catch (err) {
+      console.error("Error deleting audience:", err);
+    }
+  };
+
+  const openEmailModal = (id) => {
+    setShowEmailModal(true);
     setError("");
+    setAudienceId(id);
+  };
+
+  const handleAddUser = async () => {
+    if (!email) return;
 
     try {
-      if (isEditing) {
-        await updateToken(formData.id, formData.campaign_name, formData.advertiseId);
-        toast.success("Campaign updated successfully");
-      } else {
-        await createToken(formData.campaign_name, formData.advertiseId);
-        toast.success("Campaign created successfully");
+      setLoading(true);
+      setError("");
+      const res = await addAudienceToUser(email, audienceId);
+      if (res.message) {
+        closeModal();
+        setShowEmailModal(false);
+        setEmail("");
       }
-      setShowModal(false);
-      getTokenData();
     } catch (err) {
-      setError("Failed to save campaign. Please try again.");
-      toast.error("Failed to save campaign.");
+      setError("Failed to add user");
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredData = tokenData.filter(
-    (item) =>
-      item.campaign_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.advertiseId && item.advertiseId.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  if (loading) {
+    return <CampaignLoader progress={progress} status={loadingStatus} />;
+  }
 
   return (
-    <div className="container my-5 position-relative">
-      <ToastContainer />
-      {/* Header */}
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <div>
-          <h1 className="display-5">Campaigns</h1>
-          <p className="text-muted">Manage your campaigns</p>
-        </div>
-        <button className="btn btn-primary d-flex align-items-center gap-2" onClick={handleAdd}>
-          <Plus size={20} /> Add Campaign
-        </button>
-      </div>
-
-      {/* Search & Count */}
-      <div className="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between mb-3 gap-2">
-        <div className="input-group" style={{ maxWidth: "400px" }}>
-          <span className="input-group-text">
-            <Search size={16} />
-          </span>
-          <input
-            type="text"
-            className="form-control"
-            placeholder="Search campaigns..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <div className="badge bg-primary fs-6">
-          {filteredData.length} campaigns
+    <div className="card">
+      <div className="card-body p-3 d-flex align-items-center justify-content-between">
+        <h5 className="fw-bold mb-0">Campaigns</h5>
+        <div className="d-flex gap-2 align-items-center">
+          <button
+            className="btn btn-sm btn-primary"
+            onClick={openAddModal}
+            title="Add Campaign"
+          >
+            <i className="feather-plus me-1"></i> Add
+          </button>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="table-responsive">
-        <table className="table table-hover align-middle">
-          <thead className="table-light">
-            <tr>
-              <th>Campaign</th>
-              <th>Advertiser ID</th>
-              <th className="text-end">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredData.length === 0 && (
+      <div className="card-body p-3">
+        <div className="table-responsive">
+          <table className="table table-hover table-striped table-sm">
+            <thead>
               <tr>
-                <td colSpan="3" className="text-center py-5">
-                  <div>
-                    <AlertCircle size={40} className="text-secondary mb-2" />
-                    <h5>No campaigns found</h5>
-                    <p className="text-muted">
-                      {searchTerm
-                        ? "Try adjusting your search terms"
-                        : "No campaigns available"}
-                    </p>
-                  </div>
-                </td>
+                <th>Report Name</th>
+                <th>Source</th>
+                <th>Advertiser ID</th>
+                <th>Campaign ID</th>
+                <th>Insertion Order ID</th>
+                <th>CPM</th>
+                <th>Currency</th>
+                <th className="text-end">Actions</th>
               </tr>
-            )}
-
-            {filteredData.map((item) => (
-              <tr key={item._id}>
-                <td>
-                  <div className="d-flex align-items-center">
+            </thead>
+            <tbody>
+              {loading && (
+                <tr>
+                  <td colSpan={5} className="text-center py-4">
                     <div
-                      className="bg-primary text-white rounded me-3 d-flex align-items-center justify-content-center"
-                      style={{ width: "40px", height: "40px" }}
-                    >
-                      {item.campaign_name.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="fw-bold">{item.campaign_name}</div>
-                    </div>
-                  </div>
-                </td>
-                <td>
-                  <span className="fw-medium">{item.advertiseId || "N/A"}</span>
-                </td>
-                <td className="text-end d-flex justify-content-end gap-2 flex-wrap">
-                  {/* Add Email Button (User Icon) */}
-                  <button
-                    className="btn btn-sm btn-outline-primary"
-                    onClick={() => handleOpenEmailModal(item._id)}
-                  >
-                    <UserPlus size={16} /> User
-                  </button>
+                      className="spinner-border spinner-border-sm me-2"
+                      role="status"
+                    ></div>
+                    Loading...
+                  </td>
+                </tr>
+              )}
 
-                  {/* Edit Button */}
-                  <button
-                    className="btn btn-sm btn-outline-success"
-                    onClick={() => handleEdit(item)}
-                  >
-                    <Pen size={16} /> Edit
-                  </button>
+              {!loading && campaigns.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="text-center py-4 text-muted">
+                    No campaigns yet. Click "Add" to create one.
+                  </td>
+                </tr>
+              )}
 
-                
-
-                  {/* Delete Button */}
-                  {deleteConfirm === item._id ? (
-                    <>
-                      <span className="align-self-center text-danger">
-                        Delete?
+              {!loading &&
+                campaigns.map((c, idx) => (
+                  <tr key={c._id || idx}>
+                    <td className="align-middle">{c.reportName}</td>
+                    <td className="align-middle">
+                      <span className={`badge ${c.source === 'Eskimi' ? 'bg-info' : 'bg-primary'}`}>
+                        {c.source || 'DV360'}
                       </span>
-                      <button
-                        className="btn btn-sm btn-danger"
-                        onClick={() => handleDelete(item._id)}
+                    </td>
+                    <td className="align-middle">{c.advertiserId}</td>
+                    <td className="align-middle">{c.campaignId || '-'}</td>
+                    <td className="align-middle">{c.insertionOrderId || '-'}</td>
+                    <td className="align-middle">{c.cpm}</td>
+                    <td className="align-middle">{c.currency || '-'}</td>
+                    <td className="text-end align-middle">
+                      {/* action buttons as a single row with gap and inline SVG icons */}
+                      <div
+                        className="d-flex align-items-center justify-content-end"
+                        style={{ gap: 8 }}
                       >
-                        Yes
-                      </button>
-                      <button
-                        className="btn btn-sm btn-secondary"
-                        onClick={() => setDeleteConfirm(null)}
-                      >
-                        No
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      className="btn btn-sm btn-outline-danger"
-                      onClick={() => setDeleteConfirm(item._id)}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                        <button
+                          className="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center"
+                          onClick={() => {
+                            openEmailModal(c._id);
+                          }}
+                          title="Add User"
+                          aria-label="Add User"
+                          style={{ width: 36, height: 36, padding: 0 }}
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M15 7a3 3 0 11-6 0 3 3 0 016 0z"
+                            />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M4 20a8 8 0 0116 0"
+                            />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M19 8v6m3-3h-6"
+                            />
+                          </svg>
+                        </button>
+
+                        <button
+                          className="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center"
+                          onClick={() => openEditModal(idx)}
+                          title="Edit"
+                          aria-label="Edit"
+                          style={{ width: 36, height: 36, padding: 0 }}
+                        >
+                          {/* edit SVG */}
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            aria-hidden="true"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M15.232 5.232l3.536 3.536M9 11l6 6H3v-6l6-6z"
+                            />
+                          </svg>
+                        </button>
+
+                        <button
+                          className="btn btn-sm btn-outline-danger d-flex align-items-center justify-content-center"
+                          onClick={() => handleDelete(c._id)}
+                          title="Delete"
+                          aria-label="Delete"
+                          style={{ width: 36, height: 36, padding: 0 }}
+                        >
+                          {/* trash SVG */}
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            aria-hidden="true"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* Modal - Basic Overlay Implementation */}
-      {showModal && (
-        <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
-          <div className="bg-white rounded shadow p-4" style={{ width: '100%', maxWidth: '500px' }}>
-            <div className="d-flex justify-content-between align-items-center mb-4">
-              <h4 className="m-0">{isEditing ? 'Edit Campaign' : 'Add New Campaign'}</h4>
-              <button className="btn btn-link text-dark p-0" onClick={() => setShowModal(false)}>
-                <X size={24} />
-              </button>
-            </div>
-            
-            {error && <div className="alert alert-danger">{error}</div>}
+      {modalOpen && (
+        <div className="modal-backdrop d-block">
+          <div
+            className="modal d-block"
+            tabIndex={-1}
+            style={{ display: "block" }}
+          >
+            <div className="modal-dialog modal-lg modal-dialog-centered">
+              <div className="modal-content">
+                <form onSubmit={handleSave}>
+                  <div className="modal-header">
+                    <h5 className="modal-title">
+                      {editingIndex !== null ? "Edit Campaign" : "Add Campaign"}
+                    </h5>
+                    <button
+                      type="button"
+                      className="btn-close"
+                      onClick={closeModal}
+                    ></button>
+                  </div>
+                  <div className="modal-body">
+                    <div className="row mb-4">
+                      <div className="col-4 d-flex align-items-center">
+                        <label className="fw-semibold mb-0">Data Source</label>
+                      </div>
+                      <div className="col-8">
+                        <div className="btn-group w-100" role="group">
+                          <button
+                            type="button"
+                            className={`btn btn-sm ${campaignData?.source === "DV360" ? "btn-primary" : "btn-outline-primary"}`}
+                            onClick={() => setCampaignData(prev => ({ ...prev, source: "DV360" }))}
+                          >
+                            DV360 (Pre-fetch to DB)
+                          </button>
+                          <button
+                            type="button"
+                            className={`btn btn-sm ${campaignData?.source === "Eskimi" ? "btn-primary" : "btn-outline-primary"}`}
+                            onClick={() => setCampaignData(prev => ({ ...prev, source: "Eskimi" }))}
+                          >
+                            Eskimi (Live Direct)
+                          </button>
+                        </div>
+                        <small className="text-muted mt-1 d-block">
+                          {campaignData?.source === "DV360" 
+                            ? "Requires IDs to fetch and store data in our database." 
+                            : "Connects directly to Eskimi APIs without storing report data."}
+                        </small>
+                      </div>
+                    </div>
 
-            <form onSubmit={handleSave}>
-              <div className="mb-3">
-                <label className="form-label">Campaign Name</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={formData.campaign_name}
-                  onChange={(e) => setFormData({ ...formData, campaign_name: e.target.value })}
-                  required
-                />
+                    <div className="row mb-3">
+                      <div className="col-4 d-flex align-items-center">
+                        <label className="fw-semibold mb-0">Report Name</label>
+                      </div>
+                      <div className="col-8">
+                        <input
+                          name="reportName"
+                          value={campaignData?.reportName || ""}
+                          onChange={handleInputChange}
+                          className="form-control"
+                          placeholder="e.g. Q1 Performance"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="row mb-3">
+                      <div className="col-4 d-flex align-items-center">
+                        <label className="fw-semibold mb-0">
+                          Advertiser ID
+                        </label>
+                      </div>
+                      <div className="col-8">
+                        <input
+                          name="advertiserId"
+                          value={campaignData?.advertiserId || ""}
+                          onChange={handleInputChange}
+                          className="form-control"
+                          placeholder="Advertiser ID"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {campaignData?.source === "DV360" && (
+                      <>
+                        <div className="row mb-3">
+                          <div className="col-4 d-flex align-items-center">
+                            <label className="fw-semibold mb-0">Campaign ID</label>
+                          </div>
+                          <div className="col-8">
+                            <input
+                              name="campaignId"
+                              value={campaignData?.campaignId || ""}
+                              onChange={handleInputChange}
+                              className="form-control"
+                              placeholder="Required for DV360"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="row mb-3">
+                          <div className="col-4 d-flex align-items-center">
+                            <label className="fw-semibold mb-0">
+                              Insertion Order ID
+                            </label>
+                          </div>
+                          <div className="col-8">
+                            <input
+                              name="insertionOrderId"
+                              value={campaignData?.insertionOrderId || ""}
+                              onChange={handleInputChange}
+                              className="form-control"
+                              placeholder="Required for DV360"
+                              required
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    <div className="row mb-3">
+                      <div className="col-4 d-flex align-items-center">
+                        <label className="fw-semibold mb-0">CPM</label>
+                      </div>
+                      <div className="col-8">
+                        <input
+                          type="number"
+                          name="cpm"
+                          value={campaignData?.cpm || ""}
+                          onChange={handleInputChange}
+                          className="form-control"
+                          placeholder="Enter CPM"
+                          min="0"
+                          step="0.01"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="row mb-3">
+                      <div className="col-4 d-flex align-items-center">
+                        <label className="fw-semibold mb-0">Currency</label>
+                      </div>
+                      <div className="col-8">
+                        <input
+                          type="text"
+                          name="currency"
+                          value={campaignData?.currency || ""}
+                          onChange={handleInputChange}
+                          className="form-control"
+                          placeholder="e.g. USD, EUR, GBP"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={closeModal}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn btn-primary"
+                      disabled={
+                        !(
+                          campaignData?.reportName?.trim() &&
+                          campaignData?.advertiserId?.trim() &&
+                          campaignData?.cpm?.toString().trim() &&
+                          (campaignData.source === "Eskimi" || (campaignData.campaignId?.trim() && campaignData.insertionOrderId?.trim()))
+                        )
+                      }
+                    >
+                      {editingIndex !== null ? "Update" : "Create"}
+                    </button>
+                  </div>
+                </form>
               </div>
-              <div className="mb-3">
-                <label className="form-label">Advertiser ID</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={formData.advertiseId}
-                  onChange={(e) => setFormData({ ...formData, advertiseId: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="d-flex justify-content-end gap-2">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={loading}>
-                  {loading ? 'Saving...' : (isEditing ? 'Update Campaign' : 'Create Campaign')}
-                </button>
-              </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Modal - Add Email */}
       {showEmailModal && (
-        <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
-          <div className="bg-white rounded shadow p-4" style={{ width: '100%', maxWidth: '400px' }}>
-            <div className="d-flex justify-content-between align-items-center mb-4">
-              <h4 className="m-0">Add Email to Campaign</h4>
-              <button className="btn btn-link text-dark p-0" onClick={() => setShowEmailModal(false)}>
-                <X size={24} />
-              </button>
-            </div>
-            
-            {error && <div className="alert alert-danger">{error}</div>}
+        <div className="modal fade show d-block" tabIndex="-1">
+          <div className="modal-dialog modal-sm modal-dialog-centered">
+            <div className="modal-content">
+              {/* Header */}
+              <div className="modal-header">
+                <h5 className="modal-title">Add User</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowEmailModal(false)}
+                ></button>
+              </div>
 
-            <form onSubmit={handleEmailSubmit}>
-              <div className="mb-3">
-                <label className="form-label">User Email</label>
+              {/* Body */}
+              <div className="modal-body">
+                <label className="form-label">Email</label>
                 <input
                   type="email"
                   className="form-control"
                   placeholder="Enter user email"
-                  value={emailData.email}
-                  onChange={(e) => setEmailData({ ...emailData, email: e.target.value })}
-                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
-              <div className="d-flex justify-content-end gap-2">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowEmailModal(false)}>
+
+              {/* Footer */}
+              <div className="modal-footer">
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setShowEmailModal(false)}
+                >
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary" disabled={loading}>
-                  {loading ? 'Adding...' : 'Add Email'}
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => handleAddUser()}
+                  disabled={!email}
+                >
+                  Add
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
@@ -379,4 +728,4 @@ const CampaignTable = () => {
   );
 };
 
-export default CampaignTable;
+export default Campaign;

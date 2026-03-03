@@ -1,474 +1,318 @@
 import { useEffect, useRef, useMemo } from "react";
 import { Chart } from "chart.js/auto";
-import { labels } from "@/components/tasks/TaskHeader";
 
-// Donut Chart Component
-const DonutChart = ({ percentage,value, total, label, color }) => {
+const DonutLarge = ({ value, percentage, label, color, showBoth }) => {
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
 
   useEffect(() => {
     if (chartRef.current) {
       const ctx = chartRef.current.getContext("2d");
-
-      if (chartInstance.current) {
-        chartInstance.current.destroy();
-      }
+      if (chartInstance.current) chartInstance.current.destroy();
 
       chartInstance.current = new Chart(ctx, {
         type: "doughnut",
         data: {
-          datasets: [
-            {
-              data: [value,total ],
-              backgroundColor: [color, "#E5E7EB"],
-              borderWidth: 0,
-            },
-          ],
+          datasets: [{
+            data: [parseFloat(percentage), 100 - parseFloat(percentage)],
+            backgroundColor: [color, "#F3F4F6"],
+            borderWidth: 0,
+          }],
         },
         options: {
-          cutout: "75%",
-          plugins: {
-            legend: { display: false },
-            tooltip: { enabled: false },
+          cutout: "85%",
+          plugins: { 
+            legend: { display: false }, 
+            tooltip: { enabled: false } 
           },
+          maintainAspectRatio: false,
+          animation: { duration: 1000 }
         },
       });
     }
-
-    return () => {
-      if (chartInstance.current) {
-        chartInstance.current.destroy();
-      }
-    };
-  }, [value, total, color]);
+    return () => { if (chartInstance.current) chartInstance.current.destroy(); };
+  }, [percentage, color]);
 
   return (
     <div className="text-center">
-      <div
-        className="position-relative d-inline-block"
-        style={{ width: "100px", height: "100px" }}
-      >
+      <div className="position-relative d-inline-block" style={{ width: "150px", height: "150px" }}>
         <canvas ref={chartRef}></canvas>
-        <div className="position-absolute top-50 start-50 translate-middle text-center">
-          <div className="fw-bold text-dark" style={{ fontSize: "16px" }}>
-            {value >= 1000 ? (value / 1000).toFixed(1) + "k" : value}
-          </div>
-          <div className="text-muted small">
-            {percentage}%
-          </div>
+        <div style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'none'
+        }}>
+          {showBoth ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.2 }}>
+              <span style={{ fontWeight: 700, color: '#111', fontSize: '18px' }}>{value}</span>
+              <span style={{ fontWeight: 700, color: '#111', fontSize: '16px' }}>{percentage}%</span>
+            </div>
+          ) : (
+            <span style={{ fontWeight: 700, color: '#111', fontSize: '18px' }}>{percentage}%</span>
+          )}
         </div>
       </div>
-      <p className="mt-2 mb-0 small fw-semibold text-secondary">{label}</p>
+      <p className="mt-3 mb-0 text-dark fw-bold" style={{ fontSize: '14px', letterSpacing: '0.3px', opacity: 0.9 }}>{label}</p>
     </div>
   );
 };
 
-
-
-const PerformanceLineChart = ({ tableData }) => {
+const TrendChart = ({ tableData }) => {
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
 
   useEffect(() => {
     if (!tableData || tableData.length === 0) return;
+    const ctx = chartRef.current.getContext("2d");
+    if (chartInstance.current) chartInstance.current.destroy();
 
-    const labels = tableData.map((row) => row.Date || "");
+    const labels = tableData.map((row) => row.Date || row.date || "");
+    const impressions = tableData.map((row) => Number(row.Impressions || row.impressions) || 0);
+    const clicks = tableData.map((row) => Number(row.Clicks || row.clicks) || 0);
+    const ctr = tableData.map((row) => {
+        const imp = Number(row.Impressions || row.impressions || 0);
+        const cks = Number(row.Clicks || row.clicks || 0);
+        return imp > 0 ? (cks / imp) * 100 : 0;
+    });
+    const cost = tableData.map((row) => Number(row.mediaCost || row.mediaCostAdvertiserCurrency || row.Spent || row.spent || row.cost) || 0);
 
-    const impressions = tableData.map((row) => row.Impressions || 0);
-    const engagement = tableData.map((row) => row.Engagement || 0);
-
-    // 🔧 FIXED: multiply per value
-    const clicks = tableData.map((row) => (row.Clicks || 0));
-    const ctr = tableData.map(
-      (row) => parseFloat(String(row.CTR).replace("%", "")) || 0
-    );
-    const cost = tableData.map((row) => (row.Spent || 0));
-
-    if (chartRef.current) {
-      const ctx = chartRef.current.getContext("2d");
-
-      if (chartInstance.current) {
-        chartInstance.current.destroy();
-      }
-
-      chartInstance.current = new Chart(ctx, {
-        type: "line",
-        data: {
-          labels,
-          datasets: [
-            {
-              label: "Impressions",
-              data: impressions,
-              yAxisID: "yLarge",
-              borderColor: "rgb(34,197,94)",
-              backgroundColor: "rgba(34,197,94,0.1)",
-              tension: 0.4,
-              fill: true,
-            },
-            {
-              label: "Engagement",
-              data: engagement,
-              yAxisID: "yLarge",
-              borderColor: "rgb(239,68,68)",
-              backgroundColor: "rgba(239,68,68,0.1)",
-              tension: 0.4,
-              fill: true,
-            },
-            {
-              label: "Clicks",
-              data: clicks,
-              yAxisID: "ySmall",
-              borderColor: "rgb(37,99,235)",
-              backgroundColor: "rgba(37,99,235,0.1)",
-              tension: 0.4,
-              fill: true,
-            },
-            {
-              label: "CTR (%)",
-              data: ctr,
-              yAxisID: "ySmall",
-              borderColor: "rgb(168,85,247)",
-              backgroundColor: "rgba(168,85,247,0.1)",
-              tension: 0.4,
-              fill: true,
-            },
-            {
-              label: "Cost",
-              data: cost,
-              yAxisID: "ySmall",
-              borderColor: "rgb(234,179,8)",
-              backgroundColor: "rgba(234,179,8,0.1)",
-              tension: 0.4,
-              fill: true,
-            },
-          ],
+    chartInstance.current = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Impressions",
+            data: impressions,
+            borderColor: "#2ECC71",
+            backgroundColor: "transparent",
+            tension: 0.4,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            pointStyle: 'rect',
+            pointBackgroundColor: "#2ECC71",
+            borderWidth: 2,
+            yAxisID: 'y',
+          },
+          {
+            label: "Clicks",
+            data: clicks,
+            borderColor: "#1F6FEB",
+            backgroundColor: "transparent",
+            tension: 0.4,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            pointStyle: 'rect',
+            pointBackgroundColor: "#1F6FEB",
+            borderWidth: 2,
+            yAxisID: 'y1',
+          },
+          {
+            label: "CTR",
+            data: ctr,
+            borderColor: "#9B59B6",
+            backgroundColor: "transparent",
+            tension: 0.4,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            pointStyle: 'rect',
+            pointBackgroundColor: "#9B59B6",
+            borderWidth: 2,
+            yAxisID: 'y2',
+          },
+          {
+            label: "Cost",
+            data: cost,
+            borderColor: "#F1C40F",
+            backgroundColor: "transparent",
+            tension: 0.4,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            pointStyle: 'rect',
+            pointBackgroundColor: "#F1C40F",
+            borderWidth: 2,
+            yAxisID: 'y3',
+          }
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {
+          padding: { top: 20, bottom: 5, left: 25, right: 25 }
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          interaction: {
-            mode: "index",
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            mode: 'index',
             intersect: false,
-          },
-          plugins: {
-            legend: {
-              position: "top",
-              align: "end",
-            },
-          },
-          scales: {
-            x: {
-              grid: { display: false },
-            },
-
-            // 🔹 Large values (Impressions, Engagement)
-            yLarge: {
-              type: "linear",
-              position: "left",
-              beginAtZero: true,
-              title: {
-                display: true,
-                text: "Impressions / Engagement",
-              },
-            },
-
-            // 🔹 Small values (Clicks, CTR, Cost)
-            ySmall: {
-              type: "linear",
-              position: "right",
-              beginAtZero: true,
-              grid: {
-                drawOnChartArea: false,
-              },
-              title: {
-                display: true,
-                text: "Clicks / CTR / Cost",
-              },
-            },
-          },
+            backgroundColor: 'rgba(255, 255, 255, 0.98)',
+            titleColor: '#111',
+            bodyColor: '#444',
+            borderColor: '#eee',
+            borderWidth: 1,
+            padding: 12,
+            usePointStyle: true,
+            boxWidth: 8,
+            boxHeight: 8
+          }
         },
-      });
-    }
-
-    return () => {
-      if (chartInstance.current) {
-        chartInstance.current.destroy();
-      }
-    };
+        scales: {
+          x: { 
+            grid: { display: true, color: 'rgba(0,0,0,0.03)', drawBorder: false }, 
+            ticks: { color: "#888", font: { size: 10 }, padding: 10 },
+            offset: true
+          },
+          y: { 
+            display: true,
+            beginAtZero: true,
+            grace: '15%',
+            grid: { color: 'rgba(0,0,0,0.05)', drawBorder: false },
+            ticks: { display: false }
+          },
+          y1: { display: false, beginAtZero: true, grace: '15%' },
+          y2: { display: false, beginAtZero: true, grace: '15%' },
+          y3: { display: false, beginAtZero: true, grace: '15%' },
+        },
+      },
+    });
+    return () => { if (chartInstance.current) chartInstance.current.destroy(); };
   }, [tableData]);
 
   return (
-    <div style={{ height: "400px" }}>
-      <canvas ref={chartRef}></canvas>
+    <div className="bg-white p-0 pb-4 mt-3 rounded shadow-sm border-0 overflow-hidden">
+      <div className="d-flex align-items-center mb-0 px-4 pt-4 pb-2">
+        <div className="d-flex align-items-center gap-2 me-auto">
+            <span className="fw-bold text-dark" style={{ fontSize: '15px' }}>Result</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-secondary opacity-50"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <div className="d-flex gap-5">
+             {[
+               { color: '#2ECC71', label: 'Impressions' },
+               { color: '#1F6FEB', label: 'Clicks' },
+               { color: '#9B59B6', label: 'CTR' },
+               { color: '#F1C40F', label: 'Cost' }
+             ].map((item, idx) => (
+                <div key={idx} className="d-flex align-items-center gap-2">
+                    <span style={{ width: '12px', height: '12px', backgroundColor: item.color, display: 'inline-block' }}></span>
+                    <span className="text-dark fw-bold" style={{ fontSize: '13px', opacity: 0.7 }}>{item.label}</span>
+                </div>
+             ))}
+        </div>
+      </div>
+      <div style={{ height: "350px", width: "100%" }} className="mt-3">
+        <canvas ref={chartRef}></canvas>
+      </div>
     </div>
   );
 };
 
-
-
-
-// Main Dashboard Component
-const PerformanceDashboard = ({ tableData }) => {
-  const aggregatedData = useMemo(() => {
-    const total = {
-      Impressions: 0,
-      Clicks: 0,
-      Reach: 0,
-      Spent: 0,
-      Engagement: 0,
-      ViewableImpressions: 0,
-      CTR: 0,
-      CPM: 0,
-      CPC: 0,
-      CPE: 0,
-      Viewablity: 0,
-      ER:0,
-      ReachPercentage:0
-    };
-
+export const PerformanceDashboard = ({ tableData, currencySymbol = "$" }) => {
+  const stats = useMemo(() => {
+    const total = { Imp: 0, Clicks: 0, Reach: 0, Spent: 0, SumCPM: 0, SumCPC: 0 };
+    if (tableData?.length > 0) console.log("PerformanceDashboard input data:", tableData[0]);
     tableData?.forEach((item) => {
-      total.Impressions += Number(item.Impressions) || 0;
-      total.Clicks += Number(item.Clicks) || 0;
-      total.Reach += Number(item.Reach) || 0;
-      total.Spent += Number(item.Spent) || 0;
-      total.Engagement += Number(item.Engagement) || 0;
-      total.CTR = total.Impressions ? ((total.Clicks / total.Impressions) * 100).toFixed(2) : 0;
-      total.CPM = total.Impressions ? ((total.Spent / total.Impressions) * 1000).toFixed(2) : 0;
-      total.CPC = total.Clicks ? (total.Spent / total.Clicks).toFixed(2) : 0;
-      total.CPE = total.Engagement ? (total.Spent / total.Engagement).toFixed(2) : 0;
-      total.ViewableImpressions += Number(item.ViewableImpressions) || 0;
-      total.Viewablity = total.Impressions ? ((total.ViewableImpressions / total.Impressions) * 100).toFixed(2) : 0;
-      total.ER= total.Engagement ? ((total.Engagement / total.Impressions) * 100).toFixed(2) : 0;
-      total.ReachPercentage = total.Impressions ? ((total.Reach / total.Impressions) * 100).toFixed(2) : 0;
+      const imp = Number(item.Impressions || item.impressions || 0);
+      const clicks = Number(item.Clicks || item.clicks || 0);
+      const spent = Number(item.mediaCost || item.mediaCostAdvertiserCurrency || item.Spent || item.spent || item.cost || 0);
+      let cpm = Number(item.CPM || item.cpm || 0);
+      if (!cpm && imp > 0) cpm = (spent / imp) * 1000;
+      
+      let cpc = Number(item.CPC || item.cpc || 0);
+      if (!cpc && clicks > 0) cpc = (spent / clicks);
 
-
+      total.Imp += imp;
+      total.Clicks += clicks;
+      total.Reach += Number(item.Reach || item.reach || item.total_reach || item.uniqueReachImpressionReach || 0);
+      total.Spent += spent;
+      total.SumCPM += (cpm * imp);
+      total.SumCPC += (cpc * clicks);
     });
 
-
-
-    return [total];
+    const safeDiv = (a, b) => (b ? ((a / b) * 100).toFixed(2) : "0.00");
+    return {
+      total,
+      CTR: safeDiv(total.Clicks, total.Imp),
+      ReachPct: safeDiv(total.Reach, total.Imp),
+      CPC: total.Clicks ? (total.SumCPC / total.Clicks).toFixed(2) : "0.00",
+      CPM: total.Imp ? (total.SumCPM / total.Imp).toFixed(2) : "0.00",
+      Spent: total.Spent.toFixed(2)
+    };
   }, [tableData]);
-  console.log("Aggregated Data:", aggregatedData);
-
-   const total = aggregatedData[0] || {};
-
-
 
   return (
-    <div className="bg-light min-vh-100 py-4">
-      <div className="container-fluid">
-        {/* Header */}
-        <div className="mb-4">
-          <h1 className="h3 fw-bold text-dark mb-1">Performance Dashboard</h1>
-          <p className="text-muted small mb-0">
-            Overview of campaign metrics and analytics
-          </p>
+    <div className="mb-4">
+      {/* Tabs */}
+      <div className="d-flex mb-0">
+        <div className="px-5 py-3 fw-bold text-dark border-bottom border-primary border-4 bg-white" style={{ fontSize: '18px', cursor: 'pointer', zIndex: 2, letterSpacing: '0.5px' }}>
+          Performance
         </div>
+        <div className="flex-grow-1 bg-light border-bottom border-light opacity-50"></div>
+      </div>
 
-        {/* Top Section - Metrics Overview */}
-        <div className="card border-0 shadow-sm mb-4">
-          <div className="card-body p-4">
-            <div className="row">
-              {/* Left Side - Main Metrics & Donuts */}
-              <div className="col-lg-8">
-                {/* Big Numbers */}
-                <div className="row mb-4">
-                  <div className="col-md-6 mb-3 mb-md-0">
-                    <div className="d-flex align-items-center gap-3">
-                      <div className="bg-primary bg-opacity-10 rounded-3 p-3">
-                        <svg
-                          width="32"
-                          height="32"
-                          fill="currentColor"
-                          className="bi bi-emoji-smile text-white"
-                          viewBox="0 0 16 16"
-                        >
-                          <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
-                          <path d="M4.285 12.433a.5.5 0 0 0 .683-.183A3.498 3.498 0 0 1 8 10.5c1.295 0 2.426.703 3.032 1.75a.5.5 0 0 0 .866-.5A4.498 4.498 0 0 0 8 9.5a4.5 4.5 0 0 0-3.898 2.25.5.5 0 0 0 .183.683zM7 6.5C7 7.328 6.552 8 6 8s-1-.672-1-1.5S5.448 5 6 5s1 .672 1 1.5zm4 0c0 .828-.448 1.5-1 1.5s-1-.672-1-1.5S9.448 5 10 5s1 .672 1 1.5z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <h2 className="h2 fw-bold text-dark mb-0">{total.Impressions}</h2>
-                        <p className="text-muted mb-0 small">
-                          Total Impressions
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="col-md-6">
-                    <div className="d-flex align-items-center gap-3">
-                      <div className="bg-success bg-opacity-10 rounded-3 p-3">
-                        <svg
-                          width="32"
-                          height="32"
-                          fill="currentColor"
-                          className="text-white"
-                          viewBox="0 0 16 16"
-                        >
-                          <path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
-                          <path
-                            fillRule="evenodd"
-                            d="M5.216 14A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1h4.216z"
-                          />
-                          <path d="M4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <h2 className="h2 fw-bold text-dark mb-0">{total.Reach}</h2>
-                        <p className="text-muted mb-0 small">Total Reach</p>
-                      </div>
-                    </div>
-                  </div>
+      <div className="card border-0 shadow-sm overflow-hidden bg-white" style={{ borderRadius: '0 0 4px 4px', zIndex: 1 }}>
+        <div className="card-body p-0">
+          <div className="row g-0">
+            {/* Left Content */}
+            <div className="col-lg-9 border-end border-light">
+              <div className="row g-0 text-center">
+                <div className="col-6 py-4" style={{ backgroundColor: '#D6E4FF' }}>
+                  <h3 className="fw-bold text-dark mb-1" style={{ fontSize: '24px' }}>{stats.total.Imp.toLocaleString()}</h3>
+                  <p className="text-dark small fw-bold mb-0 opacity-75">Impressions</p>
                 </div>
-
-                {/* Donut Charts */}
-              <div className="row g-3">
-                  <div className="col-6 col-md-4 col-lg">
-                    <div className="p-3 bg-light rounded-3 h-100">
-                      <DonutChart
-                        percentage={total.ER}
-                        value={total.Engagement}
-                        total={total.Impressions}
-                        label="Engagement"
-                        color="#3B82F6"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="col-6 col-md-4 col-lg">
-                    <div className="p-3 bg-light rounded-3 h-100">
-                      <DonutChart
-                        percentage={total.ReachPercentage}
-                        value={total.Reach}
-                        total={total.Impressions}
-                        label="Reach"
-                        color="#16A34A"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="col-6 col-md-4 col-lg">
-                    <div className="p-3 bg-light rounded-3 h-100">
-                      <DonutChart
-                        percentage={total.Viewablity}
-                        value={total.ViewableImpressions}
-                        total={total.Impressions}
-                        label="Viewable impr."
-                        color="#F59E0B"
-                      />
-                    </div>
-                  </div>
-
-
-                  <div className="col-6 col-md-4 col-lg">
-                    <div className="p-3 bg-light rounded-3 h-100">
-                      <DonutChart
-                        percentage={total.CTR}
-                        value={total.Clicks}
-                        total={total.Impressions}
-                        label="Clicks"
-                        color="#EF4444"
-                      />
-                    </div>
-                  </div>
+                <div className="col-6 py-4" style={{ backgroundColor: '#EDF2FF' }}>
+                  <h3 className="fw-bold text-dark mb-1" style={{ fontSize: '24px' }}>{stats.total.Reach.toLocaleString()}</h3>
+                  <p className="text-dark small fw-bold mb-0 opacity-75">Reach</p>
                 </div>
               </div>
-
-
-              {/* Right Side - Performance Stats */}
-              <div className="col-lg-4 mt-4 mt-lg-0">
-                <div className="card border-0 shadow-sm h-100">
-                  <div className="card-body p-4">
-                    <div className="d-flex align-items-center mb-4">
-                      <svg
-                        width="24"
-                        height="24"
-                        fill="currentColor"
-                        className="me-2 text-primary"
-                        viewBox="0 0 16 16"
-                      >
-                        <path d="M2.5 8a5.5 5.5 0 0 1 8.25-4.764.5.5 0 0 0 .5-.866A6.5 6.5 0 1 0 14.5 8a.5.5 0 0 0-1 0 5.5 5.5 0 1 1-11 0z" />
-                        <path d="M15.354 3.354a.5.5 0 0 0-.708-.708L8 9.293 5.354 6.646a.5.5 0 1 0-.708.708l3 3a.5.5 0 0 0 .708 0l7-7z" />
-                      </svg>
-                      <h3 className="h5 fw-bold mb-0 text-dark">
-                        Performance Metrics
-                      </h3>
-                    </div>
-
-                    <div className="d-flex flex-column gap-3">
-                      <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded-3 shadow-sm">
-                        <span className="text-muted small fw-medium">CTR</span>
-                        <span className="fw-bold text-dark">{total.CTR}%</span>
-                      </div>
-
-                      <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded-3 shadow-sm">
-                        <span className="text-muted small fw-medium">CPC</span>
-                        <span className="fw-bold text-success">${total.CPC}</span>
-                      </div>
-
-                      <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded-3 shadow-sm">
-                        <span className="text-muted small fw-medium">CPE</span>
-                        <span className="fw-bold text-info">${total.CPE}</span>
-                      </div>
-
-                      <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded-3 shadow-sm">
-                        <span className="text-muted small fw-medium">CPM</span>
-                        <span className="fw-bold text-warning">${total.CPM}</span>
-                      </div>
-
-                      <div className="d-flex justify-content-between align-items-center p-3 bg-primary bg-opacity-10 rounded-3 border border-primary">
-                        <span className="text-white fw-semibold small">
-                          Total Spent
-                        </span>
-                        <span className="fw-bold text-white h5 mb-0">
-                          ${total.Spent}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+              <div className="row py-5 align-items-center">
+                <div className="col-6 d-flex flex-column align-items-center">
+                  <DonutLarge percentage={stats.ReachPct} label="Reach" color="#3B82F6" />
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Line Chart Section */}
-        <div className="card border-0 shadow-sm">
-          <div className="card-header bg-white border-bottom py-3">
-            <div className="d-flex justify-content-between align-items-center">
-              <h3 className="h5 fw-bold text-dark mb-0">
-                <svg
-                  width="20"
-                  height="20"
-                  fill="currentColor"
-                  className="me-2"
-                  viewBox="0 0 16 16"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M0 0h1v15h15v1H0V0zm10 3.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0V4.9l-3.613 4.417a.5.5 0 0 1-.74.037L7.06 6.767l-3.656 5.027a.5.5 0 0 1-.808-.588l4-5.5a.5.5 0 0 1 .758-.06l2.609 2.61L13.445 4H10.5a.5.5 0 0 1-.5-.5z"
+                <div className="col-6 d-flex flex-column align-items-center border-start border-light" style={{ height: '220px', justifyContent: 'center' }}>
+                  <DonutLarge 
+                    value={stats.total.Clicks.toLocaleString()} 
+                    percentage={stats.CTR} 
+                    label="Clicks" 
+                    color="#3B82F6" 
+                    showBoth 
                   />
-                </svg>
-                Performance Trends
-              </h3>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="card-body p-4">
-            <PerformanceLineChart tableData={tableData} totals={total} />
+
+            {/* Right Sidebar */}
+            <div className="col-lg-3 p-4 bg-white d-flex flex-column align-items-center">
+              <div className="mb-5 w-100 text-end pe-4 mt-2">
+                <h5 className="fw-bold text-dark mb-0" style={{ fontSize: '18px' }}>Performance</h5>
+              </div>
+              <div className="d-flex flex-column gap-4 w-100 px-4">
+                <div className="d-flex justify-content-between align-items-center">
+                  <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>CTR</span>
+                  <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{stats.CTR}%</span>
+                </div>
+                <div className="d-flex justify-content-between align-items-center">
+                  <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>CPC</span>
+                  <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{currencySymbol}{stats.CPC}</span>
+                </div>
+                <div className="d-flex justify-content-between align-items-center">
+                  <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>CPM</span>
+                  <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{currencySymbol}{stats.CPM}</span>
+                </div>
+                <div className="d-flex justify-content-between align-items-center">
+                  <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>Spent</span>
+                  <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{currencySymbol}{stats.Spent}</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <style>{`
-        .card {
-          transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-        
-        .card:hover {
-          transform: translateY(-2px);
-        }
-      `}</style>
+      <TrendChart tableData={tableData} />
     </div>
   );
 };
