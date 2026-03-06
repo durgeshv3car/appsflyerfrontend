@@ -2,29 +2,49 @@
 import React, { useState } from "react";
 import { Modal, Button, Form } from "react-bootstrap";
 import { FiChevronLeft, FiChevronRight, FiChevronDown, FiPlus } from "react-icons/fi";
+import { useSession } from "next-auth/react";
+import { useEffect } from "react";
 
 const columnsList = [
   { name: "Title", defaultVisible: true },
   { name: "Impressions", defaultVisible: true },
   { name: "Clicks", defaultVisible: true },
-  { name: "Reach", defaultVisible: true },
   { name: "CTR", defaultVisible: true },
-  { name: "CPM", defaultVisible: true },
-  { name: "CPC", defaultVisible: true },
-  { name: "Spent", defaultVisible: true },
+  { name: "CPM", defaultVisible: true, permission: "cpm" },
+  { name: "CPC", defaultVisible: true, permission: "cpm" },
+  { name: "Spent", defaultVisible: true, permission: "spent" },
   { name: "Total Conversions", defaultVisible: true },
 ];
 
 const CreativePerformanceTable = ({ CreativeTableData = [], currencySymbol = "$" }) => {
-  const [visibleColumns, setVisibleColumns] = useState(
-    columnsList.filter((col) => col.defaultVisible).map((col) => col.name)
-  );
+  const { data: session } = useSession();
+
+  const filteredColumnsByPermission = columnsList.filter(col => {
+    if (session?.user?.role === "super_admin") return true;
+    if (!col.permission) return true;
+    return session?.user?.permissions?.some(p => p.toLowerCase() === col.permission.toLowerCase());
+  });
+
+  const [visibleColumns, setVisibleColumns] = useState([]);
+
+  useEffect(() => {
+    if (filteredColumnsByPermission.length > 0) {
+      const allowedNames = filteredColumnsByPermission.map(c => c.name);
+      setVisibleColumns(prev => {
+        if (prev.length === 0) {
+          return filteredColumnsByPermission.filter(col => col.defaultVisible).map(col => col.name);
+        }
+        return prev.filter(name => allowedNames.includes(name));
+      });
+    }
+  }, [session, filteredColumnsByPermission.length]);
+
   const [show, setShow] = useState(false);
   const [search, setSearch] = useState("");
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const filteredColumns = columnsList.filter((col) =>
+  const filteredColumns = filteredColumnsByPermission.filter((col) =>
     col.name.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -41,7 +61,6 @@ const CreativePerformanceTable = ({ CreativeTableData = [], currencySymbol = "$"
   const totals = CreativeTableData?.reduce((acc, row) => {
     const imp = Number(row.Impressions || row.impressions || 0);
     const clicks = Number(row.Clicks || row.clicks || 0);
-    const reach = Number(row.Reach || row.reach || row.total_reach || row.uniqueReachImpressionReach || 0);
     const spent = Number(row.mediaCost || row.mediaCostAdvertiserCurrency || row.Spent || row.spent || row.cost || 0);
     const totalConversions = Number(row.TotalConversions || row.totalConversions || row.total_conversions || 0);
     
@@ -55,18 +74,17 @@ const CreativePerformanceTable = ({ CreativeTableData = [], currencySymbol = "$"
     return {
       Impressions: acc.Impressions + imp,
       Clicks: acc.Clicks + clicks,
-      Reach: acc.Reach + reach,
       Spent: acc.Spent + spent,
       "Total Conversions": (acc["Total Conversions"] || 0) + totalConversions,
       SumCPM: (acc.SumCPM || 0) + (cpm * imp),
       SumCPC: (acc.SumCPC || 0) + (cpc * clicks),
     };
-  }, { Impressions: 0, Clicks: 0, Reach: 0, Spent: 0, "Total Conversions": 0, SumCPM: 0, SumCPC: 0 });
+  }, { Impressions: 0, Clicks: 0, Spent: 0, "Total Conversions": 0, SumCPM: 0, SumCPC: 0 });
 
   const formatValue = (col, value) => {
     if (col === "Title") return value || "-";
     if (value === undefined || value === null) return "0";
-    if (col === "Impressions" || col === "Clicks" || col === "Reach" || col === "Total Conversions") {
+    if (col === "Impressions" || col === "Clicks" || col === "Total Conversions") {
       return isNaN(Number(value)) ? (value || "0") : Number(value).toLocaleString();
     }
     if (col === "Spent" || col === "CPM" || col === "CPC") {
@@ -109,7 +127,6 @@ const CreativePerformanceTable = ({ CreativeTableData = [], currencySymbol = "$"
                     // Base metrics normalization
                     const imp = Number(row.Impressions || row.impressions || 0);
                     const cks = Number(row.Clicks || row.clicks || 0);
-                    const rch = Number(row.Reach || row.reach || row.total_reach || row.uniqueReachImpressionReach || 0);
                     const spt = Number(row.mediaCost || row.mediaCostAdvertiserCurrency || row.Spent || row.spent || row.cost || 0);
                     const cnv = Number(row.TotalConversions || row.totalConversions || row.total_conversions || 0);
 
@@ -121,7 +138,6 @@ const CreativePerformanceTable = ({ CreativeTableData = [], currencySymbol = "$"
                     // Priority mappings
                     if (col === "Impressions") val = imp;
                     if (col === "Clicks") val = cks;
-                    if (col === "Reach") val = rch;
                     if (col === "Spent") val = spt;
                     if (col === "Total Conversions") val = cnv;
                     

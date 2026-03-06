@@ -29,6 +29,7 @@ const ProfileModal = () => {
 
 
   const handleLogout = async () => {
+    localStorage.clear();
     await signOut({ redirect: false });
     router.push("/");
   };

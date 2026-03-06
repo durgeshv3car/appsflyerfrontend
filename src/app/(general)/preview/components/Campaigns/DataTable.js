@@ -1,7 +1,8 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Modal, Button, Form } from "react-bootstrap";
 import { FiChevronLeft, FiChevronRight, FiChevronDown, FiPlus } from "react-icons/fi";
+import { useSession } from "next-auth/react";
 
 const columnsList = [
   { name: "Date", defaultVisible: true },
@@ -10,22 +11,46 @@ const columnsList = [
   { name: "Frequency", defaultVisible: true },
   { name: "Clicks", defaultVisible: true },
   { name: "CTR", defaultVisible: true },
-  { name: "CPM", defaultVisible: true },
-  { name: "CPC", defaultVisible: true },
-  { name: "Spent", defaultVisible: true },
+  { name: "CPM", defaultVisible: true, permission: "cpm" },
+  { name: "CPC", defaultVisible: true, permission: "cpm" }, // Assuming CPC follows CPM permission
+  { name: "Spent", defaultVisible: true, permission: "spent" },
   { name: "Total Conversions", defaultVisible: true },
 ];
 
 const PerformanceTable = ({ tableData, currencySymbol = "$" }) => {
-  const [visibleColumns, setVisibleColumns] = useState(
-    columnsList.filter((col) => col.defaultVisible).map((col) => col.name)
-  );
+  const { data: session } = useSession();
+  
+  const filteredColumnsByPermission = columnsList.filter(col => {
+    if (session?.user?.role === "super_admin") return true;
+    if (!col.permission) return true;
+    return session?.user?.permissions?.includes(col.permission.toLowerCase());
+  });
+
+  const [visibleColumns, setVisibleColumns] = useState([]);
+
+  useEffect(() => {
+    if (filteredColumnsByPermission.length > 0) {
+      // Get the set of currently allowed column names
+      const allowedNames = filteredColumnsByPermission.map(c => c.name);
+      
+      setVisibleColumns(prev => {
+        // If it's the first load (prev is empty), use defaults
+        if (prev.length === 0) {
+          return filteredColumnsByPermission
+            .filter((col) => col.defaultVisible)
+            .map((col) => col.name);
+        }
+        // Otherwise, filter the existing visible columns to only include allowed ones
+        return prev.filter(name => allowedNames.includes(name));
+      });
+    }
+  }, [session, filteredColumnsByPermission.length]);
   const [show, setShow] = useState(false);
   const [search, setSearch] = useState("");
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const filteredColumns = columnsList.filter((col) =>
+  const filteredColumns = filteredColumnsByPermission.filter((col) =>
     col.name.toLowerCase().includes(search.toLowerCase())
   );
 

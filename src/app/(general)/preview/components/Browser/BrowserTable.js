@@ -2,28 +2,49 @@
 import React, { useState } from "react";
 import { Modal, Button, Form } from "react-bootstrap";
 import { FiChevronLeft, FiChevronRight, FiChevronDown, FiPlus } from "react-icons/fi";
+import { useSession } from "next-auth/react";
+import { useEffect } from "react";
 
 const columnsList = [
   { name: "Title", defaultVisible: true },
   { name: "Impressions", defaultVisible: true },
   { name: "Clicks", defaultVisible: true },
   { name: "CTR", defaultVisible: true },
-  { name: "CPM", defaultVisible: true },
-  { name: "CPC", defaultVisible: true },
-  { name: "Spent", defaultVisible: true },
+  { name: "CPM", defaultVisible: true, permission: "cpm" },
+  { name: "CPC", defaultVisible: true, permission: "cpm" },
+  { name: "Spent", defaultVisible: true, permission: "spent" },
   { name: "Total Conversions", defaultVisible: true },
 ];
 
 const BrowserTable = ({ browserData = [], currencySymbol = "$" }) => {
-  const [visibleColumns, setVisibleColumns] = useState(
-    columnsList.filter((col) => col.defaultVisible).map((col) => col.name)
-  );
+  const { data: session } = useSession();
+
+  const filteredColumnsByPermission = columnsList.filter(col => {
+    if (session?.user?.role === "super_admin") return true;
+    if (!col.permission) return true;
+    return session?.user?.permissions?.some(p => p.toLowerCase() === col.permission.toLowerCase());
+  });
+
+  const [visibleColumns, setVisibleColumns] = useState([]);
+  
+  useEffect(() => {
+    if (filteredColumnsByPermission.length > 0) {
+      const allowedNames = filteredColumnsByPermission.map(c => c.name);
+      setVisibleColumns(prev => {
+        if (prev.length === 0) {
+          return filteredColumnsByPermission.filter(col => col.defaultVisible).map(col => col.name);
+        }
+        return prev.filter(name => allowedNames.includes(name));
+      });
+    }
+  }, [session, filteredColumnsByPermission.length]);
+
   const [show, setShow] = useState(false);
   const [search, setSearch] = useState("");
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const filteredColumns = columnsList.filter((col) =>
+  const filteredColumns = filteredColumnsByPermission.filter((col) =>
     col.name.toLowerCase().includes(search.toLowerCase())
   );
 

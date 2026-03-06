@@ -26,6 +26,7 @@ export const loginUser = async ({ email, password }) => {
  */
 export const logoutUser = async () => {
   try {
+    localStorage.clear();
     await signOut({ redirect: true, callbackUrl: "/" });
   } catch (error) {
     console.error("Logout error:", error);

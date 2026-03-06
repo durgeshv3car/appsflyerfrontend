@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import { getCurrencySymbol } from "@/utils/currencySymbol";
 import PerformanceDashboard from "./components/PerformanceChart";
 import TableWithDynamicColumns from "./components/Campaigns/DataTable";
@@ -627,23 +627,25 @@ const CampaignDashboard = () => {
 
   return (
     <div className="bg-light min-vh-100 ">
-      <ReportsFilter
-        tableData={tableData.tableData}
-        filters={filters}
-        setFilters={setFilters}
-        fetchCampaignData={fetchCampaignData}
-        fetchCreativeTableData={fetchCreativeTableData}
-        fetchAgeData={fetchAgeData}
-        fetchGenderData={fetchGenderData}
-        fetchTotalData={fetchTotalData}
-        fetchOsData={fetchOsData}
-        fetchBrowserData={fetchBrowserData}
-        fetchOperatorData={fetchOperatorData}
-        fetchPlacementPosData={fetchPlacementPosData}
-        fetchPlacementTypeData={fetchPlacementTypeData}
-        fetchDeviceData={fetchDeviceData}
-        fetchSyncData={fetchSyncData}
-      />
+      <Suspense fallback={<div className="p-4 text-center">Loading filters...</div>}>
+        <ReportsFilter
+          tableData={tableData.tableData}
+          filters={filters}
+          setFilters={setFilters}
+          fetchCampaignData={fetchCampaignData}
+          fetchCreativeTableData={fetchCreativeTableData}
+          fetchAgeData={fetchAgeData}
+          fetchGenderData={fetchGenderData}
+          fetchTotalData={fetchTotalData}
+          fetchOsData={fetchOsData}
+          fetchBrowserData={fetchBrowserData}
+          fetchOperatorData={fetchOperatorData}
+          fetchPlacementPosData={fetchPlacementPosData}
+          fetchPlacementTypeData={fetchPlacementTypeData}
+          fetchDeviceData={fetchDeviceData}
+          fetchSyncData={fetchSyncData}
+        />
+      </Suspense>
 
       <div className="container-fluid py-4" id="dashboard-content">
         <div className="row g-4">

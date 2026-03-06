@@ -1,5 +1,6 @@
-import { useEffect, useRef, useMemo } from "react";
+import { useEffect, useRef, useMemo, useState } from "react";
 import { Chart } from "chart.js/auto";
+import { useSession } from "next-auth/react";
 
 const DonutLarge = ({ value, percentage, label, color, showBoth }) => {
   const chartRef = useRef(null);
@@ -63,6 +64,10 @@ const DonutLarge = ({ value, percentage, label, color, showBoth }) => {
 const TrendChart = ({ tableData }) => {
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
+  const { data: session } = useSession();
+
+  const hasSpent = session?.user?.role === "super_admin" || session?.user?.permissions?.some(p => p.toLowerCase() === "spent");
+  const hasCPM = session?.user?.role === "super_admin" || session?.user?.permissions?.some(p => p.toLowerCase() === "cpm");
 
   useEffect(() => {
     if (!tableData || tableData.length === 0) return;
@@ -79,64 +84,69 @@ const TrendChart = ({ tableData }) => {
     });
     const cost = tableData.map((row) => Number(row.mediaCost || row.mediaCostAdvertiserCurrency || row.Spent || row.spent || row.cost) || 0);
 
+    const datasets = [
+      {
+        label: "Impressions",
+        data: impressions,
+        borderColor: "#2ECC71",
+        backgroundColor: "transparent",
+        tension: 0.4,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        pointStyle: 'rect',
+        pointBackgroundColor: "#2ECC71",
+        borderWidth: 2,
+        yAxisID: 'y',
+      },
+      {
+        label: "Clicks",
+        data: clicks,
+        borderColor: "#1F6FEB",
+        backgroundColor: "transparent",
+        tension: 0.4,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        pointStyle: 'rect',
+        pointBackgroundColor: "#1F6FEB",
+        borderWidth: 2,
+        yAxisID: 'y1',
+      },
+      {
+        label: "CTR",
+        data: ctr,
+        borderColor: "#9B59B6",
+        backgroundColor: "transparent",
+        tension: 0.4,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        pointStyle: 'rect',
+        pointBackgroundColor: "#9B59B6",
+        borderWidth: 2,
+        yAxisID: 'y2',
+      }
+    ];
+
+    if (hasSpent) {
+      datasets.push({
+        label: "Cost",
+        data: cost,
+        borderColor: "#F1C40F",
+        backgroundColor: "transparent",
+        tension: 0.4,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        pointStyle: 'rect',
+        pointBackgroundColor: "#F1C40F",
+        borderWidth: 2,
+        yAxisID: 'y3',
+      });
+    }
+
     chartInstance.current = new Chart(ctx, {
       type: "line",
       data: {
         labels,
-        datasets: [
-          {
-            label: "Impressions",
-            data: impressions,
-            borderColor: "#2ECC71",
-            backgroundColor: "transparent",
-            tension: 0.4,
-            pointRadius: 4,
-            pointHoverRadius: 6,
-            pointStyle: 'rect',
-            pointBackgroundColor: "#2ECC71",
-            borderWidth: 2,
-            yAxisID: 'y',
-          },
-          {
-            label: "Clicks",
-            data: clicks,
-            borderColor: "#1F6FEB",
-            backgroundColor: "transparent",
-            tension: 0.4,
-            pointRadius: 4,
-            pointHoverRadius: 6,
-            pointStyle: 'rect',
-            pointBackgroundColor: "#1F6FEB",
-            borderWidth: 2,
-            yAxisID: 'y1',
-          },
-          {
-            label: "CTR",
-            data: ctr,
-            borderColor: "#9B59B6",
-            backgroundColor: "transparent",
-            tension: 0.4,
-            pointRadius: 4,
-            pointHoverRadius: 6,
-            pointStyle: 'rect',
-            pointBackgroundColor: "#9B59B6",
-            borderWidth: 2,
-            yAxisID: 'y2',
-          },
-          {
-            label: "Cost",
-            data: cost,
-            borderColor: "#F1C40F",
-            backgroundColor: "transparent",
-            tension: 0.4,
-            pointRadius: 4,
-            pointHoverRadius: 6,
-            pointStyle: 'rect',
-            pointBackgroundColor: "#F1C40F",
-            borderWidth: 2,
-            yAxisID: 'y3',
-          }
-        ],
+        datasets,
       },
       options: {
         responsive: true,
@@ -180,7 +190,14 @@ const TrendChart = ({ tableData }) => {
       },
     });
     return () => { if (chartInstance.current) chartInstance.current.destroy(); };
-  }, [tableData]);
+  }, [tableData, hasSpent]);
+
+  const legendItems = [
+    { color: '#2ECC71', label: 'Impressions' },
+    { color: '#1F6FEB', label: 'Clicks' },
+    { color: '#9B59B6', label: 'CTR' }
+  ];
+  if (hasSpent) legendItems.push({ color: '#F1C40F', label: 'Cost' });
 
   return (
     <div className="bg-white p-0 pb-4 mt-3 rounded shadow-sm border-0 overflow-hidden">
@@ -190,12 +207,7 @@ const TrendChart = ({ tableData }) => {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-secondary opacity-50"><path d="M6 9l6 6 6-6"/></svg>
         </div>
         <div className="d-flex gap-5">
-             {[
-               { color: '#2ECC71', label: 'Impressions' },
-               { color: '#1F6FEB', label: 'Clicks' },
-               { color: '#9B59B6', label: 'CTR' },
-               { color: '#F1C40F', label: 'Cost' }
-             ].map((item, idx) => (
+             {legendItems.map((item, idx) => (
                 <div key={idx} className="d-flex align-items-center gap-2">
                     <span style={{ width: '12px', height: '12px', backgroundColor: item.color, display: 'inline-block' }}></span>
                     <span className="text-dark fw-bold" style={{ fontSize: '13px', opacity: 0.7 }}>{item.label}</span>
@@ -211,9 +223,13 @@ const TrendChart = ({ tableData }) => {
 };
 
 export const PerformanceDashboard = ({ tableData, currencySymbol = "$" }) => {
+  const { data: session } = useSession();
+  
+  const hasSpent = session?.user?.role === "super_admin" || session?.user?.permissions?.some(p => p.toLowerCase() === "spent");
+  const hasCPMValue = session?.user?.role === "super_admin" || session?.user?.permissions?.some(p => p.toLowerCase() === "cpm");
+
   const stats = useMemo(() => {
     const total = { Imp: 0, Clicks: 0, Reach: 0, Spent: 0, SumCPM: 0, SumCPC: 0 };
-    if (tableData?.length > 0) console.log("PerformanceDashboard input data:", tableData[0]);
     tableData?.forEach((item) => {
       const imp = Number(item.Impressions || item.impressions || 0);
       const clicks = Number(item.Clicks || item.clicks || 0);
@@ -294,18 +310,24 @@ export const PerformanceDashboard = ({ tableData, currencySymbol = "$" }) => {
                   <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>CTR</span>
                   <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{stats.CTR}%</span>
                 </div>
-                <div className="d-flex justify-content-between align-items-center">
-                  <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>CPC</span>
-                  <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{currencySymbol}{stats.CPC}</span>
-                </div>
-                <div className="d-flex justify-content-between align-items-center">
-                  <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>CPM</span>
-                  <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{currencySymbol}{stats.CPM}</span>
-                </div>
-                <div className="d-flex justify-content-between align-items-center">
-                  <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>Spent</span>
-                  <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{currencySymbol}{stats.Spent}</span>
-                </div>
+                {hasCPMValue && (
+                  <>
+                    <div className="d-flex justify-content-between align-items-center">
+                      <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>CPC</span>
+                      <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{currencySymbol}{stats.CPC}</span>
+                    </div>
+                    <div className="d-flex justify-content-between align-items-center">
+                      <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>CPM</span>
+                      <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{currencySymbol}{stats.CPM}</span>
+                    </div>
+                  </>
+                )}
+                {hasSpent && (
+                  <div className="d-flex justify-content-between align-items-center">
+                    <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>Spent</span>
+                    <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{currencySymbol}{stats.Spent}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

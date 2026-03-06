@@ -50,7 +50,7 @@ const Menus = () => {
     if (userDetails.role === "super_admin") {
       return !permissionsAdmin.includes(menu.name);
     }
-    const permissionsUser = ["dashboards", "Lms","preview"];
+    const permissionsUser = ["dashboards", "Lms","reports", "Preview List"];
     return permissionsUser.includes(menu.name);
   });
 

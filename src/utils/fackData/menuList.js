@@ -1,11 +1,5 @@
 export const menuList = [
     {
-        id: 0,
-        name: "dashboards",
-        path: "/dashboards",
-        icon: 'feather-airplay',        
-    },
-    {
         id: 1,
         name: "users",
         path: "/users",
@@ -22,20 +16,20 @@ export const menuList = [
 
      {
         id: 4,
-        name: "previewList",
+        name: "Preview List",
         path: `/preview-list`,
         icon: 'feather-eye',        
     },
     {
         id: 5,
-        name: "preview",
+        name: "reports",
         path: `/preview`,
         icon: 'feather-layout',        
     },
     
        {
         id: 4,
-        name: "createAccount",
+        name: "Create Account",
         path: `/authentication/register/creative`,
         icon: 'feather-send',        
     },

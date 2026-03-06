@@ -38,10 +38,10 @@ export const authOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
+        token.id = user._id || user.id;
         token.email = user.email;
         token.name = user.name;
-        token.role=user.role
+        token.role = user.role;
         token.token = user.token; 
       }
       return token;
@@ -51,18 +51,21 @@ export const authOptions = {
       
 
       try {
-       const res =await axios.get(`${API_BASE_URL}/auth/user/${token.id}`, {
+        const res = await axios.get(`${API_BASE_URL}/auth/user/${token.id}`, {
           headers: {
             Authorization: `Bearer ${token.token}`,
           },
         });
         
-
+        const userData = res.data?.user || res.data;
+        
         if (session?.user) {
           session.user.id = token.id;
-          session.user.email = token.email;
+          session.user.email = token.email || userData?.email;
           session.user.token = token.token;
-          session.user.role=token.role
+          session.user.role = userData?.role || token.role;
+          session.user.permissions = (userData?.permissions || []).map(p => p.toLowerCase());
+          session.user.audienceId = userData?.audienceId || [];
         }
 
         return session;

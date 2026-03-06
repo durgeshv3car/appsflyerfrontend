@@ -1,4 +1,7 @@
+"use client";
 import React, { useState, useEffect, useRef } from "react";
+import { useSession } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 import Select from "react-select";
 import { DateRange } from "react-date-range";
 import { FiCalendar, FiChevronDown, FiFileText, FiDownload } from "react-icons/fi";
@@ -17,6 +20,7 @@ import "react-date-range/dist/styles.css";
 import "react-date-range/dist/theme/default.css";
 import { getCampaignIdData, getSiteIdData } from "@/services/creativeData";
 import { getAudience } from "@/services/createaudience";
+import { downloadCSV, downloadExcel } from "@/services/export";
 
 /** ✅ SAFE DATE FORMATTER (NO UTC BUG) */
 const formatDateToYMD = (date) => {
@@ -43,16 +47,19 @@ const ReportsFilter = ({
   fetchDeviceData,
   fetchSyncData,
 }) => {
+  const { data: session } = useSession();
+  const searchParams = useSearchParams();
+  const queryAdvertiser = searchParams.get("advertiser");
   const [advertisers, setAdvertisers] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [isPdfLoading, setIsPdfLoading] = useState(false);
+  const [isCsvLoading, setIsCsvLoading] = useState(false);
+  const [isExcelLoading, setIsExcelLoading] = useState(false);
 
   const [showCalendar, setShowCalendar] = useState(false);
 
   const wrapperRef = useRef(null);
-
-  // Filter Dates (Strings in YMD format, synced with filters)
-  // Local state for the picker (Date objects)
+  
   const [range, setRange] = useState([
     {
       startDate: new Date(),
@@ -61,46 +68,104 @@ const ReportsFilter = ({
     },
   ]);
 
-
-
+  // Helper to find audience by ID or advertiserId
+  const findAudience = (list, id) => {
+    return list?.find(a => a.advertiserId === id || a._id === id);
+  }
 
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Load from localStorage on mount - ONLY RUN ONCE
+  // Load from localStorage/URL/Session on mount
   useEffect(() => {
     const savedFilters = localStorage.getItem("campaignFilteredData");
-    if (savedFilters) {
-      const parsed = JSON.parse(savedFilters);
-      // Ensure currency field exists (may be missing from older saved data)
-      if (!parsed.currency) parsed.currency = "";
-      setFilters(parsed);
+    let initialFilters = null;
 
-      // Restore local date objects for calendars (avoiding UTC shift)
-      if (parsed.dateRange?.startDate && parsed.dateRange?.endDate) {
-        const [sy, sm, sd] = parsed.dateRange.startDate.split("-").map(Number);
-        const [ey, em, ed] = parsed.dateRange.endDate.split("-").map(Number);
-        setRange([{
-          startDate: new Date(sy, sm - 1, sd),
-          endDate: new Date(ey, em - 1, ed),
-          key: "selection"
-        }]);
+    if (savedFilters) {
+      initialFilters = JSON.parse(savedFilters);
+      if (!initialFilters.currency) initialFilters.currency = "";
+    }
+
+    const applyFilters = (targetFilters) => {
+       setFilters(targetFilters);
+       // Restore local date objects for calendars (avoiding UTC shift)
+       if (targetFilters.dateRange?.startDate && targetFilters.dateRange?.endDate) {
+         const [sy, sm, sd] = targetFilters.dateRange.startDate.split("-").map(Number);
+         const [ey, em, ed] = targetFilters.dateRange.endDate.split("-").map(Number);
+         setRange([{
+           startDate: new Date(sy, sm - 1, sd),
+           endDate: new Date(ey, em - 1, ed),
+           key: "selection"
+         }]);
+       }
+       
+       fetchCampaignData(targetFilters);
+       fetchCreativeTableData(targetFilters);
+       fetchAgeData(targetFilters);
+       fetchGenderData(targetFilters);
+       fetchTotalData(targetFilters);
+       fetchOsData(targetFilters);
+       fetchBrowserData(targetFilters);
+       fetchOperatorData(targetFilters);
+       fetchPlacementPosData(targetFilters);
+       fetchPlacementTypeData(targetFilters);
+       fetchDeviceData(targetFilters);
+    };
+
+    const handleInitialState = async () => {
+      let finalAudiences = session?.user?.audienceId || [];
+      
+      // If we only have IDs, fetch the details so we can find advertiserId etc.
+      if (finalAudiences.length > 0 && typeof finalAudiences[0] === 'string') {
+        const res = await getAudience();
+        if (res?.data) {
+          finalAudiences = res.data.filter(a => finalAudiences.includes(a._id));
+        }
       }
 
-      // Automatically fetch data when values found in localStorage
-      fetchCampaignData(parsed);
-      fetchCreativeTableData(parsed);
-      fetchAgeData(parsed);
-      fetchGenderData(parsed);
-      fetchTotalData(parsed);
-      fetchOsData(parsed);
-      fetchBrowserData(parsed);
-      fetchOperatorData(parsed);
-      fetchPlacementPosData(parsed);
-      fetchPlacementTypeData(parsed);
-      fetchDeviceData(parsed);
+      // 1. Check Query Params first
+      if (queryAdvertiser && finalAudiences.length > 0) {
+        const aud = findAudience(finalAudiences, queryAdvertiser);
+        if (aud) {
+           const isDV360 = aud.source === "DV360" || aud.reportName?.endsWith("_d");
+           applyFilters({
+             ...filters,
+             advertiser: aud.advertiserId,
+             source: isDV360 ? "DV360" : "Eskimi",
+             insertionOrderId: aud.insertionOrderId || "",
+             audienceId: aud._id || "",
+             currency: aud.currency || "",
+           });
+           setIsLoaded(true);
+           return;
+        }
+      }
+
+      // 2. Fallback to LocalStorage
+      if (initialFilters) {
+        applyFilters(initialFilters);
+      } 
+      // 3. Fallback to first permitted audience for users
+      else if (session?.user?.role !== "super_admin" && finalAudiences.length > 0) {
+        const firstAudience = finalAudiences[0];
+        const isDV360 = firstAudience.source === "DV360" || firstAudience.reportName?.endsWith("_d");
+        applyFilters({
+          ...filters,
+          advertiser: firstAudience.advertiserId,
+          source: isDV360 ? "DV360" : "Eskimi",
+          insertionOrderId: firstAudience.insertionOrderId || "",
+          audienceId: firstAudience._id || "",
+          currency: firstAudience.currency || "",
+        });
+      }
+      setIsLoaded(true);
+    };
+
+    if (session) {
+      handleInitialState();
+      fetchAdvertisers();
     }
-    setIsLoaded(true);
-  }, []); // Run only ONCE on mount to prevent infinite loops
+  }, [session, queryAdvertiser]); 
+
 
   // Save to localStorage when filters change (DISABLED AUTOMATIC SAVE)
   /*
@@ -114,7 +179,7 @@ const ReportsFilter = ({
   useEffect(() => {
     fetchAdvertisers();
     if (filters.advertiser) fetchAdvertisersCampaign();
-  }, [filters.advertiser, filters.source]); // Added filters.source to dependencies
+  }, [filters.advertiser, filters.source, session]); // Added filters.source and session to dependencies
 
   // Close calendar on outside click
   useEffect(() => {
@@ -198,9 +263,29 @@ const ReportsFilter = ({
   };
 
   const fetchAdvertisers = async () => {
-    const res = await getAudience();
-    console.log("Advertisers:", res);
-    if (res?.data) setAdvertisers(res.data);
+    if (session?.user?.role === "super_admin") {
+      const res = await getAudience();
+      if (res?.data) setAdvertisers(res.data);
+    } else if (session?.user?.audienceId) {
+      const userAudiences = session.user.audienceId;
+      
+      // Check if audienceId array contains IDs (strings) or Objects
+      if (userAudiences.length > 0 && typeof userAudiences[0] === 'string') {
+        // It's an array of IDs, need to fetch their details
+        try {
+          const res = await getAudience();
+          if (res?.data) {
+            const permitted = res.data.filter(a => userAudiences.includes(a._id));
+            setAdvertisers(permitted);
+          }
+        } catch (error) {
+          console.error("Failed to fetch audience details for user", error);
+        }
+      } else {
+        // It's already an array of objects
+        setAdvertisers(userAudiences);
+      }
+    }
   };
 
   const UpdateData = () => {
@@ -386,9 +471,26 @@ const ReportsFilter = ({
     }
   };
 
-  const handleExportData = (type) => {
-    alert(`Exporting ${type.toUpperCase()}... The API call will be integrated as requested.`);
-    // User mentioned: "i will add api call for csv and excel"
+  const handleExportData = async (type) => {
+    if (type === 'csv') {
+      setIsCsvLoading(true);
+      try {
+        await downloadCSV(filters);
+      } catch (error) {
+        alert("Failed to download CSV");
+      } finally {
+        setIsCsvLoading(false);
+      }
+    } else if (type === 'excel') {
+      setIsExcelLoading(true);
+      try {
+        await downloadExcel(filters);
+      } catch (error) {
+        alert("Failed to download Excel");
+      } finally {
+        setIsExcelLoading(false);
+      }
+    }
   };
 
   return (
@@ -414,16 +516,26 @@ const ReportsFilter = ({
             <button 
               className="btn btn-outline-success btn-sm d-flex align-items-center gap-2 px-3 py-2" 
               onClick={() => handleExportData('csv')} 
-              style={{ borderRadius: '8px', fontWeight: '600', fontSize: '13px', transition: 'all 0.2s' }}
+              disabled={isCsvLoading}
+              style={{ borderRadius: '8px', fontWeight: '600', fontSize: '13px', transition: 'all 0.2s', minWidth: 120 }}
             >
-               <FiDownload size={16} /> Export CSV
+               {isCsvLoading ? (
+                 <><span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Downloading…</>
+               ) : (
+                 <><FiDownload size={16} /> Export CSV</>
+               )}
             </button>
             <button 
               className="btn btn-outline-primary btn-sm d-flex align-items-center gap-2 px-3 py-2" 
               onClick={() => handleExportData('excel')} 
-              style={{ borderRadius: '8px', fontWeight: '600', fontSize: '13px', transition: 'all 0.2s' }}
+              disabled={isExcelLoading}
+              style={{ borderRadius: '8px', fontWeight: '600', fontSize: '13px', transition: 'all 0.2s', minWidth: 120 }}
             >
-               <FiDownload size={16} /> Export Excel
+               {isExcelLoading ? (
+                 <><span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Downloading…</>
+               ) : (
+                 <><FiDownload size={16} /> Export Excel</>
+               )}
             </button>
           </div>
         </div>
@@ -450,6 +562,10 @@ const ReportsFilter = ({
                     height: '42px',
                     borderRadius: '8px',
                     borderColor: '#e2e8f0'
+                  }),
+                  menu: (base) => ({
+                    ...base,
+                    zIndex: 9999
                   })
                 }}
                 onChange={(selected) => {
@@ -488,6 +604,10 @@ const ReportsFilter = ({
                       minHeight: '42px',
                       borderRadius: '8px',
                       borderColor: '#e2e8f0'
+                    }),
+                    menu: (base) => ({
+                      ...base,
+                      zIndex: 9999
                     })
                   }}
                   onChange={(selected) =>

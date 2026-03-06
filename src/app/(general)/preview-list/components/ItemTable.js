@@ -8,6 +8,7 @@ const ItemTable = ({
   deleteConfirm,
   setDeleteConfirm,
   handleDelete,
+  isEditable = true,
 }) => {
   return (
     <div className="table-responsive">
@@ -19,13 +20,13 @@ const ItemTable = ({
             <th>Description</th>
             <th>Preview URL</th>
             <th>File</th>
-            <th className="text-end">Actions</th>
+            {isEditable && <th className="text-end">Actions</th>}
           </tr>
         </thead>
         <tbody>
           {items.length === 0 ? (
             <tr>
-              <td colSpan="6" className="text-center py-5">
+              <td colSpan={isEditable ? "6" : "5"} className="text-center py-5">
                 <div>
                   <AlertCircle size={40} className="text-secondary mb-2" />
                   <h5>No items found</h5>
@@ -37,7 +38,7 @@ const ItemTable = ({
             items.map((item) => (
               <tr key={item.id}>
                 <td>
-                  {item.logo ? (
+                  {item.logo && typeof item.logo !== "string" ? (
                     <img
                       src={URL.createObjectURL(item.logo)}
                       alt="Logo"
@@ -73,43 +74,45 @@ const ItemTable = ({
                     "-"
                   )}
                 </td>
-                <td className="text-end d-flex justify-content-end gap-2 flex-wrap">
-                  <button
-                    className="btn btn-sm btn-outline-warning"
-                    onClick={() => {
-                      setShowEdit(item);
-                      setFormData(item);
-                    }}
-                  >
-                    <Pencil size={16} /> Edit
-                  </button>
-                  {deleteConfirm === item.id ? (
-                    <>
-                      <span className="align-self-center text-danger">
-                        Delete?
-                      </span>
-                      <button
-                        className="btn btn-sm btn-danger"
-                        onClick={() => handleDelete(item.id)}
-                      >
-                        <Check size={16} />
-                      </button>
-                      <button
-                        className="btn btn-sm btn-secondary"
-                        onClick={() => setDeleteConfirm(null)}
-                      >
-                        <X size={16} />
-                      </button>
-                    </>
-                  ) : (
+                {isEditable && (
+                  <td className="text-end d-flex justify-content-end gap-2 flex-wrap">
                     <button
-                      className="btn btn-sm btn-outline-danger"
-                      onClick={() => setDeleteConfirm(item.id)}
+                      className="btn btn-sm btn-outline-warning"
+                      onClick={() => {
+                        setShowEdit(item);
+                        setFormData(item);
+                      }}
                     >
-                      <Trash2 size={16} />
+                      <Pencil size={16} /> Edit
                     </button>
-                  )}
-                </td>
+                    {deleteConfirm === item.id ? (
+                      <>
+                        <span className="align-self-center text-danger">
+                          Delete?
+                        </span>
+                        <button
+                          className="btn btn-sm btn-danger"
+                          onClick={() => handleDelete(item.id)}
+                        >
+                          <Check size={16} />
+                        </button>
+                        <button
+                          className="btn btn-sm btn-secondary"
+                          onClick={() => setDeleteConfirm(null)}
+                        >
+                          <X size={16} />
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        className="btn btn-sm btn-outline-danger"
+                        onClick={() => setDeleteConfirm(item.id)}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </td>
+                )}
               </tr>
             ))
           )}
