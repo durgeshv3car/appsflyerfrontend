@@ -1,5 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef, Suspense } from "react";
+import { useSession } from "next-auth/react";
+import { jwtDecode } from "jwt-decode";
 import { getCurrencySymbol } from "@/utils/currencySymbol";
 import PerformanceDashboard from "./components/PerformanceChart";
 import TableWithDynamicColumns from "./components/Campaigns/DataTable";
@@ -110,6 +112,38 @@ const CampaignDashboard = () => {
     audienceId: "",
     currency: "",
   });
+  const [updateTrigger, setUpdateTrigger] = useState(0);
+
+  const handleUpdate = () => {
+    localStorage.setItem("campaignFilteredData", JSON.stringify(filters));
+    setUpdateTrigger(prev => prev + 1);
+  };
+
+  const { data: session } = useSession();
+  const [userPermissions, setUserPermissions] = useState([]);
+  const [userRole, setUserRole] = useState("");
+
+  useEffect(() => {
+    if (session?.user?.permissions) {
+      setUserPermissions(session.user.permissions);
+      setUserRole(session.user.role || "");
+    } else if (session?.user?.token) {
+      try {
+        const decoded = jwtDecode(session.user.token);
+        setUserPermissions(decoded.permissions || []);
+        setUserRole(decoded.role || "");
+      } catch (e) {
+        console.error("Token decode error", e);
+      }
+    }
+  }, [session]);
+
+  const hasPermission = (key) => {
+    if (userRole === "super_admin") return true;
+    // Blacklist logic: show if key is NOT in permissions
+    return !userPermissions.includes(key);
+  };
+
   console.log("Filters in Dashboard:", filters);
 
   const extractData = (res, specificKey) => {
@@ -567,6 +601,7 @@ const CampaignDashboard = () => {
     [filters],
   );
 
+
   const fetchSyncData = React.useCallback(
     async (currentFilters = filters) => {
       if (currentFilters.source !== "DV360" || !currentFilters.audienceId)
@@ -625,6 +660,43 @@ const CampaignDashboard = () => {
     ],
   );
 
+  const fetchAllData = React.useCallback(async (targetFilters = filters) => {
+    console.log("Fetching all data with filters:", targetFilters);
+    fetchCampaignData(targetFilters);
+    fetchCreativeTableData(targetFilters);
+    fetchAgeData(targetFilters);
+    fetchGenderData(targetFilters);
+    fetchTotalData(targetFilters);
+    fetchOsData(targetFilters);
+    fetchBrowserData(targetFilters);
+    fetchOperatorData(targetFilters);
+    fetchPlacementPosData(targetFilters);
+    fetchPlacementTypeData(targetFilters);
+    fetchDeviceData(targetFilters);
+    fetchSyncData(targetFilters);
+  }, [
+    filters,
+    fetchCampaignData,
+    fetchCreativeTableData,
+    fetchAgeData,
+    fetchGenderData,
+    fetchTotalData,
+    fetchOsData,
+    fetchBrowserData,
+    fetchOperatorData,
+    fetchPlacementPosData,
+    fetchPlacementTypeData,
+    fetchDeviceData,
+    fetchSyncData
+  ]);
+
+  useEffect(() => {
+    if (updateTrigger > 0) {
+      fetchAllData(filters);
+    }
+  }, [updateTrigger, fetchAllData]);
+
+
   return (
     <div className="bg-light min-vh-100 ">
       <Suspense fallback={<div className="p-4 text-center">Loading filters...</div>}>
@@ -644,114 +716,154 @@ const CampaignDashboard = () => {
           fetchPlacementTypeData={fetchPlacementTypeData}
           fetchDeviceData={fetchDeviceData}
           fetchSyncData={fetchSyncData}
+          handleUpdate={handleUpdate}
         />
       </Suspense>
 
       <div className="container-fluid py-4" id="dashboard-content">
         <div className="row g-4">
-          <div className="col-12">
-            <PerformanceDashboard
-              tableData={tableData.graphData}
-              currencySymbol={getCurrencySymbol(filters.currency)}
-            />
-          </div>
+          {hasPermission("performance_graph") && (
+            <div className="col-12">
+              <PerformanceDashboard
+                tableData={tableData.graphData}
+                currencySymbol={getCurrencySymbol(filters.currency)}
+              />
+            </div>
+          )}
 
-          <div className="col-12">
-            <TableWithDynamicColumns
-              tableData={tableData.tableData}
-              currencySymbol={getCurrencySymbol(filters.currency)}
-            />
-          </div>
+          {hasPermission("performance_table") && (
+            <div className="col-12">
+              <TableWithDynamicColumns
+                tableData={tableData.tableData}
+                currencySymbol={getCurrencySymbol(filters.currency)}
+                // TableWithDynamicColumns handles its internal column permissions (cpm/spent) separately
+              />
+            </div>
+          )}
 
-          <div className="col-12">
-            <WeekdayDistribution tableData={tableData.graphData} weekData={weekData} />
-          </div>
+          {hasPermission("delivery_by_weekday") && (
+            <div className="col-12">
+              <WeekdayDistribution tableData={tableData.graphData} weekData={weekData} />
+            </div>
+          )}
 
-          <div className="col-12">
-            <CreativePerformance
-              CreativeTableData={CreativeTableData.graphData}
-            />
-          </div>
+          {hasPermission("creative_performance_graph") && (
+            <div className="col-12">
+              <CreativePerformance
+                CreativeTableData={CreativeTableData.graphData}
+              />
+            </div>
+          )}
 
           <div className="col-lg-12">
             <div className="row g-4 mt-2">
-              <div className="col-md-6">
-                <GenderChart genderData={genderData.graphData} />
-              </div>
-              <div className="col-md-6">
-                <AgeChart ageData={ageData.graphData} />
-              </div>
+              {hasPermission("platform_gender") && (
+                <div className="col-md-6">
+                  <GenderChart genderData={genderData.graphData} />
+                </div>
+              )}
+              {hasPermission("platform_age") && (
+                <div className="col-md-6">
+                  <AgeChart ageData={ageData.graphData} />
+                </div>
+              )}
             </div>
           </div>
 
           <div className="col-12 mt-5">
             <div className="row g-4">
-              <div className="col-md-6">
-                <BrowserDistribution browserData={browserData.graphData} />
-              </div>
-              <div className="col-md-6">
-                <OperatorDistribution operatorData={operatorData.graphData} />
-              </div>
-              <div className="col-md-6">
-                <DeviceDistribution deviceData={deviceData.graphData} />
-              </div>
+              {hasPermission("browser_distribution") && (
+                <div className="col-md-6">
+                  <BrowserDistribution browserData={browserData.graphData} />
+                </div>
+              )}
+              {hasPermission("operator_distribution") && (
+                <div className="col-md-6">
+                  <OperatorDistribution operatorData={operatorData.graphData} />
+                </div>
+              )}
+              {hasPermission("device_distribution") && (
+                <div className="col-md-6">
+                  <DeviceDistribution deviceData={deviceData.graphData} />
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="col-12 mt-4">
-            <BrowserPerformance browserData={browserData.graphData} />
-          </div>
-          <div className="col-12">
-            <BrowserTable
-              browserData={browserData.tableData}
-              currencySymbol={getCurrencySymbol(filters.currency)}
-            />
-          </div>
+          {hasPermission("browser_graph") && (
+            <div className="col-12 mt-4">
+              <BrowserPerformance browserData={browserData.graphData} />
+            </div>
+          )}
+          {hasPermission("browser_table") && (
+            <div className="col-12">
+              <BrowserTable
+                browserData={browserData.tableData}
+                currencySymbol={getCurrencySymbol(filters.currency)}
+              />
+            </div>
+          )}
 
-          <div className="col-12 mt-4">
-            <OperatorPerformance operatorData={operatorData.graphData} />
-          </div>
-          <div className="col-12">
-            <OperatorTable
-              operatorData={operatorData.tableData}
-              currencySymbol={getCurrencySymbol(filters.currency)}
-            />
-          </div>
+          {hasPermission("operator_graph") && (
+            <div className="col-12 mt-4">
+              <OperatorPerformance operatorData={operatorData.graphData} />
+            </div>
+          )}
+          {hasPermission("operator_table") && (
+            <div className="col-12">
+              <OperatorTable
+                operatorData={operatorData.tableData}
+                currencySymbol={getCurrencySymbol(filters.currency)}
+              />
+            </div>
+          )}
 
-          <div className="col-12 mt-5">
-            <OsPerformance osData={osData.graphData} />
-          </div>
-          <div className="col-12">
-            <OsDistribution osData={osData.graphData} />
-          </div>
-          <div className="col-12">
-            <OsTable
-              osData={osData.tableData}
-              currencySymbol={getCurrencySymbol(filters.currency)}
-            />
-          </div>
+          {hasPermission("os_graph") && (
+            <div className="col-12 mt-5">
+              <OsPerformance osData={osData.graphData} />
+            </div>
+          )}
+          {hasPermission("os_distribution") && (
+            <div className="col-12">
+              <OsDistribution osData={osData.graphData} />
+            </div>
+          )}
+          {hasPermission("os_table") && (
+            <div className="col-12">
+              <OsTable
+                osData={osData.tableData}
+                currencySymbol={getCurrencySymbol(filters.currency)}
+              />
+            </div>
+          )}
 
           <div className="col-12 mt-5">
             <div className="row g-4">
-              <div className="col-md-6">
-                <PlacementPosDistribution
-                  placementPosData={placementPosData.graphData}
-                />
-              </div>
-              <div className="col-md-6">
-                <PlacementTypeDistribution
-                  placementTypeData={placementTypeData.graphData}
-                />
-              </div>
+              {hasPermission("placement_pos_distribution") && (
+                <div className="col-md-6">
+                  <PlacementPosDistribution
+                    placementPosData={placementPosData.graphData}
+                  />
+                </div>
+              )}
+              {hasPermission("placement_interstitial_distribution") && (
+                <div className="col-md-6">
+                  <PlacementTypeDistribution
+                    placementTypeData={placementTypeData.graphData}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="col-12">
-            <CreativeTable
-              CreativeTableData={CreativeTableData.tableData}
-              currencySymbol={getCurrencySymbol(filters.currency)}
-            />
-          </div>
+          {hasPermission("creative_performance_graph_table") && (
+            <div className="col-12">
+              <CreativeTable
+                CreativeTableData={CreativeTableData.tableData}
+                currencySymbol={getCurrencySymbol(filters.currency)}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>

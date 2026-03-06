@@ -46,6 +46,7 @@ const ReportsFilter = ({
   fetchPlacementTypeData,
   fetchDeviceData,
   fetchSyncData,
+  handleUpdate,
 }) => {
   const { data: session } = useSession();
   const searchParams = useSearchParams();
@@ -58,8 +59,10 @@ const ReportsFilter = ({
 
   const [showCalendar, setShowCalendar] = useState(false);
 
+  const initializedRef = useRef(false);
+  const lastQueryRef = useRef(null);
   const wrapperRef = useRef(null);
-  
+
   const [range, setRange] = useState([
     {
       startDate: new Date(),
@@ -68,15 +71,27 @@ const ReportsFilter = ({
     },
   ]);
 
-  // Helper to find audience by ID or advertiserId
+  const getAudId = (a) => {
+    if (!a) return null;
+    const id = a?._id || a;
+    return (typeof id === 'object' && id?.$oid) ? id.$oid : String(id);
+  };
+
+  // Helper to find audience strictly by its unique MongoDB _id or advertiserId fallback
   const findAudience = (list, id) => {
-    return list?.find(a => a.advertiserId === id || a._id === id);
+    const searchId = String(id);
+    return list?.find(a => getAudId(a) === searchId || String(a.advertiserId) === searchId);
   }
 
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Load from localStorage/URL/Session on mount
   useEffect(() => {
+    // If queryAdvertiser changed, we might need a re-init from query
+    const queryChanged = queryAdvertiser && queryAdvertiser !== lastQueryRef.current;
+    
+    if (initializedRef.current && !queryChanged) return;
+
     const savedFilters = localStorage.getItem("campaignFilteredData");
     let initialFilters = null;
 
@@ -122,9 +137,12 @@ const ReportsFilter = ({
         }
       }
 
-      // 1. Check Query Params first
+      // 1. Check Query Params first (STRICT ID LOOKUP)
       if (queryAdvertiser && finalAudiences.length > 0) {
-        const aud = findAudience(finalAudiences, queryAdvertiser);
+        const queryStr = String(queryAdvertiser);
+        // Try finding by _id (unique) first
+        const aud = finalAudiences.find(a => getAudId(a) === queryStr);
+        
         if (aud) {
            const isDV360 = aud.source === "DV360" || aud.reportName?.endsWith("_d");
            applyFilters({
@@ -132,11 +150,32 @@ const ReportsFilter = ({
              advertiser: aud.advertiserId,
              source: isDV360 ? "DV360" : "Eskimi",
              insertionOrderId: aud.insertionOrderId || "",
-             audienceId: aud._id || "",
+             audienceId: getAudId(aud),
              currency: aud.currency || "",
            });
            setIsLoaded(true);
+           lastQueryRef.current = queryAdvertiser;
+           initializedRef.current = true;
            return;
+        } else {
+           // Fallback: If it's a numerical ID, match by advertiserId
+           const matches = finalAudiences.filter(a => String(a.advertiserId) === queryStr);
+           if (matches.length === 1) {
+              const match = matches[0];
+              const isDV360 = match.source === "DV360" || match.reportName?.endsWith("_d");
+              applyFilters({
+                ...filters,
+                advertiser: match.advertiserId,
+                source: isDV360 ? "DV360" : "Eskimi",
+                insertionOrderId: match.insertionOrderId || "",
+                audienceId: getAudId(match),
+                currency: match.currency || "",
+              });
+              setIsLoaded(true);
+              lastQueryRef.current = queryAdvertiser;
+              initializedRef.current = true;
+              return;
+           }
         }
       }
 
@@ -153,11 +192,12 @@ const ReportsFilter = ({
           advertiser: firstAudience.advertiserId,
           source: isDV360 ? "DV360" : "Eskimi",
           insertionOrderId: firstAudience.insertionOrderId || "",
-          audienceId: firstAudience._id || "",
+          audienceId: getAudId(firstAudience),
           currency: firstAudience.currency || "",
         });
       }
       setIsLoaded(true);
+      initializedRef.current = true;
     };
 
     if (session) {
@@ -179,7 +219,7 @@ const ReportsFilter = ({
   useEffect(() => {
     fetchAdvertisers();
     if (filters.advertiser) fetchAdvertisersCampaign();
-  }, [filters.advertiser, filters.source, session]); // Added filters.source and session to dependencies
+  }, [filters.audienceId, filters.source, session]); // Trigger refresh on specific audience change
 
   // Close calendar on outside click
   useEffect(() => {
@@ -194,13 +234,13 @@ const ReportsFilter = ({
 
   const handleApply = () => {
     const { startDate, endDate } = range[0];
-    setFilters({
-      ...filters,
+    setFilters(prev => ({
+      ...prev,
       dateRange: {
         startDate: formatDateToYMD(startDate),
         endDate: formatDateToYMD(endDate),
       },
-    });
+    }));
     setShowCalendar(false);
   };
 
@@ -289,20 +329,26 @@ const ReportsFilter = ({
   };
 
   const UpdateData = () => {
-    // Save to localStorage ONLY when Update button is clicked
-    localStorage.setItem("campaignFilteredData", JSON.stringify(filters));
-    fetchCampaignData(filters);
-    fetchCreativeTableData(filters);
-    fetchAgeData(filters);
-    fetchGenderData(filters);
-    fetchTotalData(filters);
-    fetchOsData(filters);
-    fetchBrowserData(filters);
-    fetchOperatorData(filters);
-    fetchPlacementPosData(filters);
-    fetchPlacementTypeData(filters);
-    fetchDeviceData(filters);
-    fetchSyncData(filters);
+    // Parent handleUpdate increments a trigger state in page.js
+    // ensuring fetchAllData runs AFTER React completes all pending filter state updates.
+    if (typeof handleUpdate === 'function') {
+       handleUpdate();
+    } else {
+       // Fallback logic
+       localStorage.setItem("campaignFilteredData", JSON.stringify(filters));
+       fetchCampaignData(filters);
+       fetchCreativeTableData(filters);
+       fetchAgeData(filters);
+       fetchGenderData(filters);
+       fetchTotalData(filters);
+       fetchOsData(filters);
+       fetchBrowserData(filters);
+       fetchOperatorData(filters);
+       fetchPlacementPosData(filters);
+       fetchPlacementTypeData(filters);
+       fetchDeviceData(filters);
+       fetchSyncData(filters);
+    }
   };
 
   const campaignOptions = (campaigns || [])?.map((c) => ({
@@ -311,8 +357,9 @@ const ReportsFilter = ({
   }));
 
   const advertiserOptions = (advertisers || [])?.map((a) => ({
-    value: a.advertiserId,
+    value: getAudId(a), 
     label: a.reportName,
+    advertiserId: a.advertiserId 
   }));
   
   const handleExportPDF = async () => {
@@ -554,7 +601,7 @@ const ReportsFilter = ({
                 options={advertiserOptions}
                 placeholder="Select advertiser..."
                 value={advertiserOptions?.find(
-                  (opt) => opt.value === filters.advertiser
+                  (opt) => opt.value === filters.audienceId
                 )}
                 styles={{
                   control: (base) => ({
@@ -569,17 +616,20 @@ const ReportsFilter = ({
                   })
                 }}
                 onChange={(selected) => {
-                  const advertiserObj = advertisers?.find(a => a.advertiserId === selected?.value);
-                  const isDV360 = advertiserObj?.source === "DV360" || advertiserObj?.reportName?.endsWith("_d");
-                  setFilters({
-                    ...filters,
-                    advertiser: selected ? selected.value : "",
+                  const val = selected?.value || selected;
+                  const advertiserObj = advertisers?.find(a => getAudId(a) === String(val));
+                  if (!advertiserObj) return;
+                  
+                  const isDV360 = advertiserObj.source === "DV360" || advertiserObj.reportName?.endsWith("_d");
+                  setFilters(prev => ({
+                    ...prev,
+                    advertiser: advertiserObj.advertiserId,
                     source: isDV360 ? "DV360" : "Eskimi",
-                    insertionOrderId: advertiserObj?.insertionOrderId || "",
-                    audienceId: advertiserObj?._id || "",
-                    currency: advertiserObj?.currency || "",
+                    insertionOrderId: advertiserObj.insertionOrderId || "",
+                    audienceId: getAudId(advertiserObj),
+                    currency: advertiserObj.currency || "",
                     campaign: [],
-                  });
+                  }));
                 }}
               />
             </div>
@@ -611,10 +661,10 @@ const ReportsFilter = ({
                     })
                   }}
                   onChange={(selected) =>
-                    setFilters({
-                      ...filters,
+                    setFilters(prev => ({
+                      ...prev,
                       campaign: selected ? selected.map((opt) => opt.value) : [],
-                    })
+                    }))
                   }
                 />
               </div>

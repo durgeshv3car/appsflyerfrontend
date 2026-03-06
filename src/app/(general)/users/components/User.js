@@ -157,14 +157,12 @@ function UserPage() {
                     >
                       <Layers size={16} /> Campaigns
                     </button>
-                    {user.role === "user" && (
-                      <button
-                        className="btn btn-sm btn-outline-success"
-                        onClick={() => handleShowPermissions(user)}
-                      >
-                        <Shield size={16} /> Permissions
-                      </button>
-                    )}
+                    <button
+                      className="btn btn-sm btn-outline-success"
+                      onClick={() => handleShowPermissions(user)}
+                    >
+                      <Shield size={16} /> Permissions
+                    </button>
                     <button
                       className="btn btn-sm btn-outline-warning"
                       onClick={() => handleEdit(user._id,user)}

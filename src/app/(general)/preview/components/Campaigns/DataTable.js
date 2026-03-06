@@ -23,7 +23,7 @@ const PerformanceTable = ({ tableData, currencySymbol = "$" }) => {
   const filteredColumnsByPermission = columnsList.filter(col => {
     if (session?.user?.role === "super_admin") return true;
     if (!col.permission) return true;
-    return session?.user?.permissions?.includes(col.permission.toLowerCase());
+    return !session?.user?.permissions?.includes(col.permission.toLowerCase());
   });
 
   const [visibleColumns, setVisibleColumns] = useState([]);
