@@ -61,13 +61,21 @@ const DonutLarge = ({ value, percentage, label, color, showBoth }) => {
   );
 };
 
-const TrendChart = ({ tableData }) => {
+const TrendChart = ({ tableData, campaignPermissions = [] }) => {
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
   const { data: session } = useSession();
 
-  const hasSpent = session?.user?.role === "super_admin" || session?.user?.permissions?.some(p => p.toLowerCase() === "spent");
-  const hasCPM = session?.user?.role === "super_admin" || session?.user?.permissions?.some(p => p.toLowerCase() === "cpm");
+  const userRole = session?.user?.role || "";
+  const userPerms = session?.user?.permissions || [];
+
+  const isCampaignSpentRestricted = campaignPermissions.some(p => p.toLowerCase() === "spent");
+  const isUserSpentRestricted = userPerms.some(p => p.toLowerCase() === "spent");
+  const hasSpent = userRole === "super_admin" || (!isCampaignSpentRestricted && !isUserSpentRestricted);
+
+  const isCampaignCPMRestricted = campaignPermissions.some(p => p.toLowerCase() === "cpm");
+  const isUserCPMRestricted = userPerms.some(p => p.toLowerCase() === "cpm");
+  const hasCPM = userRole === "super_admin" || (!isCampaignCPMRestricted && !isUserCPMRestricted);
 
   useEffect(() => {
     if (!tableData || tableData.length === 0) return;
@@ -222,11 +230,19 @@ const TrendChart = ({ tableData }) => {
   );
 };
 
-export const PerformanceDashboard = ({ tableData, currencySymbol = "$" }) => {
+export const PerformanceDashboard = ({ tableData, currencySymbol = "$", campaignPermissions = [] }) => {
   const { data: session } = useSession();
   
-  const hasSpent = session?.user?.role === "super_admin" || session?.user?.permissions?.some(p => p.toLowerCase() === "spent");
-  const hasCPMValue = session?.user?.role === "super_admin" || session?.user?.permissions?.some(p => p.toLowerCase() === "cpm");
+  const userRole = session?.user?.role || "";
+  const userPerms = session?.user?.permissions || [];
+
+  const isCampaignSpentRestricted = campaignPermissions.some(p => p.toLowerCase() === "spent");
+  const isUserSpentRestricted = userPerms.some(p => p.toLowerCase() === "spent");
+  const hasSpent = userRole === "super_admin" || (!isCampaignSpentRestricted && !isUserSpentRestricted);
+
+  const isCampaignCPMRestricted = campaignPermissions.some(p => p.toLowerCase() === "cpm");
+  const isUserCPMRestricted = userPerms.some(p => p.toLowerCase() === "cpm");
+  const hasCPMValue = userRole === "super_admin" || (!isCampaignCPMRestricted && !isUserCPMRestricted);
 
   const stats = useMemo(() => {
     const total = { Imp: 0, Clicks: 0, Reach: 0, Spent: 0, SumCPM: 0, SumCPC: 0 };
@@ -334,7 +350,7 @@ export const PerformanceDashboard = ({ tableData, currencySymbol = "$" }) => {
         </div>
       </div>
 
-      <TrendChart tableData={tableData} />
+      <TrendChart tableData={tableData} campaignPermissions={campaignPermissions} />
     </div>
   );
 };

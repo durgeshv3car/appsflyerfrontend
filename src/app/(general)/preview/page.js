@@ -9,6 +9,7 @@ import DashboardHeader from "./components/Campaigns/DashboardHeader";
 import ReportsFilter from "./components/Campaigns/FilterSection";
 import CreativePerformance from "./components/Creative/CreativePerformance";
 import DeviceDistribution from "./components/Device/DeviceDistribution";
+import CityDistribution from "./components/City/CityDistribution";
 import {
   getCampaignData,
   getCampaignDataByAge,
@@ -37,10 +38,12 @@ import {
   getCampaignDataByPlacementPos,
   getCampaignDataByPlacementType,
   getCampaignDataByDevice,
+  getCampaignDataByCity,
 } from "@/services/campaignData";
 import { getDailyReportsByRange as getOvDataByRange } from "@/services/reports";
 import { getDailyReportsByRange as getDeviceDataByRange } from "@/services/device";
 import { getDailyReportsByRange as getAgeDataByRange } from "@/services/demographics";
+import { getDailyReportsByRangeCity } from "@/services/city";
 import { getDailyReportsByRangeOs } from "@/services/os";
 import { getDailyReportsByRangeBrowser } from "@/services/browser";
 import { getDailyReportsByRangeOperator } from "@/services/operator";
@@ -58,11 +61,13 @@ import {
 } from "@/services/reports"; // Assuming consolidated or imported from respective files
 import { createReportsDataAge as createAgeSync } from "@/services/demographics";
 import { createReportsDataDevice as createDeviceSync } from "@/services/device";
+import { createReportsDataCity as createCitySync } from "@/services/city";
 import { createReportsDataOs as createOsSync } from "@/services/os";
 import { createReportsDataBrowser as createBrowserSync } from "@/services/browser";
 import { createReportsDataOperator as createOperatorSync } from "@/services/operator";
 import { createReportsDataAdPos as createAdPosSync } from "@/services/ad-pos";
 import { createReportsDataAdType as createAdTypeSync } from "@/services/ad-type";
+import { getAudience } from "@/services/createaudience";
 
 // Main Dashboard Component
 const CampaignDashboard = () => {
@@ -90,6 +95,10 @@ const CampaignDashboard = () => {
     graphData: [],
   });
   const [deviceData, setDeviceData] = useState({
+    tableData: [],
+    graphData: [],
+  });
+  const [cityData, setCityData] = useState({
     tableData: [],
     graphData: [],
   });
@@ -122,6 +131,37 @@ const CampaignDashboard = () => {
   const { data: session } = useSession();
   const [userPermissions, setUserPermissions] = useState([]);
   const [userRole, setUserRole] = useState("");
+  const [campaignPermissions, setCampaignPermissions] = useState([]);
+  const [allAudiences, setAllAudiences] = useState([]);
+
+  useEffect(() => {
+    const fetchAudiences = async () => {
+      try {
+        const res = await getAudience();
+        if (res?.data) {
+          setAllAudiences(res.data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch audiences for permissions", error);
+      }
+    };
+    fetchAudiences();
+  }, []);
+
+  const getNormalizedId = (id) => {
+    if (!id) return null;
+    return (typeof id === 'object' && id?.$oid) ? id.$oid : String(id);
+  };
+
+  useEffect(() => {
+    if (filters.audienceId && allAudiences.length > 0) {
+      const targetId = getNormalizedId(filters.audienceId);
+      const selectedAud = allAudiences.find(a => getNormalizedId(a._id) === targetId);
+      setCampaignPermissions(selectedAud?.permissions || []);
+    } else {
+      setCampaignPermissions([]);
+    }
+  }, [filters.audienceId, allAudiences]);
 
   useEffect(() => {
     if (session?.user?.permissions) {
@@ -140,8 +180,15 @@ const CampaignDashboard = () => {
 
   const hasPermission = (key) => {
     if (userRole === "super_admin") return true;
-    // Blacklist logic: show if key is NOT in permissions
-    return !userPermissions.includes(key);
+    const lowerKey = key.toLowerCase();
+    
+    // Campaign-level restrictions apply to all non-admin users
+    const isCampaignRestricted = campaignPermissions.some(p => p.toLowerCase() === lowerKey);
+    if (isCampaignRestricted) return false;
+    
+    // User-level restrictions
+    const isUserRestricted = userPermissions.some(p => p.toLowerCase() === lowerKey);
+    return !isUserRestricted;
   };
 
   console.log("Filters in Dashboard:", filters);
@@ -601,6 +648,43 @@ const CampaignDashboard = () => {
     [filters],
   );
 
+  const fetchCityData = React.useCallback(
+    async (currentFilters = filters) => {
+      try {
+        let tData = [],
+          gData = [];
+        if (currentFilters.source === "DV360") {
+           const res = await getDailyReportsByRangeCity(
+            currentFilters.insertionOrderId,
+            currentFilters.dateRange.startDate,
+            currentFilters.dateRange.endDate,
+            1,
+            500,
+          );
+          ({ tData, gData } = extractData(res));
+        } else {
+           const res = await getCampaignDataByCity(currentFilters, "cities");
+           tData = (
+            Array.isArray(res.report)
+              ? res.report
+              : res.report
+                ? [res.report]
+                : []
+          ).sort(
+            (a, b) =>
+              Number(b.Impressions || b.impressions || 0) -
+              Number(a.Impressions || a.impressions || 0),
+          );
+           gData = tData.slice(0, 25);
+        }
+        setCityData({ tableData: tData, graphData: gData });
+      } catch (error) {
+        console.log(error);
+      }
+    },
+    [filters],
+  );
+
 
   const fetchSyncData = React.useCallback(
     async (currentFilters = filters) => {
@@ -620,6 +704,7 @@ const CampaignDashboard = () => {
         await Promise.all([
           createReportsData(commonParams),
           createDeviceSync(commonParams),
+          createCitySync(commonParams),
           createAgeSync(ageParams),
           createOsSync(commonParams),
           createBrowserSync(commonParams),
@@ -640,6 +725,7 @@ const CampaignDashboard = () => {
         fetchPlacementPosData(currentFilters);
         fetchPlacementTypeData(currentFilters);
         fetchDeviceData(currentFilters);
+        fetchCityData(currentFilters);
       } catch (error) {
         console.log("Sync Error:", error);
       }
@@ -657,6 +743,7 @@ const CampaignDashboard = () => {
       fetchPlacementPosData,
       fetchPlacementTypeData,
       fetchDeviceData,
+      fetchCityData,
     ],
   );
 
@@ -673,6 +760,7 @@ const CampaignDashboard = () => {
     fetchPlacementPosData(targetFilters);
     fetchPlacementTypeData(targetFilters);
     fetchDeviceData(targetFilters);
+    fetchCityData(targetFilters);
     fetchSyncData(targetFilters);
   }, [
     filters,
@@ -687,6 +775,7 @@ const CampaignDashboard = () => {
     fetchPlacementPosData,
     fetchPlacementTypeData,
     fetchDeviceData,
+    fetchCityData,
     fetchSyncData
   ]);
 
@@ -715,6 +804,7 @@ const CampaignDashboard = () => {
           fetchPlacementPosData={fetchPlacementPosData}
           fetchPlacementTypeData={fetchPlacementTypeData}
           fetchDeviceData={fetchDeviceData}
+          fetchCityData={fetchCityData}
           fetchSyncData={fetchSyncData}
           handleUpdate={handleUpdate}
         />
@@ -727,6 +817,7 @@ const CampaignDashboard = () => {
               <PerformanceDashboard
                 tableData={tableData.graphData}
                 currencySymbol={getCurrencySymbol(filters.currency)}
+                campaignPermissions={campaignPermissions}
               />
             </div>
           )}
@@ -736,6 +827,7 @@ const CampaignDashboard = () => {
               <TableWithDynamicColumns
                 tableData={tableData.tableData}
                 currencySymbol={getCurrencySymbol(filters.currency)}
+                campaignPermissions={campaignPermissions}
                 // TableWithDynamicColumns handles its internal column permissions (cpm/spent) separately
               />
             </div>
@@ -787,6 +879,11 @@ const CampaignDashboard = () => {
                   <DeviceDistribution deviceData={deviceData.graphData} />
                 </div>
               )}
+              {hasPermission("city_distribution") && (
+                <div className="col-md-6">
+                  <CityDistribution cityData={cityData.graphData} />
+                </div>
+              )}
             </div>
           </div>
 
@@ -800,6 +897,7 @@ const CampaignDashboard = () => {
               <BrowserTable
                 browserData={browserData.tableData}
                 currencySymbol={getCurrencySymbol(filters.currency)}
+                campaignPermissions={campaignPermissions}
               />
             </div>
           )}
@@ -814,6 +912,7 @@ const CampaignDashboard = () => {
               <OperatorTable
                 operatorData={operatorData.tableData}
                 currencySymbol={getCurrencySymbol(filters.currency)}
+                campaignPermissions={campaignPermissions}
               />
             </div>
           )}
@@ -833,6 +932,7 @@ const CampaignDashboard = () => {
               <OsTable
                 osData={osData.tableData}
                 currencySymbol={getCurrencySymbol(filters.currency)}
+                campaignPermissions={campaignPermissions}
               />
             </div>
           )}
@@ -861,6 +961,7 @@ const CampaignDashboard = () => {
               <CreativeTable
                 CreativeTableData={CreativeTableData.tableData}
                 currencySymbol={getCurrencySymbol(filters.currency)}
+                campaignPermissions={campaignPermissions}
               />
             </div>
           )}

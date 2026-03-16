@@ -178,3 +178,23 @@ export const getCampaignDataByDevice = async (filters,report_type) => {
     throw error;
   }
 };
+
+export const getCampaignDataByCity = async (filters,report_type) => {
+  try {
+    const token = await getToken();
+    const res = await axios.post(
+      `${Api_Url}/eskimi/get/city`,
+      {advertiserId:filters.advertiser,campaignId:filters.campaign,report_type,start_date:filters.dateRange.startDate,end_date:filters.dateRange.endDate,report_by:filters.report_by},
+      {
+        headers: {
+          Authorization: `${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    return res.data;
+  } catch (error) {
+    console.error("Error creating token:", error.response?.data || error.message);
+    throw error;
+  }
+};

@@ -13,7 +13,7 @@ import {
   startOfMonth, 
   endOfMonth, 
   subMonths,
-  startOfYear
+  subYears
 } from "date-fns";
 
 import "react-date-range/dist/styles.css";
@@ -45,6 +45,7 @@ const ReportsFilter = ({
   fetchPlacementPosData,
   fetchPlacementTypeData,
   fetchDeviceData,
+  fetchCityData,
   fetchSyncData,
   handleUpdate,
 }) => {
@@ -87,8 +88,9 @@ const ReportsFilter = ({
 
   // Load from localStorage/URL/Session on mount
   useEffect(() => {
-    // If queryAdvertiser changed, we might need a re-init from query
-    const queryChanged = queryAdvertiser && queryAdvertiser !== lastQueryRef.current;
+    const queryAudienceId = searchParams.get("audienceId");
+    // If query changed, we might need a re-init from query
+    const queryChanged = (queryAdvertiser && queryAdvertiser !== lastQueryRef.current) || (queryAudienceId && queryAudienceId !== lastQueryRef.current);
     
     if (initializedRef.current && !queryChanged) return;
 
@@ -124,6 +126,7 @@ const ReportsFilter = ({
        fetchPlacementPosData(targetFilters);
        fetchPlacementTypeData(targetFilters);
        fetchDeviceData(targetFilters);
+       fetchCityData(targetFilters);
     };
 
     const handleInitialState = async () => {
@@ -138,8 +141,9 @@ const ReportsFilter = ({
       }
 
       // 1. Check Query Params first (STRICT ID LOOKUP)
-      if (queryAdvertiser && finalAudiences.length > 0) {
-        const queryStr = String(queryAdvertiser);
+      const targetId = queryAudienceId || queryAdvertiser;
+      if (targetId && finalAudiences.length > 0) {
+        const queryStr = String(targetId);
         // Try finding by _id (unique) first
         const aud = finalAudiences.find(a => getAudId(a) === queryStr);
         
@@ -154,11 +158,11 @@ const ReportsFilter = ({
              currency: aud.currency || "",
            });
            setIsLoaded(true);
-           lastQueryRef.current = queryAdvertiser;
+           lastQueryRef.current = targetId;
            initializedRef.current = true;
            return;
-        } else {
-           // Fallback: If it's a numerical ID, match by advertiserId
+        } else if (!queryAudienceId) {
+           // Fallback only if no explicit audienceId: match by advertiserId
            const matches = finalAudiences.filter(a => String(a.advertiserId) === queryStr);
            if (matches.length === 1) {
               const match = matches[0];
@@ -172,7 +176,7 @@ const ReportsFilter = ({
                 currency: match.currency || "",
               });
               setIsLoaded(true);
-              lastQueryRef.current = queryAdvertiser;
+              lastQueryRef.current = targetId;
               initializedRef.current = true;
               return;
            }
@@ -276,7 +280,7 @@ const ReportsFilter = ({
         end = endOfMonth(lastMonth);
         break;
       case "all":
-        start = startOfYear(today); // Or some default far back date
+        start = subYears(today, 2);
         end = today;
         break;
       case "clear":
@@ -347,6 +351,7 @@ const ReportsFilter = ({
        fetchPlacementPosData(filters);
        fetchPlacementTypeData(filters);
        fetchDeviceData(filters);
+       fetchCityData(filters);
        fetchSyncData(filters);
     }
   };
@@ -560,7 +565,7 @@ const ReportsFilter = ({
                  <><FiFileText size={16} /> Export PDF</>
                )}
             </button>
-            <button 
+            {/* <button 
               className="btn btn-outline-success btn-sm d-flex align-items-center gap-2 px-3 py-2" 
               onClick={() => handleExportData('csv')} 
               disabled={isCsvLoading}
@@ -571,7 +576,7 @@ const ReportsFilter = ({
                ) : (
                  <><FiDownload size={16} /> Export CSV</>
                )}
-            </button>
+            </button> */}
             <button 
               className="btn btn-outline-primary btn-sm d-flex align-items-center gap-2 px-3 py-2" 
               onClick={() => handleExportData('excel')} 

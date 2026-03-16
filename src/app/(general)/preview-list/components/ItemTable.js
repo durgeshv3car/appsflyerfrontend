@@ -1,5 +1,5 @@
 import React from "react";
-import { Pencil, Trash2, AlertCircle, File, Check, X } from "lucide-react";
+import { Pencil, Trash2, AlertCircle, File, Check, X, ExternalLink } from "lucide-react";
 
 const ItemTable = ({
   items,
@@ -12,105 +12,103 @@ const ItemTable = ({
 }) => {
   return (
     <div className="table-responsive">
-      <table className="table table-hover align-middle">
-        <thead className="table-light">
-          <tr>
-            <th>Logo</th>
-            <th>Name</th>
-            <th>Description</th>
-            <th>Preview URL</th>
-            <th>File</th>
-            {isEditable && <th className="text-end">Actions</th>}
+      <table className="table table-hover align-middle mb-0">
+        <thead style={{ backgroundColor: "#f8fafc" }}>
+          <tr className="border-bottom">
+            <th className="ps-4 py-3 text-muted fw-semibold" style={{ fontSize: "0.85rem" }}>Name</th>
+            <th className="py-3 text-muted fw-semibold" style={{ fontSize: "0.85rem" }}>Details</th>
+            <th className="py-3 text-muted fw-semibold" style={{ fontSize: "0.85rem" }}>Preview URL</th>
+            <th className="py-3 text-muted fw-semibold" style={{ fontSize: "0.85rem" }}>Source</th>
+            {isEditable && <th className="text-end pe-4 py-3 text-muted fw-semibold" style={{ fontSize: "0.85rem" }}>Actions</th>}
           </tr>
         </thead>
-        <tbody>
+        <tbody className="border-0">
           {items.length === 0 ? (
             <tr>
-              <td colSpan={isEditable ? "6" : "5"} className="text-center py-5">
-                <div>
-                  <AlertCircle size={40} className="text-secondary mb-2" />
-                  <h5>No items found</h5>
-                  <p className="text-muted">Start by creating a new item</p>
+              <td colSpan={isEditable ? "5" : "4"} className="text-center py-5">
+                <div className="py-4">
+                  <AlertCircle size={40} className="text-muted opacity-25 mb-3" />
+                  <h6 className="fw-bold">No items found</h6>
+                  <p className="text-muted small">Start by creating your first creative set</p>
                 </div>
               </td>
             </tr>
           ) : (
             items.map((item) => (
-              <tr key={item.id}>
-                <td>
-                  {item.logo && typeof item.logo !== "string" ? (
-                    <img
-                      src={URL.createObjectURL(item.logo)}
-                      alt="Logo"
-                      width={40}
-                      height={40}
-                      style={{ objectFit: "cover", borderRadius: "5px" }}
-                    />
-                  ) : (
-                    "-"
-                  )}
+              <tr key={item.id} className="border-bottom border-light">
+                <td className="ps-4 py-3">
+                  <div className="d-flex align-items-center gap-3">
+                    <div className="bg-light rounded-2 d-flex align-items-center justify-content-center" style={{ width: '36px', height: '36px' }}>
+                      <File size={18} className="text-secondary" />
+                    </div>
+                    <div>
+                      <div className="fw-bold text-dark" style={{ fontSize: "0.95rem" }}>{item.name}</div>
+                      <div className="text-muted small">ID: {item.id.toString().slice(-6)}</div>
+                    </div>
+                  </div>
                 </td>
-                <td className="fw-semibold">{item.name}</td>
-                <td>{item.description || "-"}</td>
-                <td>
+                <td className="py-3 text-muted" style={{ fontSize: "0.85rem" }}>
+                  {item.description || "-"}
+                </td>
+                <td className="py-3">
                   {item.previewUrl ? (
                     <a
                       href={item.previewUrl}
                       target="_blank"
                       rel="noreferrer"
+                      className="d-flex align-items-center gap-1 text-decoration-none"
+                      style={{ color: "#6b46c1", fontWeight: "500", fontSize: "0.85rem" }}
                     >
-                      {item.previewUrl}
+                      View Preview <ExternalLink size={14} />
                     </a>
                   ) : (
                     "-"
                   )}
                 </td>
-                <td>
-                  {item.file ? (
-                    <div className="d-flex align-items-center gap-1">
-                      <File size={16} /> {item.file.name}
-                    </div>
-                  ) : (
-                    "-"
-                  )}
+                <td className="py-3">
+                   <span className="badge rounded-pill bg-light text-secondary px-3 py-2 border" style={{ fontSize: '0.75rem', fontWeight: '600' }}>
+                     {item.source || "Manual"}
+                   </span>
                 </td>
                 {isEditable && (
-                  <td className="text-end d-flex justify-content-end gap-2 flex-wrap">
-                    <button
-                      className="btn btn-sm btn-outline-warning"
-                      onClick={() => {
-                        setShowEdit(item);
-                        setFormData(item);
-                      }}
-                    >
-                      <Pencil size={16} /> Edit
-                    </button>
-                    {deleteConfirm === item.id ? (
-                      <>
-                        <span className="align-self-center text-danger">
-                          Delete?
-                        </span>
+                  <td className="text-end pe-4 py-3">
+                    <div className="d-flex justify-content-end gap-2">
                         <button
-                          className="btn btn-sm btn-danger"
-                          onClick={() => handleDelete(item.id)}
+                          className="btn btn-sm btn-light p-2 rounded-2 hover-shadow"
+                          onClick={() => {
+                            setShowEdit(item);
+                            setFormData(item);
+                          }}
+                          title="Edit"
                         >
-                          <Check size={16} />
+                          <Pencil size={16} className="text-primary" />
                         </button>
-                        <button
-                          className="btn btn-sm btn-secondary"
-                          onClick={() => setDeleteConfirm(null)}
-                        >
-                          <X size={16} />
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        className="btn btn-sm btn-outline-danger"
-                        onClick={() => setDeleteConfirm(item.id)}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
+                        
+                        {deleteConfirm === item.id ? (
+                          <div className="d-flex gap-1">
+                            <button
+                              className="btn btn-sm btn-danger px-3"
+                              onClick={() => handleDelete(item.id)}
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              className="btn btn-sm btn-light"
+                              onClick={() => setDeleteConfirm(null)}
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            className="btn btn-sm btn-light p-2 rounded-2 hover-shadow"
+                            onClick={() => setDeleteConfirm(item.id)}
+                            title="Delete"
+                          >
+                            <Trash2 size={16} className="text-danger" />
+                          </button>
+                        )}
+                    </div>
                   </td>
                 )}
               </tr>
@@ -118,6 +116,16 @@ const ItemTable = ({
           )}
         </tbody>
       </table>
+      <style jsx>{`
+        .table-hover tbody tr:hover {
+          background-color: #fcfaff !important;
+        }
+        .hover-shadow:hover {
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+          background-color: white !important;
+        }
+        .text-primary { color: #6b46c1 !important; }
+      `}</style>
     </div>
   );
 };

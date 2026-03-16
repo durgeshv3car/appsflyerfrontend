@@ -17,13 +17,21 @@ const columnsList = [
   { name: "Total Conversions", defaultVisible: true },
 ];
 
-const PerformanceTable = ({ tableData, currencySymbol = "$" }) => {
+const PerformanceTable = ({ tableData, currencySymbol = "$", campaignPermissions = [] }) => {
   const { data: session } = useSession();
   
   const filteredColumnsByPermission = columnsList.filter(col => {
     if (session?.user?.role === "super_admin") return true;
     if (!col.permission) return true;
-    return !session?.user?.permissions?.includes(col.permission.toLowerCase());
+    const perm = col.permission.toLowerCase();
+
+    // Campaign-level restrictions apply to non-admins
+    const isCampaignRestricted = campaignPermissions.some(p => p.toLowerCase() === perm);
+    if (isCampaignRestricted) return false;
+
+    // User-level restrictions
+    const isUserRestricted = session?.user?.permissions?.some(p => p.toLowerCase() === perm);
+    return !isUserRestricted;
   });
 
   const [visibleColumns, setVisibleColumns] = useState([]);

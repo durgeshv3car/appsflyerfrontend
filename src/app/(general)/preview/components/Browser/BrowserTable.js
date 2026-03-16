@@ -16,13 +16,21 @@ const columnsList = [
   { name: "Total Conversions", defaultVisible: true },
 ];
 
-const BrowserTable = ({ browserData = [], currencySymbol = "$" }) => {
+const BrowserTable = ({ browserData = [], currencySymbol = "$", campaignPermissions = [] }) => {
   const { data: session } = useSession();
 
   const filteredColumnsByPermission = columnsList.filter(col => {
     if (session?.user?.role === "super_admin") return true;
     if (!col.permission) return true;
-    return session?.user?.permissions?.some(p => p.toLowerCase() === col.permission.toLowerCase());
+    const perm = col.permission.toLowerCase();
+
+    // Campaign restrictions
+    const isCampaignRestricted = campaignPermissions.some(p => p.toLowerCase() === perm);
+    if (isCampaignRestricted) return false;
+
+    // User restrictions
+    const isUserRestricted = session?.user?.permissions?.some(p => p.toLowerCase() === perm);
+    return !isUserRestricted;
   });
 
   const [visibleColumns, setVisibleColumns] = useState([]);

@@ -1,6 +1,7 @@
 "use client";
 import { createReportsDataCity } from "@/services/city";
 // import { createReportsDataContext } from "@/services/context";
+import { Shield } from "lucide-react";
 import {
   addAudienceToUser,
   createAudience,
@@ -19,8 +20,11 @@ import { createReportsDataAdType } from "@/services/ad-type";
 import { createReportsDataCreative } from "@/services/creative";
 import { createReportsDataCreativeSize } from "@/services/creative-size";
 import { getSearchJobStatus } from "@/services/youtube";
+import PermissionModal from "./PermissionModal";
 import Image from "next/image";
 import { Search, Loader2, CheckCircle2, Layout, Database, BarChart3, PieChart, MapPin } from "lucide-react";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 import React, { useState, useEffect } from "react";
 
@@ -116,6 +120,8 @@ const Campaign = () => {
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [audienceId, setAudienceId] = useState(null);
+  const [showPermissionModal, setShowPermissionModal] = useState(false);
+  const [selectedPermissionCampaign, setSelectedPermissionCampaign] = useState(null);
 
 
   useEffect(() => {
@@ -289,8 +295,52 @@ const Campaign = () => {
       await deleteAudience(id);
       const all = await getAudience();
       setCampaigns(all?.data || []);
+      toast.success("Campaign deleted successfully");
     } catch (err) {
       console.error("Error deleting audience:", err);
+      toast.error("Failed to delete campaign");
+    }
+  };
+
+  const handleShowPermissions = (campaign) => {
+    setSelectedPermissionCampaign(campaign);
+    setShowPermissionModal(true);
+  };
+
+  const handlePermissionSave = async (id, updatedData) => {
+    const stringId = id?.$oid || id;
+    
+    // Combine existing campaign fields with the update to prevent backend from clearing them
+    const { reportName, insertionOrderId, advertiserId, campaignId, cpm, currency } = selectedPermissionCampaign;
+    const payload = {
+      reportName,
+      insertionOrderId,
+      advertiserId,
+      campaignId,
+      cpm,
+      currency,
+      ...updatedData
+    };
+
+    try {
+      setLoading(true);
+      const res = await updateAudience(stringId, payload);
+      if (res) {
+        setCampaigns((prev) =>
+          prev.map((c) => {
+            const cId = c._id?.$oid || c._id;
+            const targetId = stringId;
+            return cId === targetId ? { ...c, ...updatedData } : c;
+          })
+        );
+        setShowPermissionModal(false);
+        toast.success("Permissions updated successfully");
+      }
+    } catch (error) {
+      console.error("Failed to update permissions", error);
+      toast.error("Failed to update permissions");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -325,6 +375,7 @@ const Campaign = () => {
 
   return (
     <div className="card">
+      <ToastContainer />
       <div className="card-body p-3 d-flex align-items-center justify-content-between">
         <h5 className="fw-bold mb-0">Campaigns</h5>
         <div className="d-flex gap-2 align-items-center">
@@ -390,10 +441,17 @@ const Campaign = () => {
                     <td className="align-middle">{c.currency || '-'}</td>
                     <td className="text-end align-middle">
                       {/* action buttons as a single row with gap and inline SVG icons */}
+                        
                       <div
                         className="d-flex align-items-center justify-content-end"
                         style={{ gap: 8 }}
                       >
+                                <button
+                      className="btn btn-sm btn-outline-success"
+                      onClick={() => handleShowPermissions(c)}
+                    >
+                      <Shield size={16} /> Permissions
+                    </button>
                         <button
                           className="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center"
                           onClick={() => {
@@ -677,6 +735,13 @@ const Campaign = () => {
           </div>
         </div>
       )}
+
+         <PermissionModal
+        show={showPermissionModal}
+        onClose={() => setShowPermissionModal(false)}
+        user={selectedPermissionCampaign}
+        onSave={handlePermissionSave}
+      />
 
       {showEmailModal && (
         <div className="modal fade show d-block" tabIndex="-1">

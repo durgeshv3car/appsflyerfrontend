@@ -70,13 +70,13 @@ const DeviceDistribution = ({ deviceData = [] }) => {
   }, [processedData]);
 
   return (
-    <div className="card border-0 shadow-sm mb-4">
+    <div className="card border-0 shadow-sm mb-4 h-100">
       <div className="card-header bg-white border-0 pt-4 px-4 pb-3">
         <div className="d-flex justify-content-between align-items-center w-100">
             <h5 className="mb-0 fw-bold text-dark" style={{ fontSize: '1.2rem' }}>Devices</h5>
         </div>
       </div>
-      <div className="card-body p-4 pt-1">
+      <div className="card-body p-4 pt-1 flex-grow-1 d-flex flex-column justify-content-center">
         <div className="row align-items-center">
             {/* Left side: Vertical List of Metrics */}
             <div className="col-md-5">

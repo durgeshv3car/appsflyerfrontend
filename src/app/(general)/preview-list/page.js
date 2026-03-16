@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
 import ItemTable from "./components/ItemTable";
 import ItemModal from "./components/ItmeModal";
+import CreativeSetSettings from "./components/CreativeSetSettings";
 import { useSession } from "next-auth/react";
 import { getAudience } from "@/services/createaudience";
 
@@ -19,6 +20,7 @@ const ItemManager = () => {
   const [showCreate, setShowCreate] = useState(false);
   const [showEdit, setShowEdit] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [view, setView] = useState("list"); // "list" or "settings"
 
   useEffect(() => {
     const fetchItems = async () => {
@@ -30,7 +32,7 @@ const ItemManager = () => {
               id: aud._id,
               name: aud.reportName,
               description: `Advertiser: ${aud.advertiserId} | CPM: ${aud.cpm}`,
-              previewUrl: `/preview?advertiser=${aud.advertiserId}`,
+              previewUrl: `/preview?advertiser=${aud.advertiserId}&audienceId=${aud._id?.$oid || aud._id}`,
               source: aud.source,
               logo: null
             })));
@@ -57,7 +59,7 @@ const ItemManager = () => {
           id: aud._id,
           name: aud.reportName,
           description: `Advertiser: ${aud.advertiserId} | CPM: ${aud.cpm}`,
-          previewUrl: `/preview?advertiser=${aud.advertiserId}`,
+          previewUrl: `/preview?advertiser=${aud.advertiserId}&audienceId=${aud._id?.$oid || aud._id}`,
           source: aud.source,
           logo: null
         })));
@@ -112,32 +114,73 @@ const ItemManager = () => {
     setFormData((prev) => ({ ...prev, file: null }));
   };
 
+  if (view === "settings") {
+    return (
+      <div className="container-fluid py-4">
+        <div className="mb-4">
+          <div 
+            className="text-primary small fw-bold mb-1" 
+            style={{ cursor: "pointer", fontSize: '0.8rem', letterSpacing: '0.5px' }} 
+            onClick={() => setView("list")}
+          >
+            CREATIVE SETS
+          </div>
+          <h2 className="fw-bold text-dark" style={{ fontSize: '1.75rem' }}>New Creative Set</h2>
+        </div>
+        <CreativeSetSettings 
+          onCancel={() => setView("list")}
+          onSave={(data) => {
+            const newItem = {
+              id: Date.now(),
+              name: data.title,
+              description: `Format: ${data.selectedFormat} | Type: ${data.selectedSubFormat}`,
+              previewUrl: `/preview?name=${encodeURIComponent(data.title)}`,
+              source: "Manual",
+              logo: null
+            };
+            setItems(prev => [newItem, ...prev]);
+            setView("list");
+            alert("Creative set saved successfully!");
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="container-fluid py-4">
-      <div className="d-flex justify-content-between mb-3">
-        <h4 className="mb-3">Preview Campaign</h4>
+      <div className="d-flex justify-content-between mb-4 align-items-center">
+        <div>
+          <h4 className="fw-bold mb-1">Preview Campaign</h4>
+          <p className="text-muted small mb-0">Manage and preview your creative sets</p>
+        </div>
         {session?.user?.role === "super_admin" && (
           <button
-            className="btn btn-primary d-flex align-items-center gap-1"
-            onClick={() => setShowCreate(true)}
+            className="btn btn-primary d-flex align-items-center gap-2 px-4 py-2"
+            onClick={() => setView("settings")}
+            style={{ backgroundColor: "#6b46c1", borderColor: "#6b46c1", borderRadius: "8px", fontWeight: "600" }}
           >
-            <Plus size={18} /> Create Item
+            <Plus size={18} /> Create New Set
           </button>
         )}
       </div>
 
-      {/* Table */}
-      <ItemTable
-        items={items}
-        setFormData={setFormData}
-        setShowEdit={setShowEdit}
-        deleteConfirm={deleteConfirm}
-        setDeleteConfirm={setDeleteConfirm}
-        handleDelete={handleDelete}
-        isEditable={session?.user?.role === "super_admin"}
-      />
+      {/* Table Card */}
+      <div className="card border-0 shadow-sm rounded-4 overflow-hidden">
+        <div className="card-body p-0">
+          <ItemTable
+            items={items}
+            setFormData={setFormData}
+            setShowEdit={setShowEdit}
+            deleteConfirm={deleteConfirm}
+            setDeleteConfirm={setDeleteConfirm}
+            handleDelete={handleDelete}
+            isEditable={session?.user?.role === "super_admin"}
+          />
+        </div>
+      </div>
 
-      {/* Create Modal */}
+      {/* Legacy Modals (keeping for now just in case) */}
       {showCreate && (
         <ItemModal
           title="Create Item"
