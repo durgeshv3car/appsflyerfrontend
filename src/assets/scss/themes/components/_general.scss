@@ -1251,7 +1251,7 @@ img {
 	font-size: $font-10;
 	font-family: inherit;
 	font-weight: $font-500;
-	text-transform: $font-uppercase;
+	text-transform: none; // Allow mixed case (eCPM, eCPC) in tooltips
 
 	.tooltip-inner {
 		padding: 5px 10px;

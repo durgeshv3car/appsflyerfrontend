@@ -1,0 +1,53 @@
+@media print {
+  /* Nuclear hide for UI controls when printing / generating PDF */
+  [data-print-hide], 
+  [data-html2canvas-ignore],
+  .btn, 
+  .btn-primary, 
+  .btn-outline-secondary,
+  .form-select, 
+  .pagination,
+  .modal,
+  .modal-backdrop,
+  .card-header button,
+  .input-group,
+  .dropdown-toggle,
+  svg.text-muted, /* Hide various dropdown arrows */
+  div[className*="justify-content-end"] select /* Target pagination containers specifically */ {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Ensure tables expand to full width and show all rows */
+  .table-responsive {
+    overflow: visible !important;
+    width: 100% !important;
+  }
+
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  /* Remove card shadow and borders for clean print */
+  .card {
+    border: none !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Remove page background and adjust margins */
+  body {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 20px !important;
+  }
+
+  /* Force display of data rows if they are inside a scrollable area */
+  .card-body {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+}

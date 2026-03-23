@@ -12,12 +12,36 @@ const columnsList = [
   { name: "Clicks", defaultVisible: true },
   { name: "CTR", defaultVisible: true },
   { name: "CPM", defaultVisible: true, permission: "cpm" },
-  { name: "CPC", defaultVisible: true, permission: "cpm" }, // Assuming CPC follows CPM permission
+  { name: "CPC", defaultVisible: true, permission: "cpm" },
   { name: "Spent", defaultVisible: true, permission: "spent" },
   { name: "Total Conversions", defaultVisible: true },
 ];
 
-const PerformanceTable = ({ tableData, currencySymbol = "$", campaignPermissions = [] }) => {
+const getPriceForDate = (pricingObj, targetDate) => {
+  if (!pricingObj || typeof pricingObj !== 'object') return undefined;
+  const normalize = (d) => String(d).replace(/\//g, '-').split(' ')[0].substring(0, 10);
+  
+  // Search logic: Use targetDate if available, otherwise assume latest rule
+  const normalizedTarget = targetDate ? normalize(targetDate) : "9999-12-31"; 
+  
+  const normalizedPricing = {};
+  Object.entries(pricingObj).forEach(([d, v]) => {
+    normalizedPricing[normalize(d)] = v;
+  });
+
+  const sortedDates = Object.keys(normalizedPricing).sort();
+  let latestValue = undefined;
+  for (const date of sortedDates) {
+    if (date <= normalizedTarget) {
+      latestValue = normalizedPricing[date];
+    } else {
+      break;
+    }
+  }
+  return latestValue;
+};
+
+const PerformanceTable = ({ tableData, currencySymbol = "$", campaignPermissions = [], campaignPricing = { cpm: {}, cpc: {} } }) => {
   const { data: session } = useSession();
   
   const filteredColumnsByPermission = columnsList.filter(col => {
@@ -76,22 +100,37 @@ const PerformanceTable = ({ tableData, currencySymbol = "$", campaignPermissions
     const imp = Number(row.Impressions || row.impressions || 0);
     const clicks = Number(row.Clicks || row.clicks || 0);
     const reach = Number(row.Reach || row.reach || row.total_reach || row.uniqueReachImpressionReach || 0);
-    const spt = Number(row.mediaCost || row.mediaCostAdvertiserCurrency || row.Spent || row.spent || row.cost || 0);
-    const cnv = Number(row.TotalConversions || row.totalConversions || row.total_conversions || 0);
+    const rowDate = row.Date || row.date || "";
     
-    // Prioritize provided CPM/CPC for weighted aggregate
-    let cpm = Number(row.CPM || row.cpm || 0);
-    if (!cpm && imp > 0) cpm = (spt / imp) * 1000;
+    // Range-based pricing lookup
+    const dateSpecificCPM = getPriceForDate(campaignPricing?.cpm, rowDate);
+    const dateSpecificCPC = getPriceForDate(campaignPricing?.cpc, rowDate);
+
+    const totalConversions = Number(row.TotalConversions || row.totalConversions || row.total_conversions || 0);
     
-    let cpc = Number(row.CPC || row.cpc || 0);
-    if (!cpc && clicks > 0) cpc = (spt / clicks);
+    // Determine effective CPM/CPC
+    let cpm = dateSpecificCPM !== undefined ? dateSpecificCPM : Number(row.CPM || row.cpm || 0);
+    let cpc = dateSpecificCPC !== undefined ? dateSpecificCPC : Number(row.CPC || row.cpc || 0);
+
+    // FORCE: Always calculate locally
+    let spent = 0;
+    if (dateSpecificCPM !== undefined) {
+      spent = (imp / 1000) * cpm;
+    } else if (dateSpecificCPC !== undefined) {
+      spent = clicks * cpc;
+    } else {
+      spent = cpm > 0 ? (imp / 1000) * cpm : (clicks * cpc);
+    }
+
+    if (!cpm && imp > 0) cpm = (spent / imp) * 1000;
+    if (!cpc && clicks > 0) cpc = (spent / clicks);
 
     return {
       Impressions: acc.Impressions + imp,
       Clicks: acc.Clicks + clicks,
+      Spent: acc.Spent + spent,
       Reach: acc.Reach + reach,
-      Spent: acc.Spent + spt,
-      "Total Conversions": (acc["Total Conversions"] || 0) + cnv,
+      "Total Conversions": (acc["Total Conversions"] || 0) + totalConversions,
       // Aggregate for weighted averages
       SumCPM: (acc.SumCPM || 0) + (cpm * imp),
       SumCPC: (acc.SumCPC || 0) + (cpc * clicks),
@@ -125,7 +164,7 @@ const PerformanceTable = ({ tableData, currencySymbol = "$", campaignPermissions
       <div className="card-header bg-white border-0 pt-4 px-4 pb-3">
         <div className="d-flex justify-content-between align-items-center w-100">
           <h5 className="mb-0 fw-bold text-dark" style={{ fontSize: '1.2rem' }}>Performance</h5>
-          <button className="btn btn-primary d-flex align-items-center gap-2" onClick={() => setShow(true)} style={{ borderRadius: '8px', padding: '8px 16px', fontSize: '14px' }}>
+          <button data-html2canvas-ignore="true" className="btn btn-primary d-flex align-items-center gap-2" onClick={() => setShow(true)} style={{ borderRadius: '8px', padding: '8px 16px', fontSize: '14px' }}>
             <FiPlus size={18} />
             <span>Columns</span>
           </button>
@@ -150,11 +189,10 @@ const PerformanceTable = ({ tableData, currencySymbol = "$", campaignPermissions
                     const imp = Number(row.Impressions || row.impressions || 0);
                     const cks = Number(row.Clicks || row.clicks || 0);
                     const rch = Number(row.Reach || row.reach || row.total_reach || row.uniqueReachImpressionReach || 0);
-                    const spt = Number(row.mediaCost || row.mediaCostAdvertiserCurrency || row.Spent || row.spent || row.cost || 0);
                     const cnv = Number(row.TotalConversions || row.totalConversions || row.total_conversions || 0);
                     
-                    const rawCPM = row.CPM || row.cpm;
-                    const rawCPC = row.CPC || row.cpc;
+                    const rawCPM = row.eCPM || row.CPM || row.cpm;
+                    const rawCPC = row.eCPC || row.CPC || row.cpc;
 
                     let val = row[col] || row[col.toLowerCase()] || row[col.charAt(0).toLowerCase() + col.slice(1)];
                     
@@ -162,18 +200,69 @@ const PerformanceTable = ({ tableData, currencySymbol = "$", campaignPermissions
                     if (col === "Impressions") val = imp;
                     if (col === "Clicks") val = cks;
                     if (col === "Reach") val = rch;
-                    if (col === "Spent") val = spt;
                     if (col === "Total Conversions") val = cnv;
                     
                     // Force consistent derived metrics
+                    const rowDate = row.Date || row.date || "";
                     if (col === "CTR") val = imp > 0 ? (cks / imp) * 100 : 0;
+                    if (col === "Spent") {
+                      const dateSpecificCPM = getPriceForDate(campaignPricing?.cpm, rowDate);
+                      const dateSpecificCPC = getPriceForDate(campaignPricing?.cpc, rowDate);
+                      if (dateSpecificCPM !== undefined) {
+                        val = (imp / 1000) * dateSpecificCPM;
+                      } else if (dateSpecificCPC !== undefined) {
+                        val = cks * dateSpecificCPC;
+                      } else {
+                        const rowCPM = Number(rawCPM || 0);
+                        const rowCPC = Number(rawCPC || 0);
+                        val = rowCPM > 0 ? (imp / 1000) * rowCPM : (cks * rowCPC);
+                      }
+                    }
                     if (col === "CPM") {
-                      const definedCPM = Number(rawCPM || 0);
-                      val = definedCPM > 0 ? definedCPM : (imp > 0 ? (spt / imp) * 1000 : 0);
+                      const dateSpecificCPM = getPriceForDate(campaignPricing?.cpm, rowDate);
+                      if (dateSpecificCPM !== undefined) {
+                        val = dateSpecificCPM;
+                      } else {
+                        const definedCPM = Number(rawCPM || 0);
+                        if (definedCPM > 0) {
+                          val = definedCPM;
+                        } else if (imp > 0) {
+                          const dateSpecificCPC = getPriceForDate(campaignPricing?.cpc, rowDate);
+                          let calcSpent = 0;
+                          if (dateSpecificCPC !== undefined) {
+                            calcSpent = cks * dateSpecificCPC;
+                          } else {
+                            const rowCPC = Number(rawCPC || 0);
+                            calcSpent = cks * rowCPC;
+                          }
+                          val = (calcSpent / imp) * 1000;
+                        } else {
+                          val = 0;
+                        }
+                      }
                     }
                     if (col === "CPC") {
-                      const definedCPC = Number(rawCPC || 0);
-                      val = definedCPC > 0 ? definedCPC : (cks > 0 ? (spt / cks) : 0);
+                      const dateSpecificCPC = getPriceForDate(campaignPricing?.cpc, rowDate);
+                      if (dateSpecificCPC !== undefined) {
+                        val = dateSpecificCPC;
+                      } else {
+                        const definedCPC = Number(rawCPC || 0);
+                        if (definedCPC > 0) {
+                          val = definedCPC;
+                        } else if (cks > 0) {
+                          const dateSpecificCPM = getPriceForDate(campaignPricing?.cpm, rowDate);
+                          let calcSpent = 0;
+                          if (dateSpecificCPM !== undefined) {
+                            calcSpent = (imp / 1000) * dateSpecificCPM;
+                          } else {
+                            const rowCPM = Number(rawCPM || 0);
+                            calcSpent = (imp / 1000) * rowCPM;
+                          }
+                          val = calcSpent / cks;
+                        } else {
+                          val = 0;
+                        }
+                      }
                     }
                     if (col === "Frequency") val = rch > 0 ? (imp / rch) : 0;
                     return (
@@ -192,8 +281,8 @@ const PerformanceTable = ({ tableData, currencySymbol = "$", campaignPermissions
                          {col === "Date" ? "Total:" : 
                           col === "Frequency" ? (totals.Reach ? (totals.Impressions / totals.Reach).toFixed(2) : "0.00") :
                           col === "CTR" ? (totals.Impressions ? ((totals.Clicks / totals.Impressions) * 100).toFixed(2) + "%" : "0.00%") :
-                           col === "CPM" ? (totals.Impressions ? currencySymbol + (totals.SumCPM / totals.Impressions).toFixed(2) : currencySymbol + "0.00") :
-                           col === "CPC" ? (totals.Clicks ? currencySymbol + (totals.SumCPC / totals.Clicks).toFixed(2) : currencySymbol + "0.00") :
+                           col === "CPM" ? (totals.Impressions ? currencySymbol + ((totals.Spent / totals.Impressions) * 1000).toFixed(2) : currencySymbol + "0.00") :
+                           col === "CPC" ? (totals.Clicks ? currencySymbol + (totals.Spent / totals.Clicks).toFixed(2) : currencySymbol + "0.00") :
                           formatValue(col, totals[col], totals)}
                        </span>
                     </td>
@@ -205,7 +294,7 @@ const PerformanceTable = ({ tableData, currencySymbol = "$", campaignPermissions
         </div>
         
         {tableData?.length > 0 && (
-          <div className="d-flex justify-content-end align-items-center gap-4 py-3 px-4 text-muted border-top bg-light-subtle" style={{ borderBottomLeftRadius: '12px', borderBottomRightRadius: '12px' }}>
+          <div data-html2canvas-ignore="true" className="d-flex justify-content-end align-items-center gap-4 py-3 px-4 text-muted border-top bg-light-subtle" style={{ borderBottomLeftRadius: '12px', borderBottomRightRadius: '12px' }}>
               <div className="d-flex align-items-center gap-3">
                   <span style={{ fontSize: '13px', fontWeight: '500' }}>Rows per page:</span>
                   <div className="position-relative">

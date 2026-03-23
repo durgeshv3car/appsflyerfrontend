@@ -133,6 +133,7 @@ const CampaignDashboard = () => {
   const [userRole, setUserRole] = useState("");
   const [campaignPermissions, setCampaignPermissions] = useState([]);
   const [allAudiences, setAllAudiences] = useState([]);
+  const [campaignPricing, setCampaignPricing] = useState({ cpm: {}, cpc: {} });
 
   useEffect(() => {
     const fetchAudiences = async () => {
@@ -158,8 +159,13 @@ const CampaignDashboard = () => {
       const targetId = getNormalizedId(filters.audienceId);
       const selectedAud = allAudiences.find(a => getNormalizedId(a._id) === targetId);
       setCampaignPermissions(selectedAud?.permissions || []);
+      setCampaignPricing({
+        cpm: typeof selectedAud?.cpm === 'object' ? selectedAud.cpm : {},
+        cpc: typeof selectedAud?.cpc === 'object' ? selectedAud.cpc : {}
+      });
     } else {
       setCampaignPermissions([]);
+      setCampaignPricing({ cpm: {}, cpc: {} });
     }
   }, [filters.audienceId, allAudiences]);
 
@@ -192,6 +198,28 @@ const CampaignDashboard = () => {
   };
 
   console.log("Filters in Dashboard:", filters);
+
+  const getPriceForDate = (pricingObj, targetDate) => {
+    if (!pricingObj || typeof pricingObj !== 'object') return undefined;
+    const normalize = (d) => String(d).replace(/\//g, '-').split(' ')[0].substring(0, 10);
+    const normalizedTarget = targetDate ? normalize(targetDate) : "9999-12-31"; 
+    
+    const normalizedPricing = {};
+    Object.entries(pricingObj).forEach(([d, v]) => {
+      normalizedPricing[normalize(d)] = v;
+    });
+
+    const sortedDates = Object.keys(normalizedPricing).sort();
+    let latestValue = undefined;
+    for (const date of sortedDates) {
+      if (date <= normalizedTarget) {
+        latestValue = normalizedPricing[date];
+      } else {
+        break;
+      }
+    }
+    return latestValue;
+  };
 
   const extractData = (res, specificKey) => {
     let tData = [],
@@ -228,6 +256,45 @@ const CampaignDashboard = () => {
     return { tData, gData };
   };
 
+  // Reactively compute globalEffectiveMetrics from tableData + pricing (no async timing issues)
+  const globalEffectiveMetrics = React.useMemo(() => {
+    const data = tableData.tableData || [];
+    const pricing = campaignPricing;
+    let totalImp = 0;
+    let totalClicks = 0;
+    let totalSpent = 0;
+
+    data.forEach(row => {
+      const imp = Number(row.Impressions || row.impressions || 0);
+      const cks = Number(row.Clicks || row.clicks || 0);
+      const rowDate = row.Date || row.date || "";
+
+      const pCPM = getPriceForDate(pricing?.cpm, rowDate);
+      const pCPC = getPriceForDate(pricing?.cpc, rowDate);
+
+      let spent = 0;
+      if (pCPM !== undefined) {
+        spent = (imp / 1000) * pCPM;
+      } else if (pCPC !== undefined) {
+        spent = cks * pCPC;
+      } else {
+        // Match DataTable: check row.eCPM / row.CPM / row.cpm from the API
+        const rCPM = Number(row.eCPM || row.CPM || row.cpm || 0);
+        const rCPC = Number(row.eCPC || row.CPC || row.cpc || 0);
+        spent = rCPM > 0 ? (imp / 1000) * rCPM : (cks * rCPC);
+      }
+
+      totalImp += imp;
+      totalClicks += cks;
+      totalSpent += spent;
+    });
+
+    return {
+      eCPM: totalImp > 0 ? (totalSpent / totalImp) * 1000 : 0,
+      eCPC: totalClicks > 0 ? (totalSpent / totalClicks) : 0,
+    };
+  }, [tableData.tableData, campaignPricing]);
+
   const fetchCampaignData = React.useCallback(
     async (currentFilters = filters) => {
       try {
@@ -253,13 +320,16 @@ const CampaignDashboard = () => {
               : [];
           gData = tData;
         }
+        
+        
         setTableData({ tableData: tData, graphData: gData });
       } catch (error) {
         console.log(error);
       }
     },
-    [filters],
+    [filters, campaignPricing], // Important: depend on pricing too
   );
+
 
   const fetchCreativeTableData = React.useCallback(
     async (currentFilters = filters) => {
@@ -818,6 +888,7 @@ const CampaignDashboard = () => {
                 tableData={tableData.graphData}
                 currencySymbol={getCurrencySymbol(filters.currency)}
                 campaignPermissions={campaignPermissions}
+                campaignPricing={campaignPricing}
               />
             </div>
           )}
@@ -828,6 +899,7 @@ const CampaignDashboard = () => {
                 tableData={tableData.tableData}
                 currencySymbol={getCurrencySymbol(filters.currency)}
                 campaignPermissions={campaignPermissions}
+                campaignPricing={campaignPricing}
                 // TableWithDynamicColumns handles its internal column permissions (cpm/spent) separately
               />
             </div>
@@ -898,6 +970,8 @@ const CampaignDashboard = () => {
                 browserData={browserData.tableData}
                 currencySymbol={getCurrencySymbol(filters.currency)}
                 campaignPermissions={campaignPermissions}
+                campaignPricing={campaignPricing}
+                globalEffectiveMetrics={globalEffectiveMetrics}
               />
             </div>
           )}
@@ -913,6 +987,8 @@ const CampaignDashboard = () => {
                 operatorData={operatorData.tableData}
                 currencySymbol={getCurrencySymbol(filters.currency)}
                 campaignPermissions={campaignPermissions}
+                campaignPricing={campaignPricing}
+                globalEffectiveMetrics={globalEffectiveMetrics}
               />
             </div>
           )}
@@ -933,6 +1009,8 @@ const CampaignDashboard = () => {
                 osData={osData.tableData}
                 currencySymbol={getCurrencySymbol(filters.currency)}
                 campaignPermissions={campaignPermissions}
+                campaignPricing={campaignPricing}
+                globalEffectiveMetrics={globalEffectiveMetrics}
               />
             </div>
           )}
@@ -962,6 +1040,8 @@ const CampaignDashboard = () => {
                 CreativeTableData={CreativeTableData.tableData}
                 currencySymbol={getCurrencySymbol(filters.currency)}
                 campaignPermissions={campaignPermissions}
+                campaignPricing={campaignPricing}
+                globalEffectiveMetrics={globalEffectiveMetrics}
               />
             </div>
           )}

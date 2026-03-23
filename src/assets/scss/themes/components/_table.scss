@@ -32,7 +32,7 @@
 				color: $brand-dark;
 				font-size: $font-10;
 				font-weight: $font-700;
-				text-transform: $font-uppercase;
+				text-transform: none; // Allow mixed case (eCPM, eCPC) instead of forcing uppercase
 
 				&:first-child {
 					padding-left: 30px;

@@ -2,6 +2,29 @@ import { useEffect, useRef, useMemo, useState } from "react";
 import { Chart } from "chart.js/auto";
 import { useSession } from "next-auth/react";
 
+const getPriceForDate = (pricingObj, targetDate) => {
+  if (!pricingObj || typeof pricingObj !== 'object') return undefined;
+  const normalize = (d) => String(d).replace(/\//g, '-').split(' ')[0].substring(0, 10);
+  
+  // If targetDate is missing (common in dimensions), use a far future date to get the latest override rule
+  const normalizedTarget = targetDate ? normalize(targetDate) : "9999-12-31";
+  
+  const normalizedPricing = {};
+  Object.entries(pricingObj).forEach(([d, v]) => {
+    normalizedPricing[normalize(d)] = v;
+  });
+  const sortedDates = Object.keys(normalizedPricing).sort();
+  let latestValue = undefined;
+  for (const date of sortedDates) {
+    if (date <= normalizedTarget) {
+      latestValue = normalizedPricing[date];
+    } else {
+      break;
+    }
+  }
+  return latestValue;
+};
+
 const DonutLarge = ({ value, percentage, label, color, showBoth }) => {
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
@@ -61,7 +84,7 @@ const DonutLarge = ({ value, percentage, label, color, showBoth }) => {
   );
 };
 
-const TrendChart = ({ tableData, campaignPermissions = [] }) => {
+const TrendChart = ({ tableData, campaignPermissions = [], campaignPricing = { cpm: {}, cpc: {} } }) => {
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
   const { data: session } = useSession();
@@ -72,10 +95,6 @@ const TrendChart = ({ tableData, campaignPermissions = [] }) => {
   const isCampaignSpentRestricted = campaignPermissions.some(p => p.toLowerCase() === "spent");
   const isUserSpentRestricted = userPerms.some(p => p.toLowerCase() === "spent");
   const hasSpent = userRole === "super_admin" || (!isCampaignSpentRestricted && !isUserSpentRestricted);
-
-  const isCampaignCPMRestricted = campaignPermissions.some(p => p.toLowerCase() === "cpm");
-  const isUserCPMRestricted = userPerms.some(p => p.toLowerCase() === "cpm");
-  const hasCPM = userRole === "super_admin" || (!isCampaignCPMRestricted && !isUserCPMRestricted);
 
   useEffect(() => {
     if (!tableData || tableData.length === 0) return;
@@ -90,7 +109,26 @@ const TrendChart = ({ tableData, campaignPermissions = [] }) => {
         const cks = Number(row.Clicks || row.clicks || 0);
         return imp > 0 ? (cks / imp) * 100 : 0;
     });
-    const cost = tableData.map((row) => Number(row.mediaCost || row.mediaCostAdvertiserCurrency || row.Spent || row.spent || row.cost) || 0);
+    const cost = tableData.map((row) => {
+        const rowDate = row.Date || row.date || "";
+        const rowImp = Number(row.Impressions || row.impressions || 0);
+        const rowClicks = Number(row.Clicks || row.clicks || 0);
+        
+        const datePriceCPM = getPriceForDate(campaignPricing?.cpm, rowDate);
+        const datePriceCPC = getPriceForDate(campaignPricing?.cpc, rowDate);
+
+        // FORCE: Always calculate spent locally for consistent graph display
+        if (datePriceCPM !== undefined) {
+          return (rowImp / 1000) * datePriceCPM;
+        } else if (datePriceCPC !== undefined) {
+          return rowClicks * datePriceCPC;
+        } else {
+          // Fallback calculation using row's own pricing if no override
+          const rowCPM = Number(row.CPM || row.cpm || 0);
+          const rowCPC = Number(row.CPC || row.cpc || 0);
+          return rowCPM > 0 ? (rowImp / 1000) * rowCPM : (rowClicks * rowCPC);
+        }
+    });
 
     const datasets = [
       {
@@ -198,7 +236,7 @@ const TrendChart = ({ tableData, campaignPermissions = [] }) => {
       },
     });
     return () => { if (chartInstance.current) chartInstance.current.destroy(); };
-  }, [tableData, hasSpent]);
+  }, [tableData, hasSpent, campaignPricing]);
 
   const legendItems = [
     { color: '#2ECC71', label: 'Impressions' },
@@ -230,7 +268,7 @@ const TrendChart = ({ tableData, campaignPermissions = [] }) => {
   );
 };
 
-export const PerformanceDashboard = ({ tableData, currencySymbol = "$", campaignPermissions = [] }) => {
+export const PerformanceDashboard = ({ tableData, currencySymbol = "$", campaignPermissions = [], campaignPricing = { cpm: {}, cpc: {} } }) => {
   const { data: session } = useSession();
   
   const userRole = session?.user?.role || "";
@@ -246,22 +284,34 @@ export const PerformanceDashboard = ({ tableData, currencySymbol = "$", campaign
 
   const stats = useMemo(() => {
     const total = { Imp: 0, Clicks: 0, Reach: 0, Spent: 0, SumCPM: 0, SumCPC: 0 };
-    tableData?.forEach((item) => {
-      const imp = Number(item.Impressions || item.impressions || 0);
-      const clicks = Number(item.Clicks || item.clicks || 0);
-      const spent = Number(item.mediaCost || item.mediaCostAdvertiserCurrency || item.Spent || item.spent || item.cost || 0);
-      let cpm = Number(item.CPM || item.cpm || 0);
-      if (!cpm && imp > 0) cpm = (spent / imp) * 1000;
+    tableData?.forEach((row) => {
+      const rowImp = Number(row.Impressions || row.impressions || 0);
+      const rowClicks = Number(row.Clicks || row.clicks || 0);
+      const rowDate = row.Date || row.date || "";
       
-      let cpc = Number(item.CPC || item.cpc || 0);
-      if (!cpc && clicks > 0) cpc = (spent / clicks);
+      const datePriceCPM = getPriceForDate(campaignPricing?.cpm, rowDate);
+      const datePriceCPC = getPriceForDate(campaignPricing?.cpc, rowDate);
 
-      total.Imp += imp;
-      total.Clicks += clicks;
-      total.Reach += Number(item.Reach || item.reach || item.total_reach || item.uniqueReachImpressionReach || 0);
-      total.Spent += spent;
-      total.SumCPM += (cpm * imp);
-      total.SumCPC += (cpc * clicks);
+      // FORCE: Calculate Spent, do not use from DB
+      let rowCPM = datePriceCPM !== undefined ? datePriceCPM : Number(row.CPM || row.cpm || 0);
+      let rowCPC = datePriceCPC !== undefined ? datePriceCPC : Number(row.CPC || row.cpc || 0);
+      
+      let rowSpent = 0;
+      if (datePriceCPM !== undefined) {
+        rowSpent = (rowImp / 1000) * rowCPM;
+      } else if (datePriceCPC !== undefined) {
+        rowSpent = rowClicks * rowCPC;
+      } else {
+        // Fallback to row metrics if no override exists, but still recalculate
+        rowSpent = rowCPM > 0 ? (rowImp / 1000) * rowCPM : (rowClicks * rowCPC);
+      }
+
+      total.Imp += rowImp;
+      total.Clicks += rowClicks;
+      total.Reach += Number(row.Reach || row.reach || row.total_reach || row.uniqueReachImpressionReach || 0);
+      total.Spent += rowSpent;
+      total.SumCPM += (rowCPM * rowImp);
+      total.SumCPC += (rowCPC * rowClicks);
     });
 
     const safeDiv = (a, b) => (b ? ((a / b) * 100).toFixed(2) : "0.00");
@@ -269,11 +319,12 @@ export const PerformanceDashboard = ({ tableData, currencySymbol = "$", campaign
       total,
       CTR: safeDiv(total.Clicks, total.Imp),
       ReachPct: safeDiv(total.Reach, total.Imp),
-      CPC: total.Clicks ? (total.SumCPC / total.Clicks).toFixed(2) : "0.00",
-      CPM: total.Imp ? (total.SumCPM / total.Imp).toFixed(2) : "0.00",
+      // Strictly derive weighted metrics from total spent
+      CPC: total.Clicks ? (total.Spent / total.Clicks).toFixed(2) : "0.00",
+      CPM: total.Imp ? ((total.Spent / total.Imp) * 1000).toFixed(2) : "0.00",
       Spent: total.Spent.toFixed(2)
     };
-  }, [tableData]);
+  }, [tableData, campaignPricing]);
 
   return (
     <div className="mb-4">
@@ -329,11 +380,11 @@ export const PerformanceDashboard = ({ tableData, currencySymbol = "$", campaign
                 {hasCPMValue && (
                   <>
                     <div className="d-flex justify-content-between align-items-center">
-                      <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>CPC</span>
+                      <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>eCPC</span>
                       <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{currencySymbol}{stats.CPC}</span>
                     </div>
                     <div className="d-flex justify-content-between align-items-center">
-                      <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>CPM</span>
+                      <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>eCPM</span>
                       <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{currencySymbol}{stats.CPM}</span>
                     </div>
                   </>
@@ -346,11 +397,17 @@ export const PerformanceDashboard = ({ tableData, currencySymbol = "$", campaign
                 )}
               </div>
             </div>
+            <div className="col-12 mt-4">
+              <TrendChart 
+                tableData={tableData} 
+                campaignPermissions={campaignPermissions}
+                campaignPricing={campaignPricing}
+              />
+            </div>
           </div>
         </div>
       </div>
 
-      <TrendChart tableData={tableData} campaignPermissions={campaignPermissions} />
     </div>
   );
 };

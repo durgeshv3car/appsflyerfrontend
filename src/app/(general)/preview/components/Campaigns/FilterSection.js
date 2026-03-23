@@ -388,10 +388,11 @@ const ReportsFilter = ({
       input.style.cssText += `; width: ${targetWidth}px !important; min-width: ${targetWidth}px !important; max-width: none !important; overflow: visible !important;`;
       
       const canvas = await html2canvas(input, {
-        scale: 1,
+        scale: 2, // 2x scale: Sharp but balanced for file size
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
+        imageTimeout: 0, // Wait for all images to load
         windowWidth: targetWidth,
         windowHeight: input.scrollHeight,
         scrollX: 0,
@@ -425,12 +426,66 @@ const ReportsFilter = ({
             body, html { border: none !important; background: #ffffff !important; }
             /* Explicitly kill card borders if they look grey */
             .card { border: none !important; box-shadow: none !important; }
+            
+            /* Enhanced Table Readability for PDF */
+            .table { border-collapse: collapse !important; width: 100% !important; margin: 0 !important; }
+            .table th { background-color: #f8fafc !important; color: #334155 !important; padding: 12px 15px !important; border-bottom: 2px solid #e2e8f0 !important; text-align: left !important; }
+            .table td { padding: 10px 15px !important; border-bottom: 1px solid #f1f5f9 !important; vertical-align: middle !important; }
+            /* Zebra striping for better row tracking */
+            .table tbody tr:nth-child(even) { background-color: #f8fafc !important; }
+            
+            /* Hide UI elements in the PDF capture */
+            [data-print-hide], 
+            .btn-primary, 
+            button[onClick*="setShow(true)"],
+            .card-header button,
+            select,
+            .form-select,
+            .pagination,
+            .modal {
+              display: none !important;
+              visibility: hidden !important;
+              opacity: 0 !important;
+              height: 0 !important;
+              width: 0 !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              overflow: hidden !important;
+            }
           `;
           doc.head.appendChild(styleEl);
 
-          // Forcefully strip grey backgrounds via JS traversal as a foolproof backup
+          // Forcefully remove UI elements from the cloned DOM used for PDF generation
           doc.querySelectorAll('*').forEach(el => {
-            // Strip classes
+            // Remove marked elements
+            const hasIgnoreAttr = el.hasAttribute('data-print-hide') || el.hasAttribute('data-html2canvas-ignore');
+            
+            // Remove typical UI components by class/tag
+            const isUIPart = 
+              el.tagName === 'BUTTON' || 
+              el.tagName === 'SELECT' || 
+              el.classList?.contains('form-select') || 
+              el.classList?.contains('pagination') ||
+              el.classList?.contains('btn') ||
+              (el.textContent && (
+                el.textContent === 'Columns' || 
+                el.textContent === '+ Columns' || 
+                el.textContent.trim() === 'Columns' ||
+                el.textContent.includes('Rows per page')
+              ));
+
+            if (hasIgnoreAttr || isUIPart) {
+              // Be extra aggressive: if it contains sensitive text, remove the parent container too
+              if (el.textContent?.includes('Rows per page')) {
+                 const container = el.closest('.d-flex');
+                 if (container && container.parentNode) container.parentNode.removeChild(container);
+              } else if (el.parentNode) {
+                 el.parentNode.removeChild(el);
+              }
+              return; // element is gone, stop here for this el
+            }
+            
+            // Strip classes for cleaner background
             if (el.classList) {
               el.classList.remove('bg-light', 'bg-light-subtle', 'bg-secondary', 'bg-body-secondary', 'table-light');
             }
@@ -446,6 +501,23 @@ const ReportsFilter = ({
               el.style.setProperty('background-color', '#ffffff', 'important');
             }
           });
+
+          // Universal Section Dividers for PDF Readability
+          // Target only top-level dashboard sections to avoid duplicate lines
+          const mainDashboardRow = doc.querySelector('#dashboard-content > .row');
+          if (mainDashboardRow) {
+            const sections = Array.from(mainDashboardRow.children).filter(el => 
+              el.classList?.contains('col-12') || el.classList?.contains('col-lg-12') || el.classList?.contains('col-md-6')
+            );
+            
+            sections.forEach((sec, idx) => {
+              if (idx < sections.length - 1) {
+                const divider = doc.createElement('div');
+                divider.style.cssText = 'height: 1px; width: 100%; background-color: #cbd5e1; margin-top: 40px; margin-bottom: 40px; clear: both; float: none; display: block;';
+                sec.after(divider);
+              }
+            });
+          }
 
           doc.documentElement.style.background = '#ffffff';
           doc.body.style.background = '#ffffff';
@@ -467,10 +539,10 @@ const ReportsFilter = ({
       const PAGE_H_MM = HDR_MM + IMG_H_MM + PAD_MM;
 
       const pdf = new jsPDF({
-        orientation: 'p',          // portrait (tall single scroll)
+        orientation: 'p',
         unit: 'mm',
-        format: [PAGE_W_MM, PAGE_H_MM],  // custom: exact fit
-        compress: true
+        format: [PAGE_W_MM, PAGE_H_MM],  // fit content exactly
+        compress: true // Enable compression for a smaller file size (3-5MB target)
       });
 
       const audienceName = advertisers?.find(a => a.advertiserId === filters.advertiser)?.reportName || "Report";
@@ -493,11 +565,12 @@ const ReportsFilter = ({
       pdf.setFont("helvetica", "normal");
       pdf.text(dateLabel, PAGE_W_MM - 3, 10, { align: "right" });
 
-      pdf.setDrawColor(220, 220, 220);
+      pdf.setDrawColor(180, 188, 200); // Darker slate gray for header line
+      pdf.setLineWidth(0.5);
       pdf.line(0, HDR_MM - 1, PAGE_W_MM, HDR_MM - 1);
 
-      // ── 4. Place the full screenshot as ONE image — no slicing ───────
-      const imgData = canvas.toDataURL('image/jpeg', 0.88);
+      // ── 4. Use high-quality JPEG (balanced for size) ───
+      const imgData = canvas.toDataURL('image/jpeg', 0.85); 
       pdf.addImage(imgData, 'JPEG', 0, HDR_MM, PAGE_W_MM, IMG_H_MM);
 
       // ── 5. Save ──────────────────────────────────────────────────────
@@ -595,8 +668,8 @@ const ReportsFilter = ({
 
       {/* Filter Section */}
       <div className="bg-white border-bottom shadow-sm">
-        <div className="container-fluid py-4 px-4">
-          <h2 className="h5 mb-4">Filter</h2>
+        <div className="container-fluid py-2 px-4">
+          <h2 className="h6 mb-2">Filter</h2>
 
           <div className="row g-3 align-items-end" ref={wrapperRef}>
             {/* Advertiser */}
@@ -639,8 +712,8 @@ const ReportsFilter = ({
               />
             </div>
 
-            {/* Campaign */}
-            {!advertisers?.find(a => a.advertiserId === filters.advertiser)?.reportName?.endsWith("_d") && (
+            {/* Campaign Selection - Only for Eskimi */}
+            {filters.source !== "DV360" && (
               <div className="col-lg-3 col-md-6">
                 <label className="form-label small fw-bold text-muted mb-2">Campaign</label>
                 <Select
@@ -676,7 +749,7 @@ const ReportsFilter = ({
             )}
 
             {/* Unified Date Range Column */}
-            <div className={`${!advertisers?.find(a => a.advertiserId === filters.advertiser)?.reportName?.endsWith("_d") ? 'col-lg-4' : 'col-lg-7'} col-md-6 position-relative`}>
+            <div className={`${filters.source !== "DV360" ? 'col-lg-4' : 'col-lg-7'} col-md-6 position-relative`}>
               <label className="form-label small fw-bold text-muted mb-2">Date Range</label>
               <div 
                 className="form-control d-flex align-items-center justify-content-between cursor-pointer border" 
@@ -694,11 +767,21 @@ const ReportsFilter = ({
 
               {showCalendar && (
                 <div 
-                  className="position-absolute shadow-lg bg-white border rounded mt-2" 
-                  style={{ zIndex: 1050, top: '100%', left: 0, minWidth: '650px', overflow: 'hidden', borderRadius: '12px' }}
+                  className="position-absolute shadow-lg bg-white border rounded mt-2 d-flex flex-column" 
+                  style={{ zIndex: 1050, top: '100%', right: 0, minWidth: '780px', overflow: 'hidden', borderRadius: '12px' }}
                 >
-                  <div className="p-3 border-bottom bg-white">
-                    <div className="d-flex flex-wrap gap-2 justify-content-center">
+                  <style>{`
+                    .rdrMonth { width: 310px !important; padding: 0 0.5em !important; }
+                    .rdrCalendarWrapper { font-size: 11px !important; }
+                    .rdrDateDisplayWrapper { display: none !important; }
+                    .rdrDay { height: 2.8em !important; line-height: 2.8em !important; }
+                    .rdrMonthAndYearWrapper { padding-top: 5px !important; height: 35px !important; }
+                    .rdrMonths { gap: 0 !important; }
+                  `}</style>
+                  <div className="d-flex flex-row-reverse bg-white">
+                    {/* Sidebar Presets - Now on Right */}
+                    <div className="border-start p-2 bg-light d-flex flex-column gap-0" style={{ width: '130px' }}>
+                      <label className="fw-bold text-muted mb-2 px-2 pt-1" style={{ fontSize: '10px', textTransform: 'uppercase' }}>Quick Select</label>
                       { [
                         { label: 'Today', key: 'today' },
                         { label: 'Yesterday', key: 'yesterday' },
@@ -709,38 +792,43 @@ const ReportsFilter = ({
                       ].map((btn) => (
                         <button 
                           key={btn.key} 
-                          className="btn btn-outline-primary btn-sm rounded-pill px-3"
-                          style={{ fontSize: '12px' }}
+                          className="btn btn-sm text-start px-2 py-1"
+                          style={{ fontSize: '11px', border: 'none', background: 'transparent', transition: 'all 0.1s' }}
                           onClick={() => setPreset(btn.key)}
+                          onMouseOver={(e) => e.target.style.background = '#e9ecef'}
+                          onMouseOut={(e) => e.target.style.background = 'transparent'}
                         >
                           {btn.label}
                         </button>
                       ))}
                     </div>
+
+                    {/* Calendar - Now on Left */}
+                    <div className="bg-white" style={{ transform: 'scale(0.95)', transformOrigin: 'top right', margin: '-5px 0 -15px 0' }}>
+                      <DateRange
+                        editableDateInputs={false}
+                        onChange={item => setRange([item.selection])}
+                        moveRangeOnFirstSelection={false}
+                        ranges={range}
+                        months={2}
+                        direction="horizontal"
+                        showDateDisplay={false}
+                        rangeColors={['#4c84ff']}
+                      />
+                    </div>
                   </div>
 
-                  <div className="p-2 d-flex justify-content-center bg-white">
-                    <DateRange
-                      editableDateInputs={false}
-                      onChange={item => setRange([item.selection])}
-                      moveRangeOnFirstSelection={false}
-                      ranges={range}
-                      months={2}
-                      direction="horizontal"
-                      showDateDisplay={false}
-                      rangeColors={['#4c84ff']}
-                    />
-                  </div>
-
-                  <div className="d-flex justify-content-end gap-2 p-3 border-top align-items-center bg-light">
+                  <div className="d-flex justify-content-end gap-2 p-1 px-3 border-top align-items-center bg-light">
                     <button 
                       className="btn btn-link btn-sm text-decoration-none text-secondary fw-bold" 
                       onClick={() => setShowCalendar(false)}
+                      style={{ fontSize: '12px' }}
                     >
                       Cancel
                     </button>
                     <button 
-                      className="btn btn-primary btn-sm px-4 rounded-pill" 
+                      className="btn btn-primary btn-sm rounded-pill" 
+                      style={{ padding: '4px 15px', fontSize: '12px' }}
                       onClick={handleApply}
                     >
                       Apply Range

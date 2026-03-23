@@ -10,25 +10,47 @@ const columnsList = [
   { name: "Impressions", defaultVisible: true },
   { name: "Clicks", defaultVisible: true },
   { name: "CTR", defaultVisible: true },
-  { name: "CPM", defaultVisible: true, permission: "cpm" },
-  { name: "CPC", defaultVisible: true, permission: "cpm" },
+  { name: "eCPM", defaultVisible: true, permission: "cpm" },
+  { name: "eCPC", defaultVisible: true, permission: "cpm" },
   { name: "Spent", defaultVisible: true, permission: "spent" },
   { name: "Total Conversions", defaultVisible: true },
 ];
 
-const OperatorTable = ({ operatorData = [], currencySymbol = "$", campaignPermissions = [] }) => {
+const getPriceForDate = (pricingObj, targetDate) => {
+  if (!pricingObj || typeof pricingObj !== 'object') return undefined;
+  const normalize = (d) => String(d).replace(/\//g, '-').split(' ')[0].substring(0, 10);
+  const normalizedTarget = targetDate ? normalize(targetDate) : "9999-12-31"; 
+  const normalizedPricing = {};
+  Object.entries(pricingObj).forEach(([d, v]) => {
+    normalizedPricing[normalize(d)] = v;
+  });
+  const sortedDates = Object.keys(normalizedPricing).sort();
+  let latestValue = undefined;
+  for (const date of sortedDates) {
+    if (date <= normalizedTarget) {
+      latestValue = normalizedPricing[date];
+    } else {
+      break;
+    }
+  }
+  return latestValue;
+};
+
+const OperatorTable = ({ 
+  operatorData = [], 
+  currencySymbol = "$", 
+  campaignPermissions = [], 
+  campaignPricing = { cpm: {}, cpc: {} },
+  globalEffectiveMetrics = { eCPM: 0, eCPC: 0 }
+}) => {
   const { data: session } = useSession();
 
   const filteredColumnsByPermission = columnsList.filter(col => {
     if (session?.user?.role === "super_admin") return true;
     if (!col.permission) return true;
     const perm = col.permission.toLowerCase();
-
-    // Campaign restrictions
     const isCampaignRestricted = campaignPermissions.some(p => p.toLowerCase() === perm);
     if (isCampaignRestricted) return false;
-
-    // User restrictions
     const isUserRestricted = session?.user?.permissions?.some(p => p.toLowerCase() === perm);
     return !isUserRestricted;
   });
@@ -52,6 +74,56 @@ const OperatorTable = ({ operatorData = [], currencySymbol = "$", campaignPermis
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
+  // GROUPING LOGIC: Correct Way (Weighted)
+  const groupedData = React.useMemo(() => {
+    const groups = {};
+    
+    operatorData.forEach(row => {
+      const title = row.name || row.browser || row.oses || row.os || row.OS || row.operator || row.browser_name || row.os_name || "-";
+      const imp = Number(row.Impressions || row.impressions || 0);
+      const cks = Number(row.Clicks || row.clicks || 0);
+      const cnv = Number(row.TotalConversions || row.totalConversions || row.total_conversions || 0);
+      const rowDate = row.Date || row.date || "";
+
+      let rowSpent = 0;
+      if (globalEffectiveMetrics.eCPM > 0) {
+        rowSpent = (imp / 1000) * globalEffectiveMetrics.eCPM;
+      } else if (globalEffectiveMetrics.eCPC > 0) {
+        rowSpent = cks * globalEffectiveMetrics.eCPC;
+      } else {
+        const datePriceCPM = getPriceForDate(campaignPricing?.cpm, rowDate);
+        const datePriceCPC = getPriceForDate(campaignPricing?.cpc, rowDate);
+        if (datePriceCPM !== undefined) {
+          rowSpent = (imp / 1000) * datePriceCPM;
+        } else if (datePriceCPC !== undefined) {
+          rowSpent = cks * datePriceCPC;
+        } else {
+          const rCPM = Number(row.CPM || row.cpm || 0);
+          const rCPC = Number(row.CPC || row.cpc || 0);
+          rowSpent = rCPM > 0 ? (imp / 1000) * rCPM : (cks * rCPC);
+        }
+      }
+
+      if (!groups[title]) {
+        groups[title] = { Title: title, Impressions: 0, Clicks: 0, Spent: 0, TotalConversions: 0 };
+      }
+      
+      groups[title].Impressions += imp;
+      groups[title].Clicks += cks;
+      groups[title].Spent += rowSpent;
+      groups[title].TotalConversions += cnv;
+    });
+
+    return Object.values(groups).map(g => ({
+      ...g,
+      CTR: g.Impressions > 0 ? (g.Clicks / g.Impressions) * 100 : 0,
+      eCPM: globalEffectiveMetrics.eCPM > 0
+        ? globalEffectiveMetrics.eCPM
+        : (g.Impressions > 0 ? (g.Spent / g.Impressions) * 1000 : 0),
+      eCPC: g.Clicks > 0 ? (g.Spent / g.Clicks) : 0,
+    })).sort((a,b) => b.Impressions - a.Impressions);
+  }, [operatorData, campaignPricing, globalEffectiveMetrics]);
+
   const filteredColumns = filteredColumnsByPermission.filter((col) =>
     col.name.toLowerCase().includes(search.toLowerCase())
   );
@@ -62,46 +134,30 @@ const OperatorTable = ({ operatorData = [], currencySymbol = "$", campaignPermis
     );
   };
 
-  const totalPages = Math.ceil((operatorData?.length || 0) / rowsPerPage);
+  const totalPages = Math.ceil((groupedData?.length || 0) / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
-  const paginatedData = operatorData?.slice(startIndex, startIndex + rowsPerPage) || [];
+  const paginatedData = groupedData?.slice(startIndex, startIndex + rowsPerPage) || [];
 
-  const totals = operatorData?.reduce((acc, row) => {
-    const imp = Number(row.Impressions || row.impressions || 0);
-    const clicks = Number(row.Clicks || row.clicks || 0);
-    const spent = Number(row.mediaCost || row.mediaCostAdvertiserCurrency || row.Spent || row.spent || row.cost || 0);
-    const totalConversions = Number(row.TotalConversions || row.totalConversions || row.total_conversions || 0);
-    
-    // Prioritize provided CPM/CPC for weighted aggregate
-    let cpm = Number(row.CPM || row.cpm || 0);
-    if (!cpm && imp > 0) cpm = (spent / imp) * 1000;
-    
-    let cpc = Number(row.CPC || row.cpc || 0);
-    if (!cpc && clicks > 0) cpc = (spent / clicks);
-
-    return {
-      Impressions: acc.Impressions + imp,
-      Clicks: acc.Clicks + clicks,
-      Spent: acc.Spent + spent,
-      "Total Conversions": (acc["Total Conversions"] || 0) + totalConversions,
-      SumCPM: (acc.SumCPM || 0) + (cpm * imp),
-      SumCPC: (acc.SumCPC || 0) + (cpc * clicks),
-    };
-  }, { Impressions: 0, Clicks: 0, Spent: 0, "Total Conversions": 0, SumCPM: 0, SumCPC: 0 });
+  const totals = groupedData?.reduce((acc, row) => ({
+    Impressions: acc.Impressions + row.Impressions,
+    Clicks: acc.Clicks + row.Clicks,
+    Spent: acc.Spent + row.Spent,
+    "Total Conversions": (acc["Total Conversions"] || 0) + row.TotalConversions,
+    SumCPM: (acc.SumCPM || 0) + (row.eCPM * row.Impressions),
+    SumCPC: (acc.SumCPC || 0) + (row.eCPC * row.Clicks),
+  }), { Impressions: 0, Clicks: 0, Spent: 0, "Total Conversions": 0, SumCPM: 0, SumCPC: 0 });
 
   const formatValue = (col, value) => {
     if (value === undefined || value === null) return "0";
     if (col === "Impressions" || col === "Clicks" || col === "Total Conversions") {
       return isNaN(Number(value)) ? (value || "0") : Number(value).toLocaleString();
     }
-    if (col === "Spent" || col === "CPM" || col === "CPC") {
-      const rawNum = typeof value === "string"
-        ? parseFloat(value.replace(/[^0-9.-]/g, "")) || 0
-        : Number(value || 0);
+    if (col === "Spent" || col === "eCPM" || col === "eCPC") {
+      const rawNum = Number(value || 0);
       return currencySymbol + rawNum.toFixed(2);
     }
     if (col === "CTR") {
-      return typeof value === "string" && value.includes("%") ? value : Number(value || 0).toFixed(2) + "%";
+      return Number(value || 0).toFixed(2) + "%";
     }
     return value;
   };
@@ -111,7 +167,7 @@ const OperatorTable = ({ operatorData = [], currencySymbol = "$", campaignPermis
       <div className="card-header bg-white border-0 pt-4 px-4 pb-3">
         <div className="d-flex justify-content-between align-items-center w-100">
             <h5 className="mb-0 fw-bold text-dark" style={{ fontSize: '1.2rem' }}>Operators</h5>
-            <button className="btn btn-primary d-flex align-items-center gap-2" onClick={() => setShow(true)} style={{ borderRadius: '8px', padding: '8px 16px', fontSize: '14px' }}>
+            <button data-html2canvas-ignore="true" data-print-hide className="btn btn-primary d-flex align-items-center gap-2" onClick={() => setShow(true)} style={{ borderRadius: '8px', padding: '8px 16px', fontSize: '14px' }}>
                 <FiPlus size={18} />
                 <span>Columns</span>
             </button>
@@ -131,37 +187,21 @@ const OperatorTable = ({ operatorData = [], currencySymbol = "$", campaignPermis
               {paginatedData.map((row, idx) => (
                 <tr key={idx} className="border-bottom">
                   {visibleColumns.map(col => {
-                    // Base metrics normalization
-                    const imp = Number(row.Impressions || row.impressions || 0);
-                    const cks = Number(row.Clicks || row.clicks || 0);
-                    const spt = Number(row.mediaCost || row.mediaCostAdvertiserCurrency || row.Spent || row.spent || row.cost || 0);
-                    const cnv = Number(row.TotalConversions || row.totalConversions || row.total_conversions || 0);
+                    // Use pre-computed values from groupedData (eCPM, eCPC, Spent already calculated correctly)
+                    const imp = row.Impressions || 0;
+                    const cks = row.Clicks || 0;
+                    const cnv = row.TotalConversions || 0;
 
-                    const rawCPM = row.CPM || row.cpm;
-                    const rawCPC = row.CPC || row.cpc;
-
-                    let val = row[col] || row[col.toLowerCase()] || row[col.charAt(0).toLowerCase() + col.slice(1)];
-                    
-                    // Priority mappings
-                    if (col === "Impressions") val = imp;
-                    if (col === "Clicks") val = cks;
-                    if (col === "Spent") val = spt;
-                    if (col === "Total Conversions") val = cnv;
-                    
-                    // Force consistent derived metrics
-                    if (col === "CTR") val = imp > 0 ? (cks / imp) * 100 : 0;
-                    if (col === "CPM") {
-                      const definedCPM = Number(rawCPM || 0);
-                      val = definedCPM > 0 ? definedCPM : (imp > 0 ? (spt / imp) * 1000 : 0);
-                    }
-                    if (col === "CPC") {
-                      const definedCPC = Number(rawCPC || 0);
-                      val = definedCPC > 0 ? definedCPC : (cks > 0 ? (spt / cks) : 0);
-                    }
-                    
-                    if (col === "Title" && !val) {
-                      val = row.name || row.browser || row.oses || row.os || row.OS || row.operator || row.browser_name || row.os_name || "-";
-                    }
+                    let val;
+                    if (col === "Title") val = row.Title || "-";
+                    else if (col === "Impressions") val = imp;
+                    else if (col === "Clicks") val = cks;
+                    else if (col === "Total Conversions") val = cnv;
+                    else if (col === "CTR") val = imp > 0 ? (cks / imp) * 100 : 0;
+                    else if (col === "Spent") val = row.Spent || 0;
+                    else if (col === "eCPM") val = row.eCPM || 0;
+                    else if (col === "eCPC") val = row.eCPC || 0;
+                    else val = row[col] || 0;
 
                     return (
                       <td key={col} className="py-3 px-4">
@@ -178,8 +218,8 @@ const OperatorTable = ({ operatorData = [], currencySymbol = "$", campaignPermis
                        <span className="small">
                         {col === "Title" ? "Total:" : 
                          col === "CTR" ? (totals.Impressions ? ((totals.Clicks / totals.Impressions) * 100).toFixed(2) + "%" : "0.00%") :
-                         col === "CPM" ? (totals.Impressions ? currencySymbol + (totals.SumCPM / totals.Impressions).toFixed(2) : currencySymbol + "0.00") :
-                         col === "CPC" ? (totals.Clicks ? currencySymbol + (totals.SumCPC / totals.Clicks).toFixed(2) : currencySymbol + "0.00") :
+                         col === "eCPM" ? (totals.Impressions ? currencySymbol + ((totals.Spent / totals.Impressions) * 1000).toFixed(2) : currencySymbol + "0.00") :
+                         col === "eCPC" ? (totals.Clicks ? currencySymbol + (totals.Spent / totals.Clicks).toFixed(2) : currencySymbol + "0.00") :
                          formatValue(col, totals[col])}
                        </span>
                     </td>
@@ -193,7 +233,7 @@ const OperatorTable = ({ operatorData = [], currencySymbol = "$", campaignPermis
           )}
         </div>
         {operatorData?.length > 0 && (
-          <div className="d-flex justify-content-end align-items-center gap-4 py-3 px-4 text-muted border-top bg-light-subtle" style={{ borderBottomLeftRadius: '12px', borderBottomRightRadius: '12px' }}>
+          <div data-html2canvas-ignore="true" data-print-hide className="d-flex justify-content-end align-items-center gap-4 py-3 px-4 text-muted border-top bg-light-subtle" style={{ borderBottomLeftRadius: '12px', borderBottomRightRadius: '12px' }}>
               <div className="d-flex align-items-center gap-3">
                   <span style={{ fontSize: '13px', fontWeight: '500' }}>Rows per page:</span>
                   <div className="position-relative">

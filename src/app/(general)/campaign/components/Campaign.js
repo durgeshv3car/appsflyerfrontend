@@ -33,7 +33,8 @@ const emptyCampaign = {
   advertiserId: "",
   campaignId: "",
   insertionOrderId: "",
-  cpm: "",
+  cpm: {},
+  cpc: {},
   currency: "",
   source: "DV360", // Default source
 };
@@ -122,7 +123,15 @@ const Campaign = () => {
   const [audienceId, setAudienceId] = useState(null);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [selectedPermissionCampaign, setSelectedPermissionCampaign] = useState(null);
-
+  const [newCpmDate, setNewCpmDate] = useState("");
+  const [newCpmValue, setNewCpmValue] = useState("");
+  const [newCpcDate, setNewCpcDate] = useState("");
+  const [newCpcValue, setNewCpcValue] = useState("");
+  const today = new Date();
+  const twoYearsAgo = new Date();
+  twoYearsAgo.setFullYear(today.getFullYear() - 2);
+  const formatDate = (date) => date.toISOString().split('T')[0];
+  const startDateStr = formatDate(twoYearsAgo);
 
   useEffect(() => {
     const fetchAudiences = async () => {
@@ -144,13 +153,24 @@ const Campaign = () => {
   }, [search]);
 
   const openAddModal = () => {
-    setCampaignData(emptyCampaign);
+    setCampaignData({
+      ...emptyCampaign,
+      cpm: { [startDateStr]: 0 },
+      cpc: { [startDateStr]: 0 }
+    });
+    setNewCpmDate(startDateStr);
+    setNewCpcDate(startDateStr);
     setEditingIndex(null);
     setModalOpen(true);
   };
 
   const openEditModal = (index) => {
-    setCampaignData(campaigns[index]);
+    const campaign = campaigns[index];
+    setCampaignData({
+      ...campaign,
+      cpm: typeof campaign.cpm === 'object' ? campaign.cpm : {},
+      cpc: typeof campaign.cpc === 'object' ? campaign.cpc : {}
+    });
     setEditingIndex(index);
     setModalOpen(true);
   };
@@ -164,6 +184,42 @@ const Campaign = () => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setCampaignData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleAddCpmEntry = () => {
+    if (!newCpmValue) return;
+    const dateToUse = newCpmDate || startDateStr; // Use Base Date if not defined
+    setCampaignData(prev => ({
+      ...prev,
+      cpm: { ...prev.cpm, [dateToUse]: Number(newCpmValue) }
+    }));
+    setNewCpmValue("");
+  };
+
+  const handleRemoveCpmEntry = (date) => {
+    setCampaignData(prev => {
+      const newCpm = { ...prev.cpm };
+      delete newCpm[date];
+      return { ...prev, cpm: newCpm };
+    });
+  };
+
+  const handleAddCpcEntry = () => {
+    if (!newCpcValue) return;
+    const dateToUse = newCpcDate || startDateStr; // Use Base Date if not defined
+    setCampaignData(prev => ({
+      ...prev,
+      cpc: { ...prev.cpc, [newCpcDate]: Number(newCpcValue) }
+    }));
+    setNewCpcValue("");
+  };
+
+  const handleRemoveCpcEntry = (date) => {
+    setCampaignData(prev => {
+      const newCpc = { ...prev.cpc };
+      delete newCpc[date];
+      return { ...prev, cpc: newCpc };
+    });
   };
 
   const handleSearchChange = (e) => {
@@ -205,14 +261,22 @@ const Campaign = () => {
     const isValid =
       campaignData?.reportName?.trim() &&
       campaignData?.advertiserId?.trim() &&
-      campaignData?.cpm?.toString().trim();
+      Object.keys(campaignData?.cpm || {}).length > 0;
 
-    if (!isValid) return;
+    if (!isValid) {
+      toast.warning("Please fill all required fields and add at least one CPM entry");
+      return;
+    }
     setLoading(true);
     setProgress(5);
     setLoadingStatus("Initializing campaign...");
     try {
       let res;
+      const today = new Date();
+      const twoYearsAgo = new Date();
+      twoYearsAgo.setFullYear(today.getFullYear() - 2);
+      const formatDate = (date) => date.toISOString().split('T')[0];
+
       if (editingIndex !== null) {
         const id = campaignData._id || campaigns[editingIndex]?._id;
         setLoadingStatus("Updating campaign details...");
@@ -224,7 +288,7 @@ const Campaign = () => {
         setProgress(20);
       }
 
-      if (res.audience?._id && campaignData.source === "DV360") {
+      if (res.audience?._id && campaignData.source === "DV360" && editingIndex === null) {
         const params = {
           audienceId: res.audience._id,
           dataRange: "ALL_TIME",
@@ -311,13 +375,14 @@ const Campaign = () => {
     const stringId = id?.$oid || id;
     
     // Combine existing campaign fields with the update to prevent backend from clearing them
-    const { reportName, insertionOrderId, advertiserId, campaignId, cpm, currency } = selectedPermissionCampaign;
+    const { reportName, insertionOrderId, advertiserId, campaignId, cpm, cpc, currency } = selectedPermissionCampaign;
     const payload = {
       reportName,
       insertionOrderId,
       advertiserId,
       campaignId,
       cpm,
+      cpc,
       currency,
       ...updatedData
     };
@@ -400,6 +465,7 @@ const Campaign = () => {
                 <th>Campaign ID</th>
                 <th>Insertion Order ID</th>
                 <th>CPM</th>
+                <th>CPC</th>
                 <th>Currency</th>
                 <th className="text-end">Actions</th>
               </tr>
@@ -437,7 +503,20 @@ const Campaign = () => {
                     <td className="align-middle">{c.advertiserId}</td>
                     <td className="align-middle">{c.campaignId || '-'}</td>
                     <td className="align-middle">{c.insertionOrderId || '-'}</td>
-                    <td className="align-middle">{c.cpm}</td>
+                    <td className="align-middle">
+                      {typeof c.cpm === 'object' ? (
+                        <span className="badge bg-light text-dark border">
+                          {Object.keys(c.cpm).length} dates
+                        </span>
+                      ) : (c.cpm || '-')}
+                    </td>
+                    <td className="align-middle">
+                      {typeof c.cpc === 'object' ? (
+                        <span className="badge bg-light text-dark border">
+                          {Object.keys(c.cpc).length} dates
+                        </span>
+                      ) : (c.cpc || '-')}
+                    </td>
                     <td className="align-middle">{c.currency || '-'}</td>
                     <td className="text-end align-middle">
                       {/* action buttons as a single row with gap and inline SVG icons */}
@@ -611,6 +690,7 @@ const Campaign = () => {
                           onChange={handleInputChange}
                           className="form-control"
                           placeholder="e.g. Q1 Performance"
+                          disabled={editingIndex !== null}
                           required
                         />
                       </div>
@@ -629,6 +709,7 @@ const Campaign = () => {
                           onChange={handleInputChange}
                           className="form-control"
                           placeholder="Advertiser ID"
+                          disabled={editingIndex !== null}
                           required
                         />
                       </div>
@@ -647,6 +728,7 @@ const Campaign = () => {
                               onChange={handleInputChange}
                               className="form-control"
                               placeholder="Required for DV360"
+                              disabled={editingIndex !== null}
                               required
                             />
                           </div>
@@ -665,28 +747,104 @@ const Campaign = () => {
                               onChange={handleInputChange}
                               className="form-control"
                               placeholder="Required for DV360"
+                              disabled={editingIndex !== null}
                               required
                             />
                           </div>
                         </div>
                       </>
                     )}
-                    <div className="row mb-3">
-                      <div className="col-4 d-flex align-items-center">
-                        <label className="fw-semibold mb-0">CPM</label>
+                     <div className="row mb-3">
+                      <div className="col-4">
+                        <label className="fw-semibold mb-0">Date-wise CPM</label>
                       </div>
                       <div className="col-8">
-                        <input
-                          type="number"
-                          name="cpm"
-                          value={campaignData?.cpm || ""}
-                          onChange={handleInputChange}
-                          className="form-control"
-                          placeholder="Enter CPM"
-                          min="0"
-                          step="0.01"
-                          required
-                        />
+                        <div className="d-flex gap-2 mb-2">
+                          <input
+                            type="date"
+                            className="form-control form-control-sm"
+                            value={newCpmDate}
+                            onChange={(e) => setNewCpmDate(e.target.value)}
+                          />
+                          <input
+                            type="number"
+                            className="form-control form-control-sm"
+                            placeholder="Value"
+                            value={newCpmValue}
+                            onChange={(e) => setNewCpmValue(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCpmEntry())}
+                          />
+                          <button 
+                            type="button" 
+                            className="btn btn-sm btn-outline-primary"
+                            onClick={handleAddCpmEntry}
+                          >Add</button>
+                        </div>
+                        <div className="border rounded p-2 bg-light" style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                          {Object.keys(campaignData?.cpm || {}).length === 0 ? (
+                            <small className="text-muted">No CPM entries added.</small>
+                          ) : (
+                            Object.entries(campaignData.cpm).sort().map(([date, val]) => (
+                              <div key={date} className="d-flex justify-content-between align-items-center mb-1 pb-1 border-bottom">
+                                <small className="fw-medium">
+                                  {date === startDateStr ? `Base Rate: ${val}` : `${date}: ${val}`}
+                                </small>
+                                <button 
+                                  type="button" 
+                                  className="btn btn-link btn-sm p-0 text-danger"
+                                  onClick={() => handleRemoveCpmEntry(date)}
+                                >Remove</button>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="row mb-3">
+                      <div className="col-4">
+                        <label className="fw-semibold mb-0">Date-wise CPC</label>
+                      </div>
+                      <div className="col-8">
+                        <div className="d-flex gap-2 mb-2">
+                          <input
+                            type="date"
+                            className="form-control form-control-sm"
+                            value={newCpcDate}
+                            onChange={(e) => setNewCpcDate(e.target.value)}
+                          />
+                          <input
+                            type="number"
+                            className="form-control form-control-sm"
+                            placeholder="Value"
+                            value={newCpcValue}
+                            onChange={(e) => setNewCpcValue(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCpcEntry())}
+                          />
+                          <button 
+                            type="button" 
+                            className="btn btn-sm btn-outline-primary"
+                            onClick={handleAddCpcEntry}
+                          >Add</button>
+                        </div>
+                        <div className="border rounded p-2 bg-light" style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                          {Object.keys(campaignData?.cpc || {}).length === 0 ? (
+                            <small className="text-muted">No CPC entries added.</small>
+                          ) : (
+                            Object.entries(campaignData.cpc).sort().map(([date, val]) => (
+                               <div key={date} className="d-flex justify-content-between align-items-center mb-1 pb-1 border-bottom">
+                                 <small className="fw-medium">
+                                   {date === startDateStr ? `Base Rate: ${val}` : `${date}: ${val}`}
+                                 </small>
+                                 <button 
+                                   type="button" 
+                                   className="btn btn-link btn-sm p-0 text-danger"
+                                   onClick={() => handleRemoveCpcEntry(date)}
+                                 >Remove</button>
+                               </div>
+                            ))
+                          )}
+                        </div>
                       </div>
                     </div>
 
@@ -721,7 +879,7 @@ const Campaign = () => {
                         !(
                           campaignData?.reportName?.trim() &&
                           campaignData?.advertiserId?.trim() &&
-                          campaignData?.cpm?.toString().trim() &&
+                          Object.keys(campaignData?.cpm || {}).length > 0 &&
                           (campaignData.source === "Eskimi" || (campaignData.campaignId?.trim() && campaignData.insertionOrderId?.trim()))
                         )
                       }
