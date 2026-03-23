@@ -68,6 +68,7 @@ import { createReportsDataOperator as createOperatorSync } from "@/services/oper
 import { createReportsDataAdPos as createAdPosSync } from "@/services/ad-pos";
 import { createReportsDataAdType as createAdTypeSync } from "@/services/ad-type";
 import { getAudience } from "@/services/createaudience";
+import { filterMetadataRows } from "@/utils/filterMetadata";
 
 // Main Dashboard Component
 const CampaignDashboard = () => {
@@ -253,6 +254,11 @@ const CampaignDashboard = () => {
       tData = Array.isArray(arr) ? arr : (arr?.data || []);
       gData = Array.isArray(arr) ? arr : (arr?.data || tData);
     }
+    
+    // Filter out metadata rows (DV360 Labels)
+    tData = filterMetadataRows(tData);
+    gData = filterMetadataRows(gData);
+
     return { tData, gData };
   };
 
@@ -318,6 +324,7 @@ const CampaignDashboard = () => {
             : res.report
               ? [res.report]
               : [];
+          tData = filterMetadataRows(tData); // Apply filter
           gData = tData;
         }
         
@@ -354,6 +361,7 @@ const CampaignDashboard = () => {
                 ? [res.report]
                 : []
           ).sort((a, b) => b.Impressions - a.Impressions);
+          tData = filterMetadataRows(tData); // Apply filter
           gData = tData.slice(0, 10);
         }
         setCreativeTableData({ tableData: tData, graphData: gData });
@@ -394,6 +402,7 @@ const CampaignDashboard = () => {
             : res.report
               ? [res.report]
               : [];
+          tData = filterMetadataRows(tData); // Apply filter
           gData = tData;
         }
         setAgeData({ tableData: tData, graphData: gData });
@@ -434,6 +443,7 @@ const CampaignDashboard = () => {
             : res.report
               ? [res.report]
               : [];
+          tData = filterMetadataRows(tData); // Apply filter
           gData = tData;
         }
         setGenderData({ tableData: tData, graphData: gData });
@@ -465,6 +475,7 @@ const CampaignDashboard = () => {
             : res.report
               ? [res.report]
               : [];
+          tData = filterMetadataRows(tData); // Apply filter
           gData = tData;
         }
         setTotalData({ tableData: tData, graphData: gData });
@@ -502,6 +513,7 @@ const CampaignDashboard = () => {
               Number(b.Impressions || b.impressions || 0) -
               Number(a.Impressions || a.impressions || 0),
           );
+          tData = filterMetadataRows(tData); // Apply filter
           gData = tData.slice(0, 10);
         }
         setOsData({ tableData: tData, graphData: gData });
@@ -547,6 +559,7 @@ const CampaignDashboard = () => {
                 Number(b.Impressions || b.impressions || 0) -
                 Number(a.Impressions || a.impressions || 0),
             );
+          tData = filterMetadataRows(tData); // Apply filter
           gData = tData.slice(0, 10);
         }
         setBrowserData({ tableData: tData, graphData: gData });
@@ -592,6 +605,7 @@ const CampaignDashboard = () => {
                 Number(b.Impressions || b.impressions || 0) -
                 Number(a.Impressions || a.impressions || 0),
             );
+          tData = filterMetadataRows(tData); // Apply filter
           gData = tData.slice(0, 10);
         }
         setOperatorData({ tableData: tData, graphData: gData });
@@ -632,6 +646,7 @@ const CampaignDashboard = () => {
               Number(b.Impressions || b.impressions || 0) -
               Number(a.Impressions || a.impressions || 0),
           );
+          tData = filterMetadataRows(tData); // Apply filter
           gData = tData.slice(0, 10);
         }
         setPlacementPosData({ tableData: tData, graphData: gData });
@@ -672,6 +687,7 @@ const CampaignDashboard = () => {
               Number(b.Impressions || b.impressions || 0) -
               Number(a.Impressions || a.impressions || 0),
           );
+          tData = filterMetadataRows(tData); // Apply filter
           gData = tData.slice(0, 10);
         }
         setPlacementTypeData({ tableData: tData, graphData: gData });
@@ -708,6 +724,7 @@ const CampaignDashboard = () => {
               Number(b.Impressions || b.impressions || 0) -
               Number(a.Impressions || a.impressions || 0),
           );
+          tData = filterMetadataRows(tData); // Apply filter
           gData = tData.slice(0, 10);
         }
         setDeviceData({ tableData: tData, graphData: gData });
@@ -745,6 +762,7 @@ const CampaignDashboard = () => {
               Number(b.Impressions || b.impressions || 0) -
               Number(a.Impressions || a.impressions || 0),
           );
+          tData = filterMetadataRows(tData); // Apply filter
            gData = tData.slice(0, 25);
         }
         setCityData({ tableData: tData, graphData: gData });

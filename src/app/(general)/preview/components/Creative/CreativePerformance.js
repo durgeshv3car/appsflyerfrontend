@@ -2,22 +2,25 @@
 import React, { useEffect, useRef } from "react";
 import { Chart } from "chart.js";
 import "@/lib/chart";
+import { filterMetadataRows } from "@/utils/filterMetadata";
 
 const CreativePerformance = ({ CreativeTableData = [] }) => {
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
 
+  const filteredData = React.useMemo(() => filterMetadataRows(CreativeTableData), [CreativeTableData]);
+
   useEffect(() => {
-    if (chartRef.current && CreativeTableData.length > 0) {
+    if (chartRef.current && filteredData.length > 0) {
       const ctx = chartRef.current.getContext("2d");
 
       if (chartInstance.current) {
         chartInstance.current.destroy();
       }
 
-      const labels = CreativeTableData.map(item => item.Title || item.title || item.creative_name || item.Creative || item.name || item.creative || item.line_item_name || "Unknown");
-      const impressionsData = CreativeTableData.map(item => Number(item.Impressions || item.impressions || 0));
-      const ctrData = CreativeTableData.map(item => {
+      const labels = filteredData.map(item => item.Title || item.title || item.creative_name || item.Creative || item.name || item.creative || item.line_item_name || "Unknown");
+      const impressionsData = filteredData.map(item => Number(item.Impressions || item.impressions || 0));
+      const ctrData = filteredData.map(item => {
         const ctrString = String(item.CTR || item.ctr || "0%");
         return parseFloat(ctrString.replace('%', ''));
       });
@@ -144,7 +147,8 @@ const CreativePerformance = ({ CreativeTableData = [] }) => {
     return () => {
       if (chartInstance.current) chartInstance.current.destroy();
     };
-  }, [CreativeTableData]);
+  }, [filteredData]);
+
 
   const colors = [
     "#3B82F6", "#6366F1", "#8B5CF6", "#EC4899", "#F43F5E",
@@ -173,7 +177,7 @@ const CreativePerformance = ({ CreativeTableData = [] }) => {
           {/* Left Side: Names Column */}
           <div className="col-md-4 h-100 border-end pr-3" style={{ overflowY: 'auto' }}>
             <div className="d-flex flex-column gap-3 py-2">
-              {CreativeTableData.map((item, index) => {
+              {filteredData.map((item, index) => {
                 const title = item.Title || item.title || item.creative_name || item.Creative || item.name || "Unknown";
                 return (
                   <div key={index} className="d-flex align-items-start gap-3 p-2 rounded-3 hover-bg-light transition-all" style={{ backgroundColor: 'rgba(0,0,0,0.02)' }}>
@@ -195,7 +199,7 @@ const CreativePerformance = ({ CreativeTableData = [] }) => {
 
           {/* Right Side: Graph */}
           <div className="col-md-8 h-100">
-            {CreativeTableData.length > 0 ? (
+            {filteredData.length > 0 ? (
                 <canvas ref={chartRef}></canvas>
             ) : (
                 <div className="w-100 h-100 d-flex align-items-center justify-content-center text-muted border rounded-3 bg-light">

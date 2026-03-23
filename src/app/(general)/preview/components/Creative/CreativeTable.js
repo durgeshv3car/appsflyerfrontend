@@ -4,6 +4,7 @@ import { Modal, Button, Form } from "react-bootstrap";
 import { FiChevronLeft, FiChevronRight, FiChevronDown, FiPlus } from "react-icons/fi";
 import { useSession } from "next-auth/react";
 import { useEffect } from "react";
+import { filterMetadataRows } from "@/utils/filterMetadata";
 
 const columnsList = [
   { name: "Title", defaultVisible: true },
@@ -74,11 +75,14 @@ const CreativePerformanceTable = ({
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
+  const filteredData = React.useMemo(() => filterMetadataRows(CreativeTableData), [CreativeTableData]);
+  const filteredCreativeCount = filteredData.length;
+
   // GROUPING LOGIC: Correct Way (Weighted)
   const groupedData = React.useMemo(() => {
     const groups = {};
     
-    CreativeTableData.forEach(row => {
+    filteredData.forEach(row => {
       const title = row.creative_name || row.Creative || row.name || row.creative || row.line_item_name || "-";
       const imp = Number(row.Impressions || row.impressions || 0);
       const cks = Number(row.Clicks || row.clicks || 0);
@@ -265,7 +269,7 @@ const CreativePerformanceTable = ({
               
               <div className="d-flex align-items-center gap-3">
                 <span style={{ fontSize: '13px', fontWeight: '500', minWidth: '80px', textAlign: 'center' }}>
-                  {startIndex + 1}-{Math.min(startIndex + rowsPerPage, CreativeTableData.length)} of {CreativeTableData.length}
+                  {startIndex + 1}-{Math.min(startIndex + rowsPerPage, filteredCreativeCount)} of {filteredCreativeCount}
                 </span>
                 
                 <div className="d-flex gap-2">
