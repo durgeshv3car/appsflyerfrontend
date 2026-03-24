@@ -8,27 +8,27 @@ export const menuList = [
 
 
      {
-        id: 3,
+        id: 2,
         name: "campaign",
         path: "/campaign",
         icon: 'feather-settings',        
     },
 
      {
-        id: 4,
+        id: 3,
         name: "Preview List",
         path: `/preview-list`,
         icon: 'feather-eye',        
     },
     {
-        id: 5,
+        id: 4,
         name: "reports",
         path: `/preview`,
         icon: 'feather-layout',        
     },
     
        {
-        id: 4,
+        id: 5,
         name: "Create Account",
         path: `/authentication/register/creative`,
         icon: 'feather-send',        

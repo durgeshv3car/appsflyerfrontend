@@ -7,7 +7,6 @@ export default function GenderChart({ genderData = [] }) {
   const chartData = useMemo(() => {
     let maleTotal = 0;
     let femaleTotal = 0;
-    let unknownTotal = 0; // Initialize unknownTotal
 
     genderData.forEach((item) => {
       const gender = String(item.Gender || item.gender || item.name || "").toLowerCase().trim();
@@ -17,26 +16,23 @@ export default function GenderChart({ genderData = [] }) {
         maleTotal += impressions;
       } else if (gender === "female" || gender === "f") {
         femaleTotal += impressions;
-      } else {
-        unknownTotal += impressions; // Add to unknownTotal for other genders
       }
     });
 
-    const total = maleTotal + femaleTotal + unknownTotal;
+    const total = maleTotal + femaleTotal;
     
     return {
       male: total > 0 ? Math.round((maleTotal / total) * 100) : 0,
       female: total > 0 ? Math.round((femaleTotal / total) * 100) : 0,
-      unknown: total > 0 ? Math.round((unknownTotal / total) * 100) : 0,
     };
   }, [genderData]);
 
   const data = {
-    labels: ["Male", "Female", "Unknown"],
+    labels: ["Male", "Female"],
     datasets: [
       {
-        data: [chartData.male, chartData.female, chartData.unknown],
-        backgroundColor: ["#1F6FEB", "#D63384", "#7F8C8D"],
+        data: [chartData.male, chartData.female],
+        backgroundColor: ["#1F6FEB", "#D63384"],
         borderWidth: 0,
         hoverOffset: 4
       },
@@ -90,12 +86,6 @@ export default function GenderChart({ genderData = [] }) {
             <span style={{ width: '10px', height: '10px', backgroundColor: '#D63384', borderRadius: '1px' }}></span>
             <span className="text-secondary fw-bold" style={{ fontSize: '12px', letterSpacing: '0.4px' }}>FEMALE {chartData.female}%</span>
           </div>
-          {chartData.unknown > 0 && (
-            <div className="d-flex align-items-center gap-2">
-              <span style={{ width: '10px', height: '10px', backgroundColor: '#7F8C8D', borderRadius: '1px' }}></span>
-              <span className="text-secondary fw-bold" style={{ fontSize: '12px', letterSpacing: '0.4px' }}>UNKNOWN {chartData.unknown}%</span>
-            </div>
-          )}
         </div>
       </div>
     </div>

@@ -25,30 +25,42 @@ export const filterMetadataRows = (data) => {
   return data.filter((row) => {
     // Collect all possible title/name fields
     const title = (
-      row.Title || 
-      row.title || 
-      row.creative_name || 
-      row.Creative || 
-      row.name || 
-      row.creative || 
-      row.line_item_name || 
-      row.LineItem ||
-      row.InsertionOrder || 
-      row.Advertiser || 
-      row.Browser ||
-      row.OS ||
-      row.OperatingSystem ||
-      row.Operator ||
-      row.City ||
-      row.Device ||
+      row.Title || row.title || 
+      row.creative_name || row.Creative || 
+      row.name || row.creative || 
+      row.line_item_name || row.LineItem ||
+      row.InsertionOrder || row.Advertiser ||
       ""
     ).toString().toLowerCase().trim();
 
-    // If the title itself is one of the metadata labels, filter it out
-    // Also filter if it *contains* specific known metadata blocks
-    if (!title || title === "-" || title === "unknown") return true; // Keep these, maybe handle later
+    // Collect possible dimension fields
+    const dimensionValue = (
+      row.Age || row.age || 
+      row.Gender || row.gender || 
+      row.City || row.city || 
+      row.Device || row.device || 
+      row.Browser || row.browser || 
+      row.OS || row.os || row.oses ||
+      row.Operator || row.operator ||
+      ""
+    ).toString().toLowerCase().trim();
 
+    // If we have an explicit "unknown" type label in the title or dimension, filter it out
+    const isUnknown = 
+      title === "unknown" || title === "null" || title === "undefined" || title === "-" ||
+      dimensionValue === "unknown" || dimensionValue === "null" || dimensionValue === "undefined" || dimensionValue === "-";
+
+    if (isUnknown) return false;
+
+    // Check against metadata labels
     const isMetadata = METADATA_LABELS.some(label => title.includes(label));
-    return !isMetadata;
+    if (isMetadata) return false;
+
+    // If title is empty, only keep it if it has a Date or Impressions (likely a time-series/performance row)
+    if (!title) {
+        return !!(row.Date || row.date || Number(row.Impressions || row.impressions || 0) > 0);
+    }
+
+    return true;
   });
 };
