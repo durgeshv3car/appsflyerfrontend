@@ -1,63 +1,76 @@
 "use client";
 import React, { useState } from "react";
-import { Info } from "lucide-react";
+import { Info, X } from "lucide-react";
 
 const creativeFormats = [
   { id: "banner", label: "Banner", description: "Banners are a universal ad format available in various shapes and sizes, such as rectangles, squares, leaderboards, and others." },
   { id: "video", label: "Video", description: "Video ads display across various platforms as either instream (within video content) or outstream (outside video players)." },
-  { id: "native", label: "Native", description: "Native ads match the visual design of the app or site they live on, providing a better user experience." },
-  { id: "native-video", label: "Native Video", description: "Native video ads display video incorporated within content, fitting various layouts and devices." },
   { id: "audio", label: "Audio", description: "Audio ads deliver audio format through online streaming platforms, podcasts, digital radios, and in-game environments." },
-  { id: "engagement", label: "Engagement", description: "Engagement ads encourage users to interact with the ad content." },
-  { id: "carousel", label: "Carousel", description: "Carousel ads allow you to show multiple images or videos in a single ad." },
+   { id: "rich-media", label: "Rich Media", description: "Rich media ads are interactive advertisements that provide a more engaging user experience." },
+
 ];
 
-const subFormats = {
-  banner: [
-    { id: "file-banner", label: "File Banner", description: "File banners are images in PNG, JPG, and GIF formats with the most inventory space available." },
-    { id: "js-tag", label: "Javascript Tag", description: "JavaScript tags are banners featuring animations, transitions, and other moving elements, and serve as HTML5 ads to capture viewer attention." },
-    { id: "rich-media", label: "Rich Media", description: "Rich Media ads are pre-made templates with advanced elements designed to catch attention and encourage user engagement." },
-  ],
-  video: [
-    { id: "video-vast", label: "Video VAST", description: "Video VAST adjusts video based on player options and content to match the look and feel of the apps and sites." },
-    { id: "ibv", label: "IBV", description: "IBV video ads are served within an embedded video player inside a 300x250 banner placement." },
-    { id: "video-vast-uri", label: "Video Remote VAST URI", description: "A video remote VAST URI allows integration with different ad platforms through third-party tags for widespread video distribution." },
-    { id: "video-vast-ibv", label: "Video VAST + IBV", description: "Video VAST and IBV video creatives created at once." },
-  ],
-  "native-video": [
-    { id: "video-vast", label: "Video VAST", description: "Video VAST adjusts video based on player options and content to match the look and feel of the apps and sites." },
-    { id: "video-vast-uri", label: "Video Remote VAST URI", description: "A video remote VAST URI allows integration with different ad platforms through third-party tags for widespread video distribution." },
-  ],
-  audio: [
-    { id: "audio-vast", label: "Audio VAST", description: "Audio VAST delivers audio-only content in a publisher's audio player." },
-    { id: "audio-vast-uri", label: "Audio Remote VAST URI", description: "Audio remote VAST URI allows integration with different ad platforms through third-party tags for widespread video distribution." },
-  ],
-  native: [
-    { id: "native-display", label: "Native Display", description: "Native display ads feature a headline, description, and image that match the look and feel of the publisher's site." },
-    { id: "native-content", label: "Native Content", description: "Native content ads are designed to look like a part of the content on a webpage or app." },
-  ],
-  engagement: [
-    { id: "playable", label: "Playable", description: "Playable ads offer a short, interactive sample of a game or app experience before horizontal download." },
-    { id: "scratch-reveal", label: "Scratch & Reveal", description: "Interactive ads that invite users to scratch the screen to reveal a hidden offer or message." },
-  ],
-  carousel: [
-    { id: "image-carousel", label: "Image Carousel", description: "Image carousel ads allow you to showcase up to 10 images within a single ad, each with its own link." },
-    { id: "video-carousel", label: "Video Carousel", description: "Video carousel ads allow you to showcase multiple videos in a single ad experience." },
-  ],
-};
+
 
 const CreativeSetSettings = ({ onCancel, onSave }) => {
   const [title, setTitle] = useState("");
   const [selectedFormat, setSelectedFormat] = useState("banner");
-  const [selectedSubFormat, setSelectedSubFormat] = useState("");
+  const [file, setFile] = useState(null);
+  const [fileUrl, setFileUrl] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSave = async () => {
+    setIsLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("creativeName", title);
+      formData.append("type", selectedFormat);
+      
+      if (selectedFormat === "ctv") {
+        if (fileUrl) formData.append("fileUrl", fileUrl);
+      } else {
+        if (file) formData.append("file", file);
+      }
+
+      const response = await fetch("http://localhost:5000/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json().catch(() => ({}));
+        onSave({ title, selectedFormat, file, fileUrl, responseData: data });
+      } else {
+        const errText = await response.text().catch(() => "Unknown error");
+        console.error("Upload failed:", errText);
+        alert("Upload failed. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      alert("Error uploading file. Make sure the backend is running.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleFormatChange = (formatId) => {
     setSelectedFormat(formatId);
-    setSelectedSubFormat("");
+    setFile(null);
+    setFileUrl("");
+  };
+
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
+    }
+  };
+
+  const removeFile = () => {
+    setFile(null);
   };
 
   const currentFormat = creativeFormats.find((f) => f.id === selectedFormat);
-  const currentSubFormats = subFormats[selectedFormat] || [];
+
 
   return (
     <div className="bg-white rounded-3 shadow-sm p-5 m-3" style={{ border: "1px solid #f1f5f9", minHeight: '80vh' }}>
@@ -137,36 +150,98 @@ const CreativeSetSettings = ({ onCancel, onSave }) => {
                 {currentFormat?.label} Format
               </h6>
               
-              {currentSubFormats.length > 0 ? (
-                <div className="d-flex flex-column gap-3">
-                  {currentSubFormats.map((sub) => (
-                    <div 
-                      key={sub.id} 
-                      className={`p-4 border rounded-3 d-flex gap-3 align-items-start transition-all cursor-pointer ${selectedSubFormat === sub.id ? 'bg-light-subtle shadow-sm' : ''}`}
-                      style={{ 
-                        borderColor: selectedSubFormat === sub.id ? "#6b46c1" : "#f1f5f9",
-                        backgroundColor: selectedSubFormat === sub.id ? "rgba(107, 70, 193, 0.02)" : "white"
+              {["banner", "video", "audio"].includes(selectedFormat) && (
+                <div className="mt-4">
+                  <label className="fw-semibold mb-2 text-dark" style={{ fontSize: "0.9rem" }}>Upload {currentFormat?.label} File</label>
+                  {!file ? (
+                    <input
+                      type="file"
+                      className="form-control"
+                      onChange={handleFileChange}
+                      accept={
+                        selectedFormat === "banner" ? "image/*" : 
+                        selectedFormat === "video" ? "video/*" : "audio/*"
+                      }
+                      style={{
+                        padding: "10px 14px",
+                        borderColor: "#e2e8f0",
+                        borderRadius: "8px",
                       }}
-                      onClick={() => setSelectedSubFormat(sub.id)}
-                    >
-                      <div 
-                        className={`rounded-circle d-flex align-items-center justify-content-center border-2 transition-all mt-1 ${selectedSubFormat === sub.id ? 'border-primary' : 'border-light-custom'}`}
-                        style={{ width: '18px', height: '18px', border: '2px solid', flexShrink: 0 }}
-                      >
-                        {selectedSubFormat === sub.id && <div className="bg-primary rounded-circle" style={{ width: '8px', height: '8px' }}></div>}
+                    />
+                  ) : (
+                    <div className="d-flex flex-column gap-3 p-3 mt-2 rounded-3" style={{ border: "1px solid #e2e8f0", backgroundColor: "#f8fafc" }}>
+                      {/* Local File Preview */}
+                      <div className="d-flex justify-content-center bg-dark rounded-3 overflow-hidden" style={{ minHeight: '100px' }}>
+                        {selectedFormat === "banner" && (
+                          <img
+                            src={URL.createObjectURL(file)}
+                            alt="Uploaded Preview"
+                            className="img-fluid"
+                            style={{ maxHeight: '200px', objectFit: "contain" }}
+                          />
+                        )}
+                        {selectedFormat === "video" && (
+                          <video 
+                            src={URL.createObjectURL(file)} 
+                            controls 
+                            className="w-100" 
+                            style={{ maxHeight: '200px' }}
+                          />
+                        )}
+                        {selectedFormat === "audio" && (
+                          <div className="w-100 p-4 d-flex align-items-center justify-content-center">
+                            <audio 
+                              src={URL.createObjectURL(file)} 
+                              controls 
+                              className="w-100"
+                            />
+                          </div>
+                        )}
                       </div>
-                      <div className="flex-grow-1">
-                        <label className={`fw-bold d-block mb-1 cursor-pointer ${selectedSubFormat === sub.id ? 'text-dark' : 'text-muted'}`} style={{ fontSize: "0.9rem" }}>
-                          {sub.label}
-                        </label>
-                        <p className="text-muted m-0" style={{ fontSize: "0.8rem", lineHeight: "1.5" }}>
-                          {sub.description}
-                        </p>
+                      
+                      {/* File Details */}
+                      <div className="d-flex align-items-center justify-content-between">
+                        <div className="flex-grow-1 text-truncate">
+                          <span className="fw-medium d-block text-truncate" style={{ fontSize: "0.9rem" }}>{file.name}</span>
+                          <span className="text-muted small">{(file.size / 1024).toFixed(1)} KB</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-danger d-flex align-items-center gap-1 border-0"
+                          onClick={removeFile}
+                          style={{ padding: "6px 12px", backgroundColor: "#fee2e2", color: "#ef4444" }}
+                        >
+                          <X size={14} /> Remove
+                        </button>
                       </div>
                     </div>
-                  ))}
+                  )}
                 </div>
-              ) : null}
+              )}
+
+              {selectedFormat === "ctv" && (
+                <div className="mt-4">
+                  <label className="fw-semibold mb-2 text-dark" style={{ fontSize: "0.9rem" }}>File URL</label>
+                  <input
+                    type="url"
+                    className="form-control"
+                    placeholder="Enter file URL here (e.g., https://example.com/video.mp4)"
+                    value={fileUrl}
+                    onChange={(e) => setFileUrl(e.target.value)}
+                    style={{
+                      padding: "12px 16px",
+                      borderColor: "#e2e8f0",
+                      borderRadius: "8px",
+                      fontSize: "0.95rem"
+                    }}
+                  />
+                  {fileUrl && (
+                    <div className="mt-2 text-muted" style={{ fontSize: "0.8rem" }}>
+                      Preview URL: <a href={fileUrl} target="_blank" rel="noopener noreferrer">{fileUrl}</a>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -188,17 +263,17 @@ const CreativeSetSettings = ({ onCancel, onSave }) => {
         </button>
         <button 
           className="btn px-5 py-2 fw-bold transition-all text-white shadow-sm" 
-          onClick={() => onSave({ title, selectedFormat, selectedSubFormat })}
-          disabled={!title || !selectedSubFormat}
+          onClick={handleSave}
+          disabled={!title || isLoading}
           style={{ 
-            backgroundColor: (!title || !selectedSubFormat) ? "#f1f5f9" : "#6b46c1", 
-            color: (!title || !selectedSubFormat) ? "#94a3b8" : "white",
+            backgroundColor: (!title || isLoading) ? "#f1f5f9" : "#6b46c1", 
+            color: (!title || isLoading) ? "#94a3b8" : "white",
             borderColor: "transparent",
             borderRadius: '8px',
             fontSize: '0.9rem'
           }}
         >
-          Save creative set
+          {isLoading ? "Saving..." : "Save creative set"}
         </button>
       </div>
 

@@ -91,7 +91,7 @@ const NavigationManu = () => {
             `}</style>
             <div className="navbar-wrapper">
                 <div className="m-header">
-                    <Link href="/" className="b-brand">
+                    <Link href="/preview" className="b-brand">
                         {/* <!-- ========   change your logo hear   ============ --> */}
                         <Image width={140} height={40} src="/images/logo360.png" alt="logo" className="logo logo-lg" style={{ background: '#031035' }} />
                         <Image width={140} height={40} src="/images/logo-abbr.png" alt="logo" className="logo logo-sm" style={{ background: '#031035' }} />

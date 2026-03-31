@@ -37,6 +37,7 @@ const emptyCampaign = {
   cpc: {},
   currency: "",
   source: "DV360", // Default source
+  active: true, // New field
 };
 
 const CampaignLoader = ({ progress, status }) => {
@@ -366,6 +367,21 @@ const Campaign = () => {
     }
   };
 
+  const handleToggleActive = async (id, currentStatus) => {
+    try {
+      setLoading(true);
+      await updateAudience(id, { active: !currentStatus });
+      const all = await getAudience();
+      setCampaigns(all?.data || []);
+      toast.success(`Campaign ${!currentStatus ? 'activated' : 'deactivated'} successfully`);
+    } catch (err) {
+      console.error("Error toggling status:", err);
+      toast.error("Failed to update status");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleShowPermissions = (campaign) => {
     setSelectedPermissionCampaign(campaign);
     setShowPermissionModal(true);
@@ -467,6 +483,7 @@ const Campaign = () => {
                 <th>CPM</th>
                 <th>CPC</th>
                 <th>Currency</th>
+                <th>Cron Status</th>
                 <th className="text-end">Actions</th>
               </tr>
             </thead>
@@ -518,6 +535,21 @@ const Campaign = () => {
                       ) : (c.cpc || '-')}
                     </td>
                     <td className="align-middle">{c.currency || '-'}</td>
+                    <td className="align-middle">
+                       <div className="form-check form-switch">
+                         <input
+                           className="form-check-input"
+                           type="checkbox"
+                           role="switch"
+                           checked={c.active !== false}
+                           onChange={() => handleToggleActive(c._id, c.active !== false)}
+                           style={{ cursor: 'pointer' }}
+                         />
+                         <span className={`badge ${c.active !== false ? 'bg-success' : 'bg-secondary'} ms-2`} style={{ fontSize: '0.7rem' }}>
+                           {c.active !== false ? 'Active' : 'Inactive'}
+                         </span>
+                       </div>
+                     </td>
                     <td className="text-end align-middle">
                       {/* action buttons as a single row with gap and inline SVG icons */}
                         
@@ -531,6 +563,28 @@ const Campaign = () => {
                     >
                       <Shield size={16} /> Permissions
                     </button>
+                     <button
+  className="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center"
+  onClick={() => openEditModal(idx)}
+  title="Edit"
+  aria-label="Edit"
+  style={{ width: 36, height: 36, padding: 0 }}
+>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z" />
+  </svg>
+</button>
                         <button
                           className="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center"
                           onClick={() => {
@@ -569,31 +623,7 @@ const Campaign = () => {
                           </svg>
                         </button>
 
-                        <button
-                          className="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center"
-                          onClick={() => openEditModal(idx)}
-                          title="Edit"
-                          aria-label="Edit"
-                          style={{ width: 36, height: 36, padding: 0 }}
-                        >
-                          {/* edit SVG */}
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="16"
-                            height="16"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            aria-hidden="true"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="2"
-                              d="M15.232 5.232l3.536 3.536M9 11l6 6H3v-6l6-6z"
-                            />
-                          </svg>
-                        </button>
+                      
 
                         <button
                           className="btn btn-sm btn-outline-danger d-flex align-items-center justify-content-center"
@@ -863,6 +893,28 @@ const Campaign = () => {
                         />
                       </div>
                     </div>
+
+                    <div className="row mb-3">
+                       <div className="col-4 d-flex align-items-center">
+                         <label className="fw-semibold mb-0">Campaign Status</label>
+                       </div>
+                       <div className="col-8">
+                         <div className="form-check form-switch pt-1">
+                           <input
+                             className="form-check-input"
+                             type="checkbox"
+                             role="switch"
+                             id="activeToggle"
+                             checked={campaignData?.active !== false}
+                             onChange={(e) => setCampaignData(prev => ({ ...prev, active: e.target.checked }))}
+                             style={{ cursor: 'pointer' }}
+                           />
+                           <label className="form-check-label ms-2 text-muted small" htmlFor="activeToggle">
+                             {campaignData?.active !== false ? 'Active (Reports will be visible)' : 'Inactive (Reports will be hidden)'}
+                           </label>
+                         </div>
+                       </div>
+                     </div>
                   </div>
                   <div className="modal-footer">
                     <button

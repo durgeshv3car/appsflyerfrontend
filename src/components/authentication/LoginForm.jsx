@@ -49,23 +49,22 @@ const LoginForm = ({ registerPath, resetPath }) => {
   return (
     <>
       <ToastContainer />
-      <h2 className="fs-20 fw-bolder mb-4 text-center">Login to your account</h2>
 
-
-      <form onSubmit={formik.handleSubmit} className="w-100 mt-4 pt-2">
+      <form onSubmit={formik.handleSubmit} className="w-100 mt-2">
         {/* Email */}
-        <div className="mb-4">
+        <div className="mb-3">
           <input
             type="email"
             name="email"
             className="form-control"
+            style={{ height: '54px', borderRadius: '8px', fontSize: '15px', padding: '10px 20px' }}
             placeholder="Email or Username"
             value={formik.values.email}
             onChange={formik.handleChange}
             onBlur={formik.handleBlur}
           />
           {formik.touched.email && formik.errors.email && (
-            <div className="text-danger fs-12">{formik.errors.email}</div>
+            <div className="text-danger fs-12 mt-1">{formik.errors.email}</div>
           )}
         </div>
 
@@ -74,7 +73,8 @@ const LoginForm = ({ registerPath, resetPath }) => {
           <input
             type={showPassword ? "text" : "password"}
             name="password"
-            className="form-control pe-5"
+            className="form-control"
+            style={{ height: '54px', borderRadius: '8px', fontSize: '15px', padding: '10px 50px 10px 20px' }}
             placeholder="Password"
             value={formik.values.password}
             onChange={formik.handleChange}
@@ -82,40 +82,36 @@ const LoginForm = ({ registerPath, resetPath }) => {
           />
 
           <span
-            className="position-absolute top-50 translate-middle-y c-pointer"
-            style={{ right: "12px" }}
+            className="position-absolute top-50 translate-middle-y c-pointer text-muted"
+            style={{ right: "15px" }}
             onClick={() => setShowPassword(!showPassword)}
           >
-            {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+            {showPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}
           </span>
 
           {formik.touched.password && formik.errors.password && (
-            <div className="text-danger fs-12">{formik.errors.password}</div>
+            <div className="text-danger fs-12 mt-1">{formik.errors.password}</div>
           )}
         </div>
 
         {/* Remember Me + Forgot Password */}
         <div className="d-flex align-items-center justify-content-between mb-4">
-          <div>
-            <div className="custom-control custom-checkbox">
-              <input
-                type="checkbox"
-                name="rememberMe"
-                id="rememberMe"
-                className="custom-control-input"
-                checked={formik.values.rememberMe}
-                onChange={formik.handleChange}
-              />
-              <label
-                className="custom-control-label c-pointer"
-                htmlFor="rememberMe"
-              >
-                Remember Me
-              </label>
-            </div>
+          <div className="form-check">
+            <input
+              className="form-check-input"
+              type="checkbox"
+              id="rememberMe"
+              name="rememberMe"
+              checked={formik.values.rememberMe}
+              onChange={formik.handleChange}
+              style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+            />
+            <label className="form-check-label ms-1 text-muted" htmlFor="rememberMe" style={{ fontSize: '14px', cursor: 'pointer' }}>
+              Remember Me
+            </label>
           </div>
           <div>
-            <Link href={resetPath} className="fs-11 text-primary">
+            <Link href={resetPath} className="text-primary hover-underline" style={{ fontSize: '13px', fontWeight: '500' }}>
               Forget password?
             </Link>
           </div>
@@ -123,9 +119,19 @@ const LoginForm = ({ registerPath, resetPath }) => {
 
         {/* Submit */}
         <div className="mt-4">
-          <button type="submit" className="btn btn-lg btn-primary w-100">
-            Login
+          <button 
+                type="submit" 
+                className="btn btn-primary w-100 fw-bold"
+                style={{ height: '54px', borderRadius: '8px', fontSize: '16px', letterSpacing: '1px' }}
+          >
+            LOGIN
           </button>
+        </div>
+        
+        <div className="mt-4 text-center">
+            <p className="text-muted" style={{ fontSize: '14px' }}>
+                Don't have an account? <Link href={registerPath} className="text-primary fw-bold">Sign up</Link>
+            </p>
         </div>
       </form>
 

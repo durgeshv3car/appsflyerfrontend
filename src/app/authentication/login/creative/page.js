@@ -22,34 +22,46 @@ const Page = () => {
   }
 
   return (
-    <main className="auth-creative-wrapper">
-      <div className="auth-creative-inner">
-        <div className="creative-card-wrapper">
-          <div className="card my-4 overflow-hidden" style={{ zIndex: 1 }}> 
-            <div className="row flex-1 g-0">
-              <div className="col-lg-6 h-100 my-auto order-1 order-lg-0">
-                <div className="wd-50 bg-white p-2 rounded-circle shadow-lg position-absolute translate-middle top-50 start-50 d-none d-lg-block">
-                  <img src="/images/logo-abbr.png" alt="img" className="img-fluid" />
-                </div>
-                <div className="creative-card-body card-body p-sm-5">
-                  <LoginForm 
-                    registerPath={"/authentication/register/creative"} 
-                    resetPath={"/authentication/reset/creative"} 
-                  />
-                </div>
+    <main className="auth-creative-wrapper vh-100 bg-white">
+      <div className="container-fluid h-100 p-0">
+        <div className="row g-0 h-100">
+          {/* Left: Graphic (Matches provided image) */}
+          <div className="col-lg-6 d-none d-lg-flex align-items-center justify-content-center bg-white" style={{ background: 'linear-gradient(135deg, #f8faff 0%, #e8efff 100%)' }}>
+            <div className="p-4 text-center">
+              <Image 
+                width={800} 
+                height={600} 
+                sizes='100vw' 
+                src="/images/dashboard_logo1.png"
+                alt="Video Promotion Dashboard" 
+                className="img-fluid rounded-4 shadow-sm"
+                priority
+              />
+            </div>
+          </div>
+
+          {/* Right: Login Form */}
+          <div className="col-lg-6 d-flex align-items-center justify-content-center bg-light">
+            <div className="auth-form-container px-4 px-sm-5 py-5 w-100" style={{ maxWidth: '480px' }}>
+              <div className="text-center mb-4">
+                 <div className="d-flex flex-column align-items-center justify-content-center mb-2">
+                    <small className="text-secondary fw-bold" style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.8, marginBottom: '2px' }}>Built by</small>
+                    <Image 
+                        className="mb-0" 
+                        style={{ objectFit: 'contain' }} 
+                        src="/images/login_logo.png" 
+                        alt="AUTOMATE360" 
+                        width={160} 
+                        height={55} 
+                    />
+                 </div>
+                 <h5 className="text-dark fw-bold mt-4 mb-0">Login to your account</h5>
               </div>
-              <div className="col-lg-6 bg-primary order-0 order-lg-1">
-                <div className="h-100 d-flex align-items-center justify-content-center">
-                  <Image 
-                    width={499} 
-                    height={499} 
-                    sizes='100vw' 
-                    src="/images/auth/auth-user.png" 
-                    alt="img" 
-                    className="img-fluid" 
-                  />
-                </div>
-              </div>
+              
+              <LoginForm 
+                registerPath={"/authentication/register/creative"} 
+                resetPath={"/authentication/reset/creative"} 
+              />
             </div>
           </div>
         </div>

@@ -46,73 +46,72 @@ const RegisterForm = ({ path }) => {
   return (
     <>
       <ToastContainer />
-      <h2 className="fs-20 fw-bolder mb-4">Register for account</h2>
 
-      <form onSubmit={formik.handleSubmit} className="w-100 mt-4 pt-2">
+      <form onSubmit={formik.handleSubmit} className="w-100 mt-2">
         {/* Full Name */}
-        <div className="mb-4">
+        <div className="mb-3">
           <input
             type="text"
             name="fullName"
             className="form-control"
+            style={{ height: '52px', borderRadius: '8px', fontSize: '14px' }}
             placeholder="Full Name"
             value={formik.values.fullName}
             onChange={formik.handleChange}
             onBlur={formik.handleBlur}
           />
           {formik.touched.fullName && formik.errors.fullName && (
-            <div className="text-danger">{formik.errors.fullName}</div>
+            <div className="text-danger fs-12 mt-1">{formik.errors.fullName}</div>
           )}
         </div>
 
         {/* Email */}
-        <div className="mb-4">
+        <div className="mb-3">
           <input
             type="email"
             name="email"
             className="form-control"
+            style={{ height: '52px', borderRadius: '8px', fontSize: '14px' }}
             placeholder="Email"
             value={formik.values.email}
             onChange={formik.handleChange}
             onBlur={formik.handleBlur}
           />
           {formik.touched.email && formik.errors.email && (
-            <div className="text-danger">{formik.errors.email}</div>
+            <div className="text-danger fs-12 mt-1">{formik.errors.email}</div>
           )}
         </div>
 
-
-
-        {/* Password with show/hide */}
-          <div className="mb-3 position-relative">
+        {/* Password */}
+        <div className="mb-3 position-relative">
           <input
             type={showPassword ? "text" : "password"}
             name="password"
-            className="form-control pe-5"
+            className="form-control"
+            style={{ height: '52px', borderRadius: '8px', fontSize: '14px', paddingRight: '45px' }}
             placeholder="Password"
             value={formik.values.password}
             onChange={formik.handleChange}
             onBlur={formik.handleBlur}
           />
-
           <span
-            className="position-absolute top-50 translate-middle-y c-pointer"
-            style={{ right: "12px" }}
+            className="position-absolute top-50 translate-middle-y c-pointer text-muted"
+            style={{ right: "15px" }}
             onClick={() => setShowPassword(!showPassword)}
           >
             {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
           </span>
-
           {formik.touched.password && formik.errors.password && (
-            <div className="text-danger fs-12">{formik.errors.password}</div>
+            <div className="text-danger fs-12 mt-1">{formik.errors.password}</div>
           )}
         </div>
 
         {/* Role Dropdown */}
-        <div className="mb-4">
+        <div className="mb-3">
           <select
             name="role"
             className="form-select"
+            style={{ height: '52px', borderRadius: '8px', fontSize: '14px' }}
             value={formik.values.role}
             onChange={formik.handleChange}
             onBlur={formik.handleBlur}
@@ -121,49 +120,42 @@ const RegisterForm = ({ path }) => {
             <option value="tester">Tester</option>
           </select>
           {formik.touched.role && formik.errors.role && (
-            <div className="text-danger">{formik.errors.role}</div>
+            <div className="text-danger fs-12 mt-1">{formik.errors.role}</div>
           )}
         </div>
 
         {/* Terms */}
-        <div className="mt-4">
-          <div className="custom-control custom-checkbox">
-            <input
-              type="checkbox"
-              name="termsCondition"
-              id="termsCondition"
-              checked={formik.values.termsCondition}
-              onChange={formik.handleChange}
-              className="custom-control-input"
-            />
-            <label
-              className="custom-control-label c-pointer text-muted"
-              htmlFor="termsCondition"
-            >
-              I agree to all the <a href="#">Terms &amp; Conditions</a> and{" "}
-              <a href="#">Fees</a>.
-            </label>
-            {formik.touched.termsCondition && formik.errors.termsCondition && (
-              <div className="text-danger">{formik.errors.termsCondition}</div>
-            )}
-          </div>
+        <div className="form-check mb-4">
+          <input
+            type="checkbox"
+            className="form-check-input"
+            id="termsCondition"
+            name="termsCondition"
+            checked={formik.values.termsCondition}
+            onChange={formik.handleChange}
+            style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+          />
+          <label className="form-check-label ms-1 text-muted" htmlFor="termsCondition" style={{ fontSize: '13px', cursor: 'pointer' }}>
+            I agree to the <Link href="#" className="text-primary">Terms & Conditions</Link>
+          </label>
+          {formik.touched.termsCondition && formik.errors.termsCondition && (
+            <div className="text-danger fs-12 mt-1">{formik.errors.termsCondition}</div>
+          )}
         </div>
 
         {/* Submit */}
-        <div className="mt-5">
-          <button type="submit" className="btn btn-lg btn-primary w-100">
-            Create Account
+        <div className="mt-4">
+          <button type="submit" className="btn btn-primary w-100 fw-bold" style={{ height: '52px', borderRadius: '8px', fontSize: '15px' }}>
+            CREATE ACCOUNT
           </button>
         </div>
-      </form>
 
-      <div className="mt-5 text-muted">
-        <span>Already have an account?</span>
-        <Link href={path} className="fw-bold">
-          {" "}
-          Login
-        </Link>
-      </div>
+        <div className="mt-4 text-center">
+            <p className="text-muted" style={{ fontSize: '14px' }}>
+                Already have an account? <Link href={path} className="text-primary fw-bold">Sign in</Link>
+            </p>
+        </div>
+      </form>
     </>
   );
 };

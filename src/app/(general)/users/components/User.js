@@ -4,7 +4,12 @@ import { Pencil, Trash2, User, Layers, X, Shield } from "lucide-react";
 import EditUserModal from "./EditUserModal";
 import PermissionModal from "./PermissionModal";
 import { useRouter } from "next/navigation";
-import { deleteUser, getAllUsers, removeUserAudience, updateUser } from "@/services/users";
+import {
+  deleteUser,
+  getAllUsers,
+  removeUserAudience,
+  updateUser,
+} from "@/services/users";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -17,17 +22,16 @@ function UserPage() {
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [selectedPermissionUser, setSelectedPermissionUser] = useState(null);
 
-    const getUserData = async () => {
+  const getUserData = async () => {
+    const res = await getAllUsers();
+    if (res.message) {
+      setUsers(res.userData);
+    }
+  };
 
-      const res = await getAllUsers();
-      if (res.message) {
-        setUsers(res.userData);
-      }
-    };
-
-    useEffect(()=>{
-      getUserData()
-    },[])
+  useEffect(() => {
+    getUserData();
+  }, []);
 
   const [showCampaignModal, setShowCampaignModal] = useState(false);
   const [selectedUserCampaigns, setSelectedUserCampaigns] = useState([]);
@@ -39,8 +43,8 @@ function UserPage() {
     setShowCampaignModal(true);
   };
 
-  const handleEdit = (id,user) => {
-    router.push(`/users?id=${id}`)
+  const handleEdit = (id, user) => {
+    router.push(`/users?id=${id}`);
     setEditingUser(user);
     setShowModal(true);
   };
@@ -50,7 +54,7 @@ function UserPage() {
       const res = await updateUser(_id, updatedData);
       if (res.message || res.success || res) {
         setUsers((prev) =>
-          prev.map((u) => (u._id === _id ? { ...u, ...updatedData } : u))
+          prev.map((u) => (u._id === _id ? { ...u, ...updatedData } : u)),
         );
         setShowModal(false);
         toast.success("User updated successfully");
@@ -70,7 +74,7 @@ function UserPage() {
       const res = await updateUser(_id, updatedData);
       if (res.message || res.success || res) {
         setUsers((prev) =>
-          prev.map((u) => (u._id === _id ? { ...u, ...updatedData } : u))
+          prev.map((u) => (u._id === _id ? { ...u, ...updatedData } : u)),
         );
         setShowPermissionModal(false);
         toast.success("Permissions updated successfully");
@@ -82,34 +86,34 @@ function UserPage() {
 
   const handleDelete = async (id) => {
     try {
-        const res = await deleteUser(id);
-        if (res.message) {
-          getUserData();
-          toast.success("User deleted successfully");
-        }
+      const res = await deleteUser(id);
+      if (res.message) {
+        getUserData();
+        toast.success("User deleted successfully");
+      }
     } catch (error) {
-        console.error(error);
-        toast.error("Failed to delete user");
+      console.error(error);
+      toast.error("Failed to delete user");
     }
   };
 
   const handleRemoveCampaign = async (campaignId) => {
-    if(!confirm("Are you sure you want to remove this campaign?")) return;
-    
+    if (!confirm("Are you sure you want to remove this campaign?")) return;
+
     try {
-        const res = await removeUserAudience(selectedUserEmail, campaignId);
-        if(res.success) {
-            setSelectedUserCampaigns(prev => prev.filter(c => c._id !== campaignId));
-            getUserData(); 
-            toast.success("Campaign removed successfully");
-        }
+      const res = await removeUserAudience(selectedUserEmail, campaignId);
+      if (res.success) {
+        setSelectedUserCampaigns((prev) =>
+          prev.filter((c) => c._id !== campaignId),
+        );
+        getUserData();
+        toast.success("Campaign removed successfully");
+      }
     } catch (error) {
-        console.error("Failed to remove campaign", error);
-        toast.error("Failed to remove campaign");
+      console.error("Failed to remove campaign", error);
+      toast.error("Failed to remove campaign");
     }
   };
-
-
 
   return (
     <div className="container-fluid py-4">
@@ -165,7 +169,7 @@ function UserPage() {
                     </button>
                     <button
                       className="btn btn-sm btn-outline-warning"
-                      onClick={() => handleEdit(user._id,user)}
+                      onClick={() => handleEdit(user._id, user)}
                     >
                       <Pencil size={16} /> Edit
                     </button>
@@ -201,15 +205,24 @@ function UserPage() {
 
       {/* Campaigns Modal */}
       {showCampaignModal && (
-        <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
-          <div className="bg-white rounded shadow p-4" style={{ width: '90%', maxWidth: '800px' }}>
+        <div
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+          style={{ backgroundColor: "rgba(0,0,0,0.5)", zIndex: 1050 }}
+        >
+          <div
+            className="bg-white rounded shadow p-4"
+            style={{ width: "90%", maxWidth: "800px" }}
+          >
             <div className="d-flex justify-content-between align-items-center mb-4">
               <h4 className="m-0">User Campaigns</h4>
-              <button className="btn btn-link text-dark p-0" onClick={() => setShowCampaignModal(false)}>
+              <button
+                className="btn btn-link text-dark p-0"
+                onClick={() => setShowCampaignModal(false)}
+              >
                 <X size={24} />
               </button>
             </div>
-            
+
             <div className="table-responsive">
               <table className="table table-bordered table-hover">
                 <thead className="table-light">
@@ -236,17 +249,26 @@ function UserPage() {
                       <tr key={camp._id}>
                         <td>{camp.reportName}</td>
                         <td>
-                          <span className={`badge ${camp.source === 'Eskimi' ? 'bg-info' : 'bg-primary'}`}>
-                            {camp.source || 'DV360'}
+                          <span
+                            className={`badge ${camp.source === "Eskimi" ? "bg-info" : "bg-primary"}`}
+                          >
+                            {camp.source || "DV360"}
                           </span>
                         </td>
                         <td>{camp.advertiserId}</td>
-                        <td>{camp.campaignId || '-'}</td>
-                        <td>{camp.insertionOrderId || '-'}</td>
-                        <td>{camp.cpm}</td>
-                        <td>{camp.currency || '-'}</td>
+                        <td>{camp.campaignId || "-"}</td>
+                        <td>{camp.insertionOrderId || "-"}</td>
                         <td>
-                          <button 
+                          {camp.cpm &&
+                            Object.entries(camp.cpm).map(([date, value]) => (
+                              <div key={date}>
+                                {date}: {value}
+                              </div>
+                            ))}
+                        </td>
+                        <td>{camp.currency || "-"}</td>
+                        <td>
+                          <button
                             className="btn btn-sm btn-danger"
                             onClick={() => handleRemoveCampaign(camp._id)}
                           >

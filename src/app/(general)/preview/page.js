@@ -49,7 +49,7 @@ import { getDailyReportsByRangeBrowser } from "@/services/browser";
 import { getDailyReportsByRangeOperator } from "@/services/operator";
 import { getDailyReportsByRangeAdPos } from "@/services/ad-pos";
 import { getDailyReportsByRangeAdType } from "@/services/ad-type";
-import { getDailyReportsByRangeCreative } from "@/services/creative";
+import { createReportsDataCreative, getDailyReportsByRangeCreative } from "@/services/creative";
 import {
   createReportsData,
   createReportsDataDevice,
@@ -69,6 +69,7 @@ import { createReportsDataAdPos as createAdPosSync } from "@/services/ad-pos";
 import { createReportsDataAdType as createAdTypeSync } from "@/services/ad-type";
 import { getAudience } from "@/services/createaudience";
 import { filterMetadataRows } from "@/utils/filterMetadata";
+import { createReportsDataCreativeSize } from "@/services/creative-size";
 
 // Main Dashboard Component
 const CampaignDashboard = () => {
@@ -123,10 +124,17 @@ const CampaignDashboard = () => {
     currency: "",
   });
   const [updateTrigger, setUpdateTrigger] = useState(0);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const handleUpdate = () => {
     localStorage.setItem("campaignFilteredData", JSON.stringify(filters));
+    setIsUpdating(true);
     setUpdateTrigger(prev => prev + 1);
+    
+    // Force show loader for 3 seconds as requested
+    setTimeout(() => {
+      setIsUpdating(false);
+    }, 3000);
   };
 
   const { data: session } = useSession();
@@ -774,66 +782,6 @@ const CampaignDashboard = () => {
   );
 
 
-  const fetchSyncData = React.useCallback(
-    async (currentFilters = filters) => {
-      if (currentFilters.source !== "DV360" || !currentFilters.audienceId)
-        return;
-      try {
-        const commonParams = {
-          audienceId: currentFilters.audienceId,
-          dataRange: "ALL_TIME",
-        };
-
-        const ageParams = {
-          audienceId: currentFilters.audienceId,
-          dataRange: "LAST_365_DAYS",
-        };
-
-        await Promise.all([
-          createReportsData(commonParams),
-          createDeviceSync(commonParams),
-          createCitySync(commonParams),
-          createAgeSync(ageParams),
-          createOsSync(commonParams),
-          createBrowserSync(commonParams),
-          createOperatorSync(commonParams),
-          createAdPosSync(commonParams),
-          createAdTypeSync(commonParams),
-        ]);
-
-        // Refresh all after sync
-        fetchCampaignData(currentFilters);
-        fetchCreativeTableData(currentFilters);
-        fetchAgeData(currentFilters);
-        fetchGenderData(currentFilters);
-        fetchTotalData(currentFilters);
-        fetchOsData(currentFilters);
-        fetchBrowserData(currentFilters);
-        fetchOperatorData(currentFilters);
-        fetchPlacementPosData(currentFilters);
-        fetchPlacementTypeData(currentFilters);
-        fetchDeviceData(currentFilters);
-        fetchCityData(currentFilters);
-      } catch (error) {
-        console.log("Sync Error:", error);
-      }
-    },
-    [
-      filters,
-      fetchCampaignData,
-      fetchCreativeTableData,
-      fetchAgeData,
-      fetchGenderData,
-      fetchTotalData,
-      fetchOsData,
-      fetchBrowserData,
-      fetchOperatorData,
-      fetchPlacementPosData,
-      fetchPlacementTypeData,
-      fetchDeviceData,
-      fetchCityData,
-    ],
-  );
 
   const fetchAllData = React.useCallback(async (targetFilters = filters) => {
     console.log("Fetching all data with filters:", targetFilters);
@@ -849,7 +797,6 @@ const CampaignDashboard = () => {
     fetchPlacementTypeData(targetFilters);
     fetchDeviceData(targetFilters);
     fetchCityData(targetFilters);
-    fetchSyncData(targetFilters);
   }, [
     filters,
     fetchCampaignData,
@@ -864,7 +811,6 @@ const CampaignDashboard = () => {
     fetchPlacementTypeData,
     fetchDeviceData,
     fetchCityData,
-    fetchSyncData
   ]);
 
   useEffect(() => {
@@ -893,12 +839,31 @@ const CampaignDashboard = () => {
           fetchPlacementTypeData={fetchPlacementTypeData}
           fetchDeviceData={fetchDeviceData}
           fetchCityData={fetchCityData}
-          fetchSyncData={fetchSyncData}
           handleUpdate={handleUpdate}
+          isUpdating={isUpdating}
         />
       </Suspense>
 
-      <div className="container-fluid py-4" id="dashboard-content">
+      <div className="container-fluid py-4 position-relative" id="dashboard-content" style={{ minHeight: isUpdating ? '400px' : 'auto' }}>
+        {isUpdating && (
+          <div 
+            className="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center"
+            style={{ 
+              backgroundColor: "rgba(255, 255, 255, 0.7)", 
+              backdropFilter: "blur(4px)",
+              zIndex: 1000,
+              borderRadius: '12px'
+            }}
+          >
+            <div className="text-center p-5 shadow-lg bg-white rounded-4 border d-flex flex-column align-items-center" style={{ position: 'sticky', top: '50%', transform: 'translateY(-50%)' }}>
+              <div className="spinner-border text-primary mb-3" style={{ width: '3rem', height: '3rem' }} role="status">
+                <span className="visually-hidden">Loading...</span>
+              </div>
+              <h5 className="fw-bold text-dark mb-1">Updating Preview</h5>
+              <p className="text-muted small mb-0">Refreshing data reports...</p>
+            </div>
+          </div>
+        )}
         <div className="row g-4">
           {hasPermission("performance_graph") && (
             <div className="col-12">

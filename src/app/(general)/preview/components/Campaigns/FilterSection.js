@@ -46,8 +46,8 @@ const ReportsFilter = ({
   fetchPlacementTypeData,
   fetchDeviceData,
   fetchCityData,
-  fetchSyncData,
   handleUpdate,
+  isUpdating,
 }) => {
   const { data: session } = useSession();
   const searchParams = useSearchParams();
@@ -352,7 +352,6 @@ const ReportsFilter = ({
        fetchPlacementTypeData(filters);
        fetchDeviceData(filters);
        fetchCityData(filters);
-       fetchSyncData(filters);
     }
   };
 
@@ -768,20 +767,23 @@ const ReportsFilter = ({
               {showCalendar && (
                 <div 
                   className="position-absolute shadow-lg bg-white border rounded mt-2 d-flex flex-column" 
-                  style={{ zIndex: 1050, top: '100%', right: 0, minWidth: '780px', overflow: 'hidden', borderRadius: '12px' }}
+                  style={{ zIndex: 1050, top: '100%', right: 0, minWidth: '850px', overflow: 'hidden', borderRadius: '12px' }}
                 >
                   <style>{`
-                    .rdrMonth { width: 310px !important; padding: 0 0.5em !important; }
-                    .rdrCalendarWrapper { font-size: 11px !important; }
+                    .rdrMonth { width: 330px !important; padding: 0 15px !important; }
+                    .rdrCalendarWrapper { font-size: 12px !important; color: #334155 !important; border-radius: 12px !important; }
                     .rdrDateDisplayWrapper { display: none !important; }
                     .rdrDay { height: 2.8em !important; line-height: 2.8em !important; }
-                    .rdrMonthAndYearWrapper { padding-top: 5px !important; height: 35px !important; }
-                    .rdrMonths { gap: 0 !important; }
+                    .rdrMonthAndYearWrapper { padding: 10px 0 !important; height: 45px !important; }
+                    .rdrMonths { gap: 20px !important; padding: 10px !important; }
+                    .rdrMonthName { font-weight: 700 !important; color: #0f172a !important; padding-bottom: 10px !important; }
+                    .rdrDayNumber span { color: #334155 !important; font-weight: 500 !important; }
+                    .rdrDayToday .rdrDayNumber span:after { background: #4c84ff !important; bottom: 4px !important; }
                   `}</style>
                   <div className="d-flex flex-row-reverse bg-white">
                     {/* Sidebar Presets - Now on Right */}
-                    <div className="border-start p-2 bg-light d-flex flex-column gap-0" style={{ width: '130px' }}>
-                      <label className="fw-bold text-muted mb-2 px-2 pt-1" style={{ fontSize: '10px', textTransform: 'uppercase' }}>Quick Select</label>
+                    <div className="border-start p-2 bg-light d-flex flex-column gap-1 shadow-sm" style={{ width: '150px' }}>
+                      <label className="fw-bold text-muted mb-2 px-2 pt-2" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Quick Select</label>
                       { [
                         { label: 'Today', key: 'today' },
                         { label: 'Yesterday', key: 'yesterday' },
@@ -792,11 +794,11 @@ const ReportsFilter = ({
                       ].map((btn) => (
                         <button 
                           key={btn.key} 
-                          className="btn btn-sm text-start px-2 py-1"
-                          style={{ fontSize: '11px', border: 'none', background: 'transparent', transition: 'all 0.1s' }}
+                          className="btn btn-sm text-start px-3 py-2 rounded-2"
+                          style={{ fontSize: '12px', border: 'none', background: 'transparent', transition: 'all 0.2s', fontWeight: '500' }}
                           onClick={() => setPreset(btn.key)}
-                          onMouseOver={(e) => e.target.style.background = '#e9ecef'}
-                          onMouseOut={(e) => e.target.style.background = 'transparent'}
+                          onMouseOver={(e) => {e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#0061ff'}}
+                          onMouseOut={(e) => {e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'inherit'}}
                         >
                           {btn.label}
                         </button>
@@ -804,7 +806,7 @@ const ReportsFilter = ({
                     </div>
 
                     {/* Calendar - Now on Left */}
-                    <div className="bg-white" style={{ transform: 'scale(0.95)', transformOrigin: 'top right', margin: '-5px 0 -15px 0' }}>
+                    <div className="bg-white p-2">
                       <DateRange
                         editableDateInputs={false}
                         onChange={item => setRange([item.selection])}
@@ -841,11 +843,27 @@ const ReportsFilter = ({
             {/* Update Button */}
             <div className="col-lg-2 col-md-6">
               <button 
-                className="btn btn-primary w-100 fw-bold" 
-                style={{ height: '42px', borderRadius: '8px', backgroundColor: '#0061ff', border: 'none', boxShadow: '0 4px 6px rgba(0, 97, 255, 0.2)' }}
+                className="btn btn-primary w-100 fw-bold d-flex align-items-center justify-content-center gap-2" 
+                style={{ 
+                  height: '42px', 
+                  borderRadius: '8px', 
+                  backgroundColor: isUpdating ? '#6c757d' : '#0061ff', 
+                  border: 'none', 
+                  boxShadow: isUpdating ? 'none' : '0 4px 6px rgba(0, 97, 255, 0.2)',
+                  opacity: isUpdating ? 0.8 : 1,
+                  transition: 'all 0.3s'
+                }}
                 onClick={UpdateData}
+                disabled={isUpdating}
               >
-                Update Result
+                {isUpdating ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    <span>Updating...</span>
+                  </>
+                ) : (
+                  "Update Result"
+                )}
               </button>
             </div>
           </div>

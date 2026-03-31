@@ -16,7 +16,7 @@ export const menuList = [
 
      {
         id: 3,
-        name: "Preview List",
+        name: "Creative List",
         path: `/preview-list`,
         icon: 'feather-eye',        
     },

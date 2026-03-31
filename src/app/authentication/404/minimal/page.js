@@ -15,7 +15,7 @@ const page = () => {
               <h4 className="fw-bold mb-2">Page not found</h4>
               <p className="fs-12 fw-medium text-muted">Sorry, the page you are looking for can't be found. Please check the URL or try to a different page on our site.</p>
               <div className="mt-5">
-                <Link href="/" className="btn btn-light-brand w-100">Back Home</Link>
+                <Link href="/preview" className="btn btn-light-brand w-100">Back Home</Link>
               </div>
             </div>
           </div>
