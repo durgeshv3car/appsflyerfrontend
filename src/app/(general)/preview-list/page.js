@@ -30,7 +30,8 @@ const ItemManager = () => {
   useEffect(() => {
     const fetchItems = async () => {
       try {
-        const response = await fetch(`http://localhost:5000/api/creatives?page=${page}&limit=${limit}&search=${encodeURIComponent(query)}`);
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL 
+        const response = await fetch(`${API_BASE_URL}/creatives?page=${page}&limit=${limit}&search=${encodeURIComponent(query)}`);
         if (response.ok) {
           const result = await response.json();
           setTotalPages(result.totalPages || 1);
@@ -94,8 +95,8 @@ const ItemManager = () => {
       } else if (formData.previewUrl) {
         data.append("fileUrl", formData.previewUrl);
       }
-
-      const response = await fetch(`http://localhost:5000/api/creatives/${showEdit.id}`, {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL
+      const response = await fetch(`${API_BASE_URL}/creatives/${showEdit.id}`, {
         method: "PUT",
         body: data,
       });
@@ -140,7 +141,8 @@ const ItemManager = () => {
 
   const handleDelete = async (id) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/creatives/${id}`, {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL
+      const response = await fetch(`${API_BASE_URL}/creatives/${id}`, {
         method: "DELETE",
       });
 
