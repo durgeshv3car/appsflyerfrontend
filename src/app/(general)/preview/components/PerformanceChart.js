@@ -97,9 +97,11 @@ const TrendChart = ({ tableData, campaignPermissions = [], campaignPricing = { c
   const hasSpent = userRole === "super_admin" || (!isCampaignSpentRestricted && !isUserSpentRestricted);
 
   useEffect(() => {
-    if (!tableData || tableData.length === 0) return;
-    const ctx = chartRef.current.getContext("2d");
+    if (!chartRef.current) return;
     if (chartInstance.current) chartInstance.current.destroy();
+    if (!tableData || tableData.length === 0) return;
+
+    const ctx = chartRef.current.getContext("2d");
 
     const labels = tableData.map((row) => row.Date || row.date || "");
     const impressions = tableData.map((row) => Number(row.Impressions || row.impressions) || 0);

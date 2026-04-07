@@ -21,6 +21,8 @@ function UserPage() {
   const [showModal, setShowModal] = useState(false);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [selectedPermissionUser, setSelectedPermissionUser] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [confirmRemoveCampaignId, setConfirmRemoveCampaignId] = useState(null);
 
   const getUserData = async () => {
     const res = await getAllUsers();
@@ -85,11 +87,16 @@ function UserPage() {
   };
 
   const handleDelete = async (id) => {
+    if (confirmDeleteId !== id) {
+      setConfirmDeleteId(id);
+      return;
+    }
     try {
       const res = await deleteUser(id);
       if (res.message) {
         getUserData();
         toast.success("User deleted successfully");
+        setConfirmDeleteId(null);
       }
     } catch (error) {
       console.error(error);
@@ -98,7 +105,10 @@ function UserPage() {
   };
 
   const handleRemoveCampaign = async (campaignId) => {
-    if (!confirm("Are you sure you want to remove this campaign?")) return;
+    if (confirmRemoveCampaignId !== campaignId) {
+      setConfirmRemoveCampaignId(campaignId);
+      return;
+    }
 
     try {
       const res = await removeUserAudience(selectedUserEmail, campaignId);
@@ -108,6 +118,7 @@ function UserPage() {
         );
         getUserData();
         toast.success("Campaign removed successfully");
+        setConfirmRemoveCampaignId(null);
       }
     } catch (error) {
       console.error("Failed to remove campaign", error);
@@ -173,12 +184,31 @@ function UserPage() {
                     >
                       <Pencil size={16} /> Edit
                     </button>
-                    <button
-                      className="btn btn-sm btn-outline-danger"
-                      onClick={() => handleDelete(user._id)}
-                    >
-                      <Trash2 size={16} /> Delete
-                    </button>
+                    {confirmDeleteId === user._id ? (
+                      <div className="d-flex gap-1">
+                        <button
+                          className="btn btn-sm btn-danger px-2"
+                          onClick={() => handleDelete(user._id)}
+                          style={{ fontSize: '11px', fontWeight: 'bold' }}
+                        >
+                          CONFIRM
+                        </button>
+                        <button
+                          className="btn btn-sm btn-outline-secondary px-2"
+                          onClick={() => setConfirmDeleteId(null)}
+                          style={{ fontSize: '11px' }}
+                        >
+                          CANCEL
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        className="btn btn-sm btn-outline-danger"
+                        onClick={() => setConfirmDeleteId(user._id)}
+                      >
+                        <Trash2 size={16} /> Delete
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))
@@ -268,12 +298,31 @@ function UserPage() {
                         </td>
                         <td>{camp.currency || "-"}</td>
                         <td>
-                          <button
-                            className="btn btn-sm btn-danger"
-                            onClick={() => handleRemoveCampaign(camp._id)}
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          {confirmRemoveCampaignId === camp._id ? (
+                            <div className="d-flex gap-1">
+                              <button
+                                className="btn btn-sm btn-danger px-1"
+                                style={{ fontSize: '10px', height: '28px' }}
+                                onClick={() => handleRemoveCampaign(camp._id)}
+                              >
+                                CONFIRM
+                              </button>
+                              <button
+                                className="btn btn-sm btn-outline-secondary px-1"
+                                style={{ fontSize: '10px', height: '28px' }}
+                                onClick={() => setConfirmRemoveCampaignId(null)}
+                              >
+                                CANCEL
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              className="btn btn-sm btn-danger"
+                              onClick={() => setConfirmRemoveCampaignId(camp._id)}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))

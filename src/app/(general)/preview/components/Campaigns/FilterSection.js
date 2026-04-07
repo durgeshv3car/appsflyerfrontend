@@ -544,7 +544,7 @@ const ReportsFilter = ({
         compress: true // Enable compression for a smaller file size (3-5MB target)
       });
 
-      const audienceName = advertisers?.find(a => a.advertiserId === filters.advertiser)?.reportName || "Report";
+      const audienceName = advertisers?.find(a => getAudId(a) === String(filters.audienceId))?.reportName || "Report";
       const dateLabel    = `${format(range[0].startDate, "dd MMM, yyyy")} – ${format(range[0].endDate, "dd MMM, yyyy")}`;
 
       // ── 3. Header bar ────────────────────────────────────────────────

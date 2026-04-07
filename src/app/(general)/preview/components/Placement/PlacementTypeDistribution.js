@@ -25,45 +25,45 @@ const PlacementTypeDistribution = ({ placementTypeData = [] }) => {
   }, [placementTypeData]);
 
   useEffect(() => {
-    if (chartRef.current && processedData.length > 0) {
-      const ctx = chartRef.current.getContext("2d");
-
-      if (chartInstance.current) {
-        chartInstance.current.destroy();
-      }
-
-      chartInstance.current = new Chart.Chart(ctx, {
-        type: "doughnut",
-        data: {
-          labels: processedData.map(d => d.label),
-          datasets: [
-            {
-              data: processedData.map(d => d.value),
-              backgroundColor: processedData.map(d => d.color),
-              borderWidth: 1,
-              borderColor: '#ffffff',
-              hoverOffset: 10,
-              cutout: "60%"
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-              titleColor: '#333',
-              bodyColor: '#666',
-              borderColor: '#eee',
-              borderWidth: 1,
-              padding: 12,
-            }
-          }
-        },
-      });
+    if (!chartRef.current) return;
+    if (chartInstance.current) {
+      chartInstance.current.destroy();
     }
+    if (!processedData || processedData.length === 0) return;
+
+    const ctx = chartRef.current.getContext("2d");
+
+    chartInstance.current = new Chart.Chart(ctx, {
+      type: "doughnut",
+      data: {
+        labels: processedData.map(d => d.label),
+        datasets: [
+          {
+            data: processedData.map(d => d.value),
+            backgroundColor: processedData.map(d => d.color),
+            borderWidth: 1,
+            borderColor: '#ffffff',
+            hoverOffset: 10,
+            cutout: "60%"
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            titleColor: '#333',
+            bodyColor: '#666',
+            borderColor: '#eee',
+            borderWidth: 1,
+            padding: 12,
+          }
+        }
+      },
+    });
 
     return () => {
       if (chartInstance.current) chartInstance.current.destroy();

@@ -128,6 +128,7 @@ const Campaign = () => {
   const [newCpmValue, setNewCpmValue] = useState("");
   const [newCpcDate, setNewCpcDate] = useState("");
   const [newCpcValue, setNewCpcValue] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const today = new Date();
   const twoYearsAgo = new Date();
   twoYearsAgo.setFullYear(today.getFullYear() - 2);
@@ -346,9 +347,11 @@ const Campaign = () => {
       const all = await getAudience();
       setCampaigns(all?.data || []);
       setProgress(100);
+      toast.success(`Campaign ${editingIndex !== null ? 'updated' : 'created'} successfully`);
       setTimeout(() => closeModal(), 500);
     } catch (err) {
       console.error("Error saving campaign:", err);
+      toast.error("Failed to save campaign");
       closeModal();
     } finally {
       setTimeout(() => setLoading(false), 800);
@@ -356,11 +359,16 @@ const Campaign = () => {
   };
 
   const handleDelete = async (id) => {
+    if (confirmDeleteId !== id) {
+      setConfirmDeleteId(id);
+      return;
+    }
     try {
       await deleteAudience(id);
       const all = await getAudience();
       setCampaigns(all?.data || []);
       toast.success("Campaign deleted successfully");
+      setConfirmDeleteId(null);
     } catch (err) {
       console.error("Error deleting audience:", err);
       toast.error("Failed to delete campaign");
@@ -439,38 +447,39 @@ const Campaign = () => {
       setError("");
       const res = await addAudienceToUser(email, audienceId);
       if (res.message) {
-        closeModal();
+        toast.success("User added successfully");
         setShowEmailModal(false);
         setEmail("");
       }
     } catch (err) {
       setError("Failed to add user");
+      toast.error("Failed to add user");
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) {
-    return <CampaignLoader progress={progress} status={loadingStatus} />;
-  }
-
   return (
-    <div className="card">
+    <>
       <ToastContainer />
-      <div className="card-body p-3 d-flex align-items-center justify-content-between">
-        <h5 className="fw-bold mb-0">Campaigns</h5>
-        <div className="d-flex gap-2 align-items-center">
-          <button
-            className="btn btn-sm btn-primary"
-            onClick={openAddModal}
-            title="Add Campaign"
-          >
-            <i className="feather-plus me-1"></i> Add
-          </button>
-        </div>
-      </div>
+      {loading ? (
+        <CampaignLoader progress={progress} status={loadingStatus} />
+      ) : (
+        <div className="card">
+          <div className="card-body p-3 d-flex align-items-center justify-content-between">
+            <h5 className="fw-bold mb-0">Campaigns</h5>
+            <div className="d-flex gap-2 align-items-center">
+              <button
+                className="btn btn-sm btn-primary"
+                onClick={openAddModal}
+                title="Add Campaign"
+              >
+                <i className="feather-plus me-1"></i> Add
+              </button>
+            </div>
+          </div>
 
-      <div className="card-body p-3">
+          <div className="card-body p-3">
         <div className="table-responsive">
           <table className="table table-hover table-striped table-sm">
             <thead>
@@ -625,31 +634,49 @@ const Campaign = () => {
 
                       
 
-                        <button
-                          className="btn btn-sm btn-outline-danger d-flex align-items-center justify-content-center"
-                          onClick={() => handleDelete(c._id)}
-                          title="Delete"
-                          aria-label="Delete"
-                          style={{ width: 36, height: 36, padding: 0 }}
-                        >
-                          {/* trash SVG */}
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="16"
-                            height="16"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            aria-hidden="true"
+                        {confirmDeleteId === c._id ? (
+                          <div className="d-flex gap-1 align-items-center">
+                            <button
+                              className="btn btn-sm btn-danger px-2"
+                              onClick={() => handleDelete(c._id)}
+                              style={{ fontSize: '11px', fontWeight: 'bold' }}
+                            >
+                              CONFIRM
+                            </button>
+                            <button
+                              className="btn btn-sm btn-outline-secondary px-2"
+                              onClick={() => setConfirmDeleteId(null)}
+                              style={{ fontSize: '11px' }}
+                            >
+                              CANCEL
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            className="btn btn-sm btn-outline-danger d-flex align-items-center justify-content-center"
+                            onClick={() => setConfirmDeleteId(c._id)}
+                            title="Delete"
+                            aria-label="Delete"
+                            style={{ width: 36, height: 36, padding: 0 }}
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="2"
-                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"
-                            />
-                          </svg>
-                        </button>
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="16"
+                              height="16"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              aria-hidden="true"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"
+                              />
+                            </svg>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -999,7 +1026,9 @@ const Campaign = () => {
           </div>
         </div>
       )}
-    </div>
+      </div>
+      )}
+    </>
   );
 };
 

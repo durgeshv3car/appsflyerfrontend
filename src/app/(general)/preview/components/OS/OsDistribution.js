@@ -25,12 +25,13 @@ const OsDistribution = ({ osData = [] }) => {
   }, [osData]);
 
   useEffect(() => {
-    if (chartRef.current && processedData.length > 0) {
-      const ctx = chartRef.current.getContext("2d");
+    if (!chartRef.current) return;
+    if (chartInstance.current) {
+      chartInstance.current.destroy();
+    }
+    if (!processedData || processedData.length === 0) return;
 
-      if (chartInstance.current) {
-        chartInstance.current.destroy();
-      }
+    const ctx = chartRef.current.getContext("2d");
 
       chartInstance.current = new Chart.Chart(ctx, {
         type: "doughnut",
@@ -60,9 +61,8 @@ const OsDistribution = ({ osData = [] }) => {
               padding: 12,
             }
           }
-        },
+        }
       });
-    }
 
     return () => {
       if (chartInstance.current) chartInstance.current.destroy();

@@ -33,15 +33,15 @@ const PermissionModal = ({ show, onClose, user, onSave }) => {
       <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050, padding: '20px' }}>
         <div className="bg-white rounded-3 shadow-lg p-0 d-flex flex-column" style={{ width: '100%', maxWidth: '850px', maxHeight: '90vh' }}>
           <div className="d-flex justify-content-between align-items-center p-4 border-bottom">
-            <h5 className="m-0 text-dark fw-bold">Manage Permissions</h5>
+            <h5 className="m-0 text-dark fw-bold">Manage Permissions Restrictions</h5>
             <button type="button" className="btn-close" onClick={onClose}></button>
-          </div>
+          </div> 
           <div className="p-4" style={{ overflowY: 'auto' }}>
             <form onSubmit={handleSubmit}>
             <div className="mb-4">
               <h6 className="fw-bold mb-3 d-flex align-items-center">
                 <Layers size={18} className="me-2 text-primary" />
-                Table Permissions
+                Table Permissions Restrictions
               </h6>
               <div className="p-3 border rounded mb-4 shadow-sm bg-light">
                 <div className="row g-3">
@@ -67,7 +67,7 @@ const PermissionModal = ({ show, onClose, user, onSave }) => {
 
               <h6 className="fw-bold mb-3 d-flex align-items-center">
                 <Shield size={18} className="me-2 text-success" />
-                Widget Permissions
+                Widget Permissions Restrictions
               </h6>
               <div className="p-3 border rounded shadow-sm bg-light">
                  <div className="row g-3">

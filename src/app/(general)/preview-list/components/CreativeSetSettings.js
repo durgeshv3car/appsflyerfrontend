@@ -21,6 +21,7 @@ const CreativeSetSettings = ({ onCancel, onSave }) => {
 
   const handleSave = async () => {
     setIsLoading(true);
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL 
     try {
       const formData = new FormData();
       formData.append("creativeName", title);
@@ -32,7 +33,7 @@ const CreativeSetSettings = ({ onCancel, onSave }) => {
         if (file) formData.append("file", file);
       }
 
-      const response = await fetch("http://localhost:5000/api/upload", {
+      const response = await fetch(`${apiBaseUrl}/upload`, {
         method: "POST",
         body: formData,
       });

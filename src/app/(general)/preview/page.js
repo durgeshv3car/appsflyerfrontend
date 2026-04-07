@@ -123,13 +123,14 @@ const CampaignDashboard = () => {
     audienceId: "",
     currency: "",
   });
-  const [updateTrigger, setUpdateTrigger] = useState(0);
   const [isUpdating, setIsUpdating] = useState(false);
 
   const handleUpdate = () => {
     localStorage.setItem("campaignFilteredData", JSON.stringify(filters));
     setIsUpdating(true);
-    setUpdateTrigger(prev => prev + 1);
+    
+    // Explicitly fetch data when the update button is clicked
+    fetchAllData(filters);
     
     // Force show loader for 3 seconds as requested
     setTimeout(() => {
@@ -783,8 +784,30 @@ const CampaignDashboard = () => {
 
 
 
+  const clearAllData = React.useCallback(() => {
+    const emptyState = { tableData: [], graphData: [] };
+    setTableData(emptyState);
+    setAgeData(emptyState);
+    setGenderData(emptyState);
+    setOsData(emptyState);
+    setBrowserData(emptyState);
+    setOperatorData(emptyState);
+    setPlacementPosData(emptyState);
+    setPlacementTypeData(emptyState);
+    setDeviceData(emptyState);
+    setCityData(emptyState);
+    setTotalData(emptyState);
+    setCreativeTableData(emptyState);
+    setWeekData([]);
+  }, []);
+
   const fetchAllData = React.useCallback(async (targetFilters = filters) => {
     console.log("Fetching all data with filters:", targetFilters);
+    
+    // Clear all existing data before fetching new reports
+    clearAllData();
+    
+    // Trigger all fetch functions
     fetchCampaignData(targetFilters);
     fetchCreativeTableData(targetFilters);
     fetchAgeData(targetFilters);
@@ -799,6 +822,7 @@ const CampaignDashboard = () => {
     fetchCityData(targetFilters);
   }, [
     filters,
+    clearAllData,
     fetchCampaignData,
     fetchCreativeTableData,
     fetchAgeData,
@@ -813,11 +837,6 @@ const CampaignDashboard = () => {
     fetchCityData,
   ]);
 
-  useEffect(() => {
-    if (updateTrigger > 0) {
-      fetchAllData(filters);
-    }
-  }, [updateTrigger, fetchAllData]);
 
 
   return (
