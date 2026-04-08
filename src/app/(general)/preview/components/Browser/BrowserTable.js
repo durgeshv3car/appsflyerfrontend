@@ -14,6 +14,14 @@ const columnsList = [
   { name: "eCPC", defaultVisible: true, permission: "cpm" },
   { name: "Spent", defaultVisible: true, permission: "spent" },
   { name: "Total Conversions", defaultVisible: true },
+  // Video metrics — hidden by default, selectable via Columns modal
+  { name: "Views", defaultVisible: false },
+  { name: "Complete Views", defaultVisible: false },
+  { name: "First Quartile Views", defaultVisible: false },
+  { name: "Midpoint Views", defaultVisible: false },
+  { name: "Third Quartile Views", defaultVisible: false },
+  { name: "Cpcv", defaultVisible: false },
+  { name: "Cpv", defaultVisible: false },
 ];
 
 const getPriceForDate = (pricingObj, targetDate) => {
@@ -89,6 +97,14 @@ const BrowserTable = ({
       const cnv = Number(row.TotalConversions || row.totalConversions || row.total_conversions || 0);
       const rowDate = row.Date || row.date || "";
 
+      const videoComplete = Number(row.completeViewsVideo || row.CompleteViewsVideo || 0);
+      const videoFirstQ = Number(row.firstQuartileViewsVideo || row.FirstQuartileViewsVideo || 0);
+      const videoMidpoint = Number(row.midpointViewsVideo || row.MidpointViewsVideo || 0);
+      const videoThirdQ = Number(row.thirdQuartileViewsVideo || row.ThirdQuartileViewsVideo || 0);
+      const videoViews = Number(row.Views || row.views || row.VideoViews || 0);
+      const videoCPCV = row.Cpcv || row.cpcv || 0;
+      const videoCPV = row.Cpv || row.cpv || 0;
+
       let rowSpent = 0;
       if (globalEffectiveMetrics.eCPM > 0) {
         rowSpent = (imp / 1000) * globalEffectiveMetrics.eCPM;
@@ -109,13 +125,33 @@ const BrowserTable = ({
       }
 
       if (!groups[title]) {
-        groups[title] = { Title: title, Impressions: 0, Clicks: 0, Spent: 0, TotalConversions: 0 };
+        groups[title] = { 
+          Title: title, 
+          Impressions: 0, 
+          Clicks: 0, 
+          Spent: 0, 
+          TotalConversions: 0,
+          "Complete Views": 0,
+          "First Quartile Views": 0,
+          "Midpoint Views": 0,
+          "Third Quartile Views": 0,
+          "Views": 0,
+          Cpcv: 0,
+          Cpv: 0
+        };
       }
       
       groups[title].Impressions += imp;
       groups[title].Clicks += cks;
       groups[title].Spent += rowSpent;
       groups[title].TotalConversions += cnv;
+      groups[title]["Complete Views"] += videoComplete;
+      groups[title]["First Quartile Views"] += videoFirstQ;
+      groups[title]["Midpoint Views"] += videoMidpoint;
+      groups[title]["Third Quartile Views"] += videoThirdQ;
+      groups[title]["Views"] += videoViews;
+      groups[title].Cpcv += videoCPCV;
+      groups[title].Cpv += videoCPV;
     });
 
     return Object.values(groups).map(g => ({
@@ -147,13 +183,45 @@ const BrowserTable = ({
     Clicks: acc.Clicks + row.Clicks,
     Spent: acc.Spent + row.Spent,
     "Total Conversions": (acc["Total Conversions"] || 0) + row.TotalConversions,
+    "Complete Views": (acc["Complete Views"] || 0) + row["Complete Views"],
+    "First Quartile Views": (acc["First Quartile Views"] || 0) + row["First Quartile Views"],
+    "Midpoint Views": (acc["Midpoint Views"] || 0) + row["Midpoint Views"],
+    "Third Quartile Views": (acc["Third Quartile Views"] || 0) + row["Third Quartile Views"],
+    "Views": (acc["Views"] || 0) + row["Views"],
+    Cpcv: (acc.Cpcv || 0) + row.Cpcv,
+    Cpv: (acc.Cpv || 0) + row.Cpv,
     SumCPM: (acc.SumCPM || 0) + (row.eCPM * row.Impressions),
     SumCPC: (acc.SumCPC || 0) + (row.eCPC * row.Clicks),
-  }), { Impressions: 0, Clicks: 0, Spent: 0, "Total Conversions": 0, SumCPM: 0, SumCPC: 0 });
+  }), { 
+    Impressions: 0, 
+    Clicks: 0, 
+    Spent: 0, 
+    "Total Conversions": 0, 
+    "Complete Views": 0,
+    "First Quartile Views": 0,
+    "Midpoint Views": 0,
+    "Third Quartile Views": 0,
+    "Views": 0,
+    Cpcv: 0,
+    Cpv: 0,
+    SumCPM: 0, 
+    SumCPC: 0 
+  });
 
   const formatValue = (col, value) => {
     if (value === undefined || value === null) return "0";
-    if (col === "Impressions" || col === "Clicks" || col === "Total Conversions") {
+    if (
+      col === "Impressions" ||
+      col === "Clicks" ||
+      col === "Total Conversions" ||
+      col === "Complete Views" ||
+      col === "First Quartile Views" ||
+      col === "Midpoint Views" ||
+      col === "Third Quartile Views" ||
+      col === "Views" ||
+      col === "Cpcv" ||
+      col === "Cpv"
+    ) {
       return isNaN(Number(value)) ? (value || "0") : Number(value).toLocaleString();
     }
     if (col === "Spent" || col === "eCPM" || col === "eCPC") {
@@ -201,6 +269,12 @@ const BrowserTable = ({
                     else if (col === "Impressions") val = imp;
                     else if (col === "Clicks") val = cks;
                     else if (col === "Total Conversions") val = cnv;
+                    else if (col === "Complete Views") val = row["Complete Views"] || 0;
+                    else if (col === "First Quartile Views") val = row["First Quartile Views"] || 0;
+                    else if (col === "Midpoint Views") val = row["Midpoint Views"] || 0;
+                    else if (col === "Third Quartile Views") val = row["Third Quartile Views"] || 0;
+                    else if (col === "Cpcv") val = row.Cpcv || 0;
+                    else if (col === "Cpv") val = row.Cpv || 0;
                     else if (col === "CTR") val = imp > 0 ? (cks / imp) * 100 : 0;
                     else if (col === "Spent") val = row.Spent || 0;
                     else if (col === "eCPM") val = row.eCPM || 0;

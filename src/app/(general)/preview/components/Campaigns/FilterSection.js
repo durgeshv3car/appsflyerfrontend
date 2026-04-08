@@ -127,6 +127,7 @@ const ReportsFilter = ({
        fetchPlacementTypeData(targetFilters);
        fetchDeviceData(targetFilters);
        fetchCityData(targetFilters);
+       if (typeof fetchUrlData === 'function') fetchUrlData(targetFilters);
     };
 
     const handleInitialState = async () => {
@@ -352,6 +353,7 @@ const ReportsFilter = ({
        fetchPlacementTypeData(filters);
        fetchDeviceData(filters);
        fetchCityData(filters);
+       if (typeof fetchUrlData === 'function') fetchUrlData(filters);
     }
   };
 

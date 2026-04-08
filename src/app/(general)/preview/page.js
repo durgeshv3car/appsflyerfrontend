@@ -29,6 +29,9 @@ import BrowserTable from "./components/Browser/BrowserTable";
 import OperatorPerformance from "./components/Operator/OperatorPerformance";
 import OperatorDistribution from "./components/Operator/OperatorDistribution";
 import OperatorTable from "./components/Operator/OperatorTable";
+import UrlPerformance from "./components/Url/UrlPerformance";
+import UrlDistribution from "./components/Url/UrlDistribution";
+import UrlTable from "./components/Url/UrlTable";
 import PlacementPosDistribution from "./components/Placement/PlacementPosDistribution";
 import PlacementTypeDistribution from "./components/Placement/PlacementTypeDistribution";
 import {
@@ -49,6 +52,7 @@ import { getDailyReportsByRangeBrowser } from "@/services/browser";
 import { getDailyReportsByRangeOperator } from "@/services/operator";
 import { getDailyReportsByRangeAdPos } from "@/services/ad-pos";
 import { getDailyReportsByRangeAdType } from "@/services/ad-type";
+import { getDailyReportsByRangeUrl } from "@/services/url";
 import { createReportsDataCreative, getDailyReportsByRangeCreative } from "@/services/creative";
 import {
   createReportsData,
@@ -100,7 +104,11 @@ const CampaignDashboard = () => {
     tableData: [],
     graphData: [],
   });
-  const [cityData, setCityData] = useState({
+   const [cityData, setCityData] = useState({
+    tableData: [],
+    graphData: [],
+  });
+  const [urlData, setUrlData] = useState({
     tableData: [],
     graphData: [],
   });
@@ -782,6 +790,33 @@ const CampaignDashboard = () => {
     [filters],
   );
 
+  const fetchUrlData = React.useCallback(
+    async (currentFilters = filters) => {
+      try {
+        let tData = [],
+          gData = [];
+        if (currentFilters.source === "DV360") {
+          const res = await getDailyReportsByRangeUrl(
+            currentFilters.insertionOrderId,
+            currentFilters.dateRange.startDate,
+            currentFilters.dateRange.endDate,
+            1,
+            500,
+          );
+          ({ tData, gData } = extractData(res));
+        } else {
+          // Add default fallback or service for non-DV360 if available
+          tData = [];
+          gData = [];
+        }
+        setUrlData({ tableData: tData, graphData: gData });
+      } catch (error) {
+        console.log(error);
+      }
+    },
+    [filters],
+  );
+
 
 
   const clearAllData = React.useCallback(() => {
@@ -797,8 +832,9 @@ const CampaignDashboard = () => {
     setDeviceData(emptyState);
     setCityData(emptyState);
     setTotalData(emptyState);
-    setCreativeTableData(emptyState);
+     setCreativeTableData(emptyState);
     setWeekData([]);
+    setUrlData(emptyState);
   }, []);
 
   const fetchAllData = React.useCallback(async (targetFilters = filters) => {
@@ -818,8 +854,9 @@ const CampaignDashboard = () => {
     fetchOperatorData(targetFilters);
     fetchPlacementPosData(targetFilters);
     fetchPlacementTypeData(targetFilters);
-    fetchDeviceData(targetFilters);
+     fetchDeviceData(targetFilters);
     fetchCityData(targetFilters);
+    fetchUrlData(targetFilters);
   }, [
     filters,
     clearAllData,
@@ -835,6 +872,7 @@ const CampaignDashboard = () => {
     fetchPlacementTypeData,
     fetchDeviceData,
     fetchCityData,
+    fetchUrlData,
   ]);
 
 
@@ -856,8 +894,9 @@ const CampaignDashboard = () => {
           fetchOperatorData={fetchOperatorData}
           fetchPlacementPosData={fetchPlacementPosData}
           fetchPlacementTypeData={fetchPlacementTypeData}
-          fetchDeviceData={fetchDeviceData}
+           fetchDeviceData={fetchDeviceData}
           fetchCityData={fetchCityData}
+          fetchUrlData={fetchUrlData}
           handleUpdate={handleUpdate}
           isUpdating={isUpdating}
         />
@@ -1036,10 +1075,34 @@ const CampaignDashboard = () => {
             </div>
           </div>
 
-          {hasPermission("creative_performance_graph_table") && (
+           {hasPermission("creative_performance_graph_table") && (
             <div className="col-12">
               <CreativeTable
                 CreativeTableData={CreativeTableData.tableData}
+                currencySymbol={getCurrencySymbol(filters.currency)}
+                campaignPermissions={campaignPermissions}
+                campaignPricing={campaignPricing}
+                globalEffectiveMetrics={globalEffectiveMetrics}
+              />
+            </div>
+          )}
+
+          {hasPermission("url_distribution") && (
+            <div className="col-12 mt-4">
+              <UrlDistribution urlData={urlData.graphData} />
+            </div>
+          )}
+
+          {hasPermission("url_graph") && (
+            <div className="col-12 mt-4">
+              <UrlPerformance urlData={urlData.graphData} />
+            </div>
+          )}
+
+          {hasPermission("url_table") && (
+            <div className="col-12">
+              <UrlTable
+                urlData={urlData.tableData}
                 currencySymbol={getCurrencySymbol(filters.currency)}
                 campaignPermissions={campaignPermissions}
                 campaignPricing={campaignPricing}

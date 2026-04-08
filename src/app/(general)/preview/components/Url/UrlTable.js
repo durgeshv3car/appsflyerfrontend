@@ -1,9 +1,8 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Modal, Button, Form } from "react-bootstrap";
 import { FiChevronLeft, FiChevronRight, FiChevronDown, FiPlus } from "react-icons/fi";
 import { useSession } from "next-auth/react";
-import { useEffect } from "react";
 
 const columnsList = [
   { name: "Title", defaultVisible: true },
@@ -14,24 +13,18 @@ const columnsList = [
   { name: "eCPC", defaultVisible: true, permission: "cpm" },
   { name: "Spent", defaultVisible: true, permission: "spent" },
   { name: "Total Conversions", defaultVisible: true },
-  // Video metrics — hidden by default, selectable via Columns modal
-  { name: "Views", defaultVisible: false },
-  { name: "Complete Views", defaultVisible: false },
-  { name: "First Quartile Views", defaultVisible: false },
-  { name: "Midpoint Views", defaultVisible: false },
-  { name: "Third Quartile Views", defaultVisible: false },
-  { name: "Cpcv", defaultVisible: false },
-  { name: "Cpv", defaultVisible: false },
 ];
 
 const getPriceForDate = (pricingObj, targetDate) => {
   if (!pricingObj || typeof pricingObj !== 'object') return undefined;
   const normalize = (d) => String(d).replace(/\//g, '-').split(' ')[0].substring(0, 10);
   const normalizedTarget = targetDate ? normalize(targetDate) : "9999-12-31"; 
+  
   const normalizedPricing = {};
   Object.entries(pricingObj).forEach(([d, v]) => {
     normalizedPricing[normalize(d)] = v;
   });
+
   const sortedDates = Object.keys(normalizedPricing).sort();
   let latestValue = undefined;
   for (const date of sortedDates) {
@@ -44,8 +37,8 @@ const getPriceForDate = (pricingObj, targetDate) => {
   return latestValue;
 };
 
-const OsTable = ({ 
-  osData = [], 
+const UrlTable = ({ 
+  urlData = [], 
   currencySymbol = "$", 
   campaignPermissions = [], 
   campaignPricing = { cpm: {}, cpc: {} },
@@ -64,7 +57,7 @@ const OsTable = ({
   });
 
   const [visibleColumns, setVisibleColumns] = useState([]);
-
+  
   useEffect(() => {
     if (filteredColumnsByPermission.length > 0) {
       const allowedNames = filteredColumnsByPermission.map(c => c.name);
@@ -82,24 +75,15 @@ const OsTable = ({
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // GROUPING LOGIC: Correct Way (Weighted)
   const groupedData = React.useMemo(() => {
     const groups = {};
     
-    osData.forEach(row => {
-      const title = row.name || row.browser || row.oses || row.os || row.OS || row.operator || row.browser_name || row.os_name || "-";
+    urlData.forEach(row => {
+      const title = row.name || row.url || row.domain || row.site || "-";
       const imp = Number(row.Impressions || row.impressions || 0);
       const cks = Number(row.Clicks || row.clicks || 0);
       const cnv = Number(row.TotalConversions || row.totalConversions || row.total_conversions || 0);
       const rowDate = row.Date || row.date || "";
-
-      const videoComplete = Number(row.completeViewsVideo || row.CompleteViewsVideo || 0);
-      const videoFirstQ = Number(row.firstQuartileViewsVideo || row.FirstQuartileViewsVideo || 0);
-      const videoMidpoint = Number(row.midpointViewsVideo || row.MidpointViewsVideo || 0);
-      const videoThirdQ = Number(row.thirdQuartileViewsVideo || row.ThirdQuartileViewsVideo || 0);
-      const videoViews = Number(row.Views || row.views || row.VideoViews || 0); 
-      const videoCPCV = row.Cpcv || row.cpcv || 0;
-      const videoCPV = row.Cpv || row.cpv || 0;
 
       let rowSpent = 0;
       if (globalEffectiveMetrics.eCPM > 0) {
@@ -121,33 +105,13 @@ const OsTable = ({
       }
 
       if (!groups[title]) {
-        groups[title] = { 
-          Title: title, 
-          Impressions: 0, 
-          Clicks: 0, 
-          Spent: 0, 
-          TotalConversions: 0,
-          "Complete Views": 0,
-          "First Quartile Views": 0,
-          "Midpoint Views": 0,
-          "Third Quartile Views": 0,
-          "Views": 0,
-          Cpcv: 0,
-          Cpv: 0
-        };
+        groups[title] = { Title: title, Impressions: 0, Clicks: 0, Spent: 0, TotalConversions: 0 };
       }
       
       groups[title].Impressions += imp;
       groups[title].Clicks += cks;
       groups[title].Spent += rowSpent;
       groups[title].TotalConversions += cnv;
-      groups[title]["Complete Views"] += videoComplete;
-      groups[title]["First Quartile Views"] += videoFirstQ;
-      groups[title]["Midpoint Views"] += videoMidpoint;
-      groups[title]["Third Quartile Views"] += videoThirdQ;
-      groups[title]["Views"] += videoViews;
-      groups[title].Cpcv += videoCPCV;
-      groups[title].Cpv += videoCPV;
     });
 
     return Object.values(groups).map(g => ({
@@ -158,7 +122,7 @@ const OsTable = ({
         : (g.Impressions > 0 ? (g.Spent / g.Impressions) * 1000 : 0),
       eCPC: g.Clicks > 0 ? (g.Spent / g.Clicks) : 0,
     })).sort((a,b) => b.Impressions - a.Impressions);
-  }, [osData, campaignPricing, globalEffectiveMetrics]);
+  }, [urlData, campaignPricing, globalEffectiveMetrics]);
 
   const filteredColumns = filteredColumnsByPermission.filter((col) =>
     col.name.toLowerCase().includes(search.toLowerCase())
@@ -179,45 +143,13 @@ const OsTable = ({
     Clicks: acc.Clicks + row.Clicks,
     Spent: acc.Spent + row.Spent,
     "Total Conversions": (acc["Total Conversions"] || 0) + row.TotalConversions,
-    "Complete Views": (acc["Complete Views"] || 0) + row["Complete Views"],
-    "First Quartile Views": (acc["First Quartile Views"] || 0) + row["First Quartile Views"],
-    "Midpoint Views": (acc["Midpoint Views"] || 0) + row["Midpoint Views"],
-    "Third Quartile Views": (acc["Third Quartile Views"] || 0) + row["Third Quartile Views"],
-    "Views": (acc["Views"] || 0) + row["Views"],
-    Cpcv: (acc.Cpcv || 0) + row.Cpcv,
-    Cpv: (acc.Cpv || 0) + row.Cpv,
-    SumCPM: (acc.SumCPM || 0) + (row.eCPM * row.Impressions), // For weighted total footer
+    SumCPM: (acc.SumCPM || 0) + (row.eCPM * row.Impressions),
     SumCPC: (acc.SumCPC || 0) + (row.eCPC * row.Clicks),
-  }), { 
-    Impressions: 0, 
-    Clicks: 0, 
-    Spent: 0, 
-    "Total Conversions": 0, 
-    "Complete Views": 0,
-    "First Quartile Views": 0,
-    "Midpoint Views": 0,
-    "Third Quartile Views": 0,
-    "Views": 0,
-    Cpcv: 0,
-    Cpv: 0,
-    SumCPM: 0, 
-    SumCPC: 0 
-  });
+  }), { Impressions: 0, Clicks: 0, Spent: 0, "Total Conversions": 0, SumCPM: 0, SumCPC: 0 });
 
   const formatValue = (col, value) => {
     if (value === undefined || value === null) return "0";
-    if (
-      col === "Impressions" ||
-      col === "Clicks" ||
-      col === "Total Conversions" ||
-      col === "Complete Views" ||
-      col === "First Quartile Views" ||
-      col === "Midpoint Views" ||
-      col === "Third Quartile Views" ||
-      col === "Views" ||
-      col === "Cpcv" ||
-      col === "Cpv"
-    ) {
+    if (col === "Impressions" || col === "Clicks" || col === "Total Conversions") {
       return isNaN(Number(value)) ? (value || "0") : Number(value).toLocaleString();
     }
     if (col === "Spent" || col === "eCPM" || col === "eCPC") {
@@ -234,7 +166,7 @@ const OsTable = ({
     <div className="card border-0 shadow-sm mb-4">
       <div className="card-header bg-white border-0 pt-4 px-4 pb-3">
         <div className="d-flex justify-content-between align-items-center w-100">
-            <h5 className="mb-0 fw-bold text-dark" style={{ fontSize: '1.2rem' }}>Operating systems</h5>
+            <h5 className="mb-0 fw-bold text-dark" style={{ fontSize: '1.2rem' }}>URLs/Domains</h5>
             <button data-html2canvas-ignore="true" data-print-hide className="btn btn-primary d-flex align-items-center gap-2" onClick={() => setShow(true)} style={{ borderRadius: '8px', padding: '8px 16px', fontSize: '14px' }}>
                 <FiPlus size={18} />
                 <span>Columns</span>
@@ -255,7 +187,6 @@ const OsTable = ({
               {paginatedData.map((row, idx) => (
                 <tr key={idx} className="border-bottom">
                   {visibleColumns.map(col => {
-                    // Use pre-computed values from groupedData (eCPM, eCPC, Spent already calculated correctly)
                     const imp = row.Impressions || 0;
                     const cks = row.Clicks || 0;
                     const cnv = row.TotalConversions || 0;
@@ -265,13 +196,6 @@ const OsTable = ({
                     else if (col === "Impressions") val = imp;
                     else if (col === "Clicks") val = cks;
                     else if (col === "Total Conversions") val = cnv;
-                    else if (col === "Complete Views") val = row["Complete Views"] || 0;
-                    else if (col === "First Quartile Views") val = row["First Quartile Views"] || 0;
-                    else if (col === "Midpoint Views") val = row["Midpoint Views"] || 0;
-                    else if (col === "Third Quartile Views") val = row["Third Quartile Views"] || 0;
-                    else if (col === "Cpcv") val = row.Cpcv || 0;
-                    else if (col === "Cpv") val = row.Cpv || 0;
-                    else if (col === "CTR") val = imp > 0 ? (cks / imp) * 100 : 0;
                     else if (col === "Spent") val = row.Spent || 0;
                     else if (col === "eCPM") val = row.eCPM || 0;
                     else if (col === "eCPC") val = row.eCPC || 0;
@@ -285,7 +209,7 @@ const OsTable = ({
                   })}
                 </tr>
               ))}
-              {osData?.length > 0 && (
+              {groupedData?.length > 0 && (
                 <tr className="bg-white">
                   {visibleColumns.map(col => (
                     <td key={col} className="py-3 px-4 fw-bold">
@@ -302,11 +226,11 @@ const OsTable = ({
               )}
             </tbody>
           </table>
-          {(!osData || osData.length === 0) && (
-            <div className="text-center py-5 text-muted">No OS data available</div>
+          {(!urlData || urlData.length === 0) && (
+            <div className="text-center py-5 text-muted">No URL data available</div>
           )}
         </div>
-        {osData?.length > 0 && (
+        {groupedData?.length > 0 && (
           <div data-html2canvas-ignore="true" data-print-hide className="d-flex justify-content-end align-items-center gap-4 py-3 px-4 text-muted border-top bg-light-subtle" style={{ borderBottomLeftRadius: '12px', borderBottomRightRadius: '12px' }}>
               <div className="d-flex align-items-center gap-3">
                   <span style={{ fontSize: '13px', fontWeight: '500' }}>Rows per page:</span>
@@ -337,7 +261,7 @@ const OsTable = ({
               
               <div className="d-flex align-items-center gap-3">
                 <span style={{ fontSize: '13px', fontWeight: '500', minWidth: '80px', textAlign: 'center' }}>
-                  {startIndex + 1}-{Math.min(startIndex + rowsPerPage, osData.length)} of {osData.length}
+                  {startIndex + 1}-{Math.min(startIndex + rowsPerPage, groupedData.length)} of {groupedData.length}
                 </span>
                 
                 <div className="d-flex gap-2">
@@ -395,7 +319,7 @@ const OsTable = ({
               <Form.Check
                 key={col.name}
                 type="checkbox"
-                id={`os-check-${col.name}`}
+                id={`url-check-${col.name}`}
                 label={col.name}
                 checked={visibleColumns.includes(col.name)}
                 onChange={() => toggleColumn(col.name)}
@@ -418,4 +342,4 @@ const OsTable = ({
   );
 };
 
-export default OsTable;
+export default UrlTable;

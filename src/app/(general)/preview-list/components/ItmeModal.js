@@ -1,5 +1,5 @@
 import React from "react";
-import { X } from "lucide-react";
+import { X, ExternalLink } from "lucide-react";
 
 const ItemModal = ({
   title,
@@ -18,6 +18,7 @@ const ItemModal = ({
       else if (d.includes("video")) type = "video";
       else if (d.includes("banner") || d.includes("image")) type = "image";
       else if (d.includes("ctv")) type = "ctv";
+      else if (d.includes("rich-media")) type = "rich-media";
       else if (url?.match(/\.(jpeg|jpg|gif|png|webp)$/i)) type = "image";
       else if (url?.match(/\.(mp4|webm|ogg)$/i)) type = "video";
       else if (url?.match(/\.(mp3|wav|ogg)$/i)) type = "audio";
@@ -88,7 +89,7 @@ const ItemModal = ({
                 />
               ) : (
                 <div className="d-flex flex-column gap-2 mt-2 p-3 border rounded bg-light position-relative">
-                  {formData.file ? (
+                   {formData.file ? (
                     <div className="d-flex align-items-center justify-content-between">
                       <span className="text-truncate fw-medium" style={{ maxWidth: '80%' }}>{formData.file.name}</span>
                       <button
@@ -103,7 +104,7 @@ const ItemModal = ({
                     <div className="d-flex flex-column align-items-center justify-content-center w-100" style={{ minHeight: '100px', backgroundColor: '#e2e8f0', borderRadius: '6px', overflow: 'hidden', padding: mediaType === 'audio' ? '20px' : '0' }}>
                       {mediaType === 'image' && <img src={formData.previewUrl} className="img-fluid" style={{ maxHeight: '180px', objectFit: 'contain' }} alt="Preview" />}
                       {mediaType === 'video' && <video src={formData.previewUrl} controls className="w-100" style={{ maxHeight: '180px' }} />}
-                      {mediaType === 'ctv' && (
+                      {(mediaType === 'ctv' || mediaType === 'rich-media') && (
                         <div className="w-100 d-flex flex-column align-items-center">
                           {formData.previewUrl?.includes("<iframe") ? (
                              <div className="w-100" style={{ height: '180px', overflow: 'hidden' }} dangerouslySetInnerHTML={{ __html: formData.previewUrl }} />

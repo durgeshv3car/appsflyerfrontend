@@ -19,6 +19,7 @@ import { createReportsDataAdPos } from "@/services/ad-pos";
 import { createReportsDataAdType } from "@/services/ad-type";
 import { createReportsDataCreative } from "@/services/creative";
 import { createReportsDataCreativeSize } from "@/services/creative-size";
+import { createReportsDataUrl } from "@/services/url";
 import { getSearchJobStatus } from "@/services/youtube";
 import PermissionModal from "./PermissionModal";
 import Image from "next/image";
@@ -308,6 +309,7 @@ const Campaign = () => {
           { name: "AdType", fn: createReportsDataAdType, params: params },
           { name: "Creative", fn: createReportsDataCreative, params: params },
           { name: "CreativeSize", fn: createReportsDataCreativeSize, params: params },
+          { name: "URL", fn: createReportsDataUrl, params: params },
         ];
 
         let completedCount = 0;

@@ -27,7 +27,7 @@ const CreativeSetSettings = ({ onCancel, onSave }) => {
       formData.append("creativeName", title);
       formData.append("type", selectedFormat);
       
-      if (selectedFormat === "ctv") {
+      if (selectedFormat === "rich-media") {
         if (fileUrl) formData.append("fileUrl", fileUrl);
       } else {
         if (file) formData.append("file", file);
@@ -220,13 +220,13 @@ const CreativeSetSettings = ({ onCancel, onSave }) => {
                 </div>
               )}
 
-              {selectedFormat === "ctv" && (
+              {selectedFormat === "rich-media" && (
                 <div className="mt-4">
-                  <label className="fw-semibold mb-2 text-dark" style={{ fontSize: "0.9rem" }}>File URL</label>
+                  <label className="fw-semibold mb-2 text-dark" style={{ fontSize: "0.9rem" }}>Rich Media URL</label>
                   <input
                     type="url"
                     className="form-control"
-                    placeholder="Enter file URL here (e.g., https://example.com/video.mp4)"
+                    placeholder="Enter Rich Media URL (e.g., https://example.com/interactive-ad)"
                     value={fileUrl}
                     onChange={(e) => setFileUrl(e.target.value)}
                     style={{
