@@ -248,9 +248,9 @@ const TrendChart = ({ tableData, campaignPermissions = [], campaignPricing = { c
 
   const legendItems = [
     { color: '#2ECC71', label: 'Impressions' },
-    { color: '#1F6FEB', label: 'Clicks' },
   ];
   if (!isVideoType) legendItems.push({ color: '#9B59B6', label: 'CTR' });
+  if (!isVideoType) legendItems.push({ color: '#1F6FEB', label: 'Clicks' });
   if (hasSpent) legendItems.push({ color: '#F1C40F', label: 'Cost' });
 
   return (
@@ -291,7 +291,7 @@ export const PerformanceDashboard = ({ tableData, currencySymbol = "$", campaign
   const hasCPMValue = userRole === "super_admin" || (!isCampaignCPMRestricted && !isUserCPMRestricted);
 
   const stats = useMemo(() => {
-    const total = { Imp: 0, Clicks: 0, Reach: 0, Spent: 0, SumCPM: 0, SumCPC: 0 };
+    const total = { Imp: 0, Clicks: 0, Reach: 0, Spent: 0, SumCPM: 0, SumCPC: 0, Views: 0, CompleteViews: 0 };
     tableData?.forEach((row) => {
       const rowImp = Number(row.Impressions || row.impressions || 0);
       const rowClicks = Number(row.Clicks || row.clicks || 0);
@@ -320,6 +320,8 @@ export const PerformanceDashboard = ({ tableData, currencySymbol = "$", campaign
       total.Spent += rowSpent;
       total.SumCPM += (rowCPM * rowImp);
       total.SumCPC += (rowCPC * rowClicks);
+      total.Views += Number(row.Views || row.views || row.VideoViews || 0);
+      total.CompleteViews += Number(row.completeViewsVideo || row.CompleteViewsVideo || row["Complete Views"] || 0);
     });
 
     const safeDiv = (a, b) => (b ? ((a / b) * 100).toFixed(2) : "0.00");
@@ -330,6 +332,9 @@ export const PerformanceDashboard = ({ tableData, currencySymbol = "$", campaign
       // Strictly derive weighted metrics from total spent
       CPC: total.Clicks ? (total.Spent / total.Clicks).toFixed(2) : "0.00",
       CPM: total.Imp ? ((total.Spent / total.Imp) * 1000).toFixed(2) : "0.00",
+      Views: total.Views.toLocaleString(),
+      CPCV: total.CompleteViews ? (total.Spent / total.CompleteViews).toFixed(2) : "0.00",
+      CPV: total.Views ? (total.Spent / total.Views).toFixed(2) : "0.00",
       Spent: total.Spent.toFixed(2)
     };
   }, [tableData, campaignPricing]);
@@ -389,6 +394,7 @@ export const PerformanceDashboard = ({ tableData, currencySymbol = "$", campaign
                     <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{stats.CTR}%</span>
                   </div>
                 )}
+               
                 {hasCPMValue && !["Video", "CTV", "Youtube"].includes(campaignType) && (
                   <>
                     <div className="d-flex justify-content-between align-items-center">
@@ -400,6 +406,24 @@ export const PerformanceDashboard = ({ tableData, currencySymbol = "$", campaign
                       <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{currencySymbol}{stats.CPM}</span>
                     </div>
                   </>
+                )}
+                {!["Banner"].includes(campaignType) && (
+                  <div className="d-flex justify-content-between align-items-center">
+                    <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>Views</span>
+                    <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{stats.Views}</span>
+                  </div>
+                )}
+                   {!["Banner"].includes(campaignType) && (
+                  <div className="d-flex justify-content-between align-items-center">
+                    <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>CPCV</span>
+                    <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{stats.CPCV}</span>
+                  </div>
+                )}
+                {!["Banner"].includes(campaignType) && (
+                  <div className="d-flex justify-content-between align-items-center">
+                    <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>CPV</span>
+                    <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{stats.CPV}</span>
+                  </div>
                 )}
                 {hasCPMValue && ["Video", "CTV", "Youtube"].includes(campaignType) && (
                   <div className="d-flex justify-content-between align-items-center">

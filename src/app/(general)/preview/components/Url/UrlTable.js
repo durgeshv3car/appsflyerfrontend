@@ -50,10 +50,7 @@ const UrlTable = ({
   const filteredColumnsByType = React.useMemo(() => {
     const isVideoType = ["Video", "CTV", "Youtube"].includes(campaignType);
     return columnsList.filter(col => {
-      if (isVideoType) {
-        if (col.name === "CTR" || col.name === "eCPC") return false;
-        if (campaignType === "CTV" && col.name === "Clicks") return false;
-      } else if (campaignType === "Banner") {
+      if (campaignType === "Banner") {
         if (["Views", "Complete Views", "First Quartile Views", "Midpoint Views", "Third Quartile Views", "CPCV", "CPV"].includes(col.name)) return false;
       }
       return true;
@@ -74,15 +71,16 @@ const UrlTable = ({
   
   useEffect(() => {
     if (filteredColumnsByPermission.length > 0) {
-      const allowedNames = filteredColumnsByPermission.map(c => c.name);
-      setVisibleColumns(prev => {
-        if (prev.length === 0) {
-          return filteredColumnsByPermission.filter(col => col.defaultVisible).map(col => col.name);
-        }
-        return prev.filter(name => allowedNames.includes(name));
-      });
+      const defaults = filteredColumnsByPermission.filter(c => {
+        if (!c.defaultVisible) return false;
+        const isVideoType = ["Video", "CTV", "Youtube"].includes(campaignType);
+        if (isVideoType && ["Clicks", "CTR", "eCPC"].includes(c.name)) return false;
+        return true;
+      }).map(c => c.name);
+
+      setVisibleColumns(defaults);
     }
-  }, [session, filteredColumnsByPermission.length]);
+  }, [campaignType, filteredColumnsByPermission.length]);
 
   const [show, setShow] = useState(false);
   const [search, setSearch] = useState("");
