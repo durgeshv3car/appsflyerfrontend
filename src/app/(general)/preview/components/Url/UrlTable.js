@@ -42,11 +42,25 @@ const UrlTable = ({
   currencySymbol = "$", 
   campaignPermissions = [], 
   campaignPricing = { cpm: {}, cpc: {} },
-  globalEffectiveMetrics = { eCPM: 0, eCPC: 0 }
+  globalEffectiveMetrics = { eCPM: 0, eCPC: 0 },
+  campaignType = ""
 }) => {
   const { data: session } = useSession();
 
-  const filteredColumnsByPermission = columnsList.filter(col => {
+  const filteredColumnsByType = React.useMemo(() => {
+    const isVideoType = ["Video", "CTV", "Youtube"].includes(campaignType);
+    return columnsList.filter(col => {
+      if (isVideoType) {
+        if (col.name === "CTR" || col.name === "eCPC") return false;
+        if (campaignType === "CTV" && col.name === "Clicks") return false;
+      } else if (campaignType === "Banner") {
+        if (["Views", "Complete Views", "First Quartile Views", "Midpoint Views", "Third Quartile Views", "CPCV", "CPV"].includes(col.name)) return false;
+      }
+      return true;
+    });
+  }, [campaignType]);
+
+  const filteredColumnsByPermission = filteredColumnsByType.filter(col => {
     if (session?.user?.role === "super_admin") return true;
     if (!col.permission) return true;
     const perm = col.permission.toLowerCase();

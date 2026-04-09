@@ -84,7 +84,7 @@ const DonutLarge = ({ value, percentage, label, color, showBoth }) => {
   );
 };
 
-const TrendChart = ({ tableData, campaignPermissions = [], campaignPricing = { cpm: {}, cpc: {} } }) => {
+const TrendChart = ({ tableData, campaignPermissions = [], campaignPricing = { cpm: {}, cpc: {} }, campaignType = "" }) => {
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
   const { data: session } = useSession();
@@ -95,6 +95,8 @@ const TrendChart = ({ tableData, campaignPermissions = [], campaignPricing = { c
   const isCampaignSpentRestricted = campaignPermissions.some(p => p.toLowerCase() === "spent");
   const isUserSpentRestricted = userPerms.some(p => p.toLowerCase() === "spent");
   const hasSpent = userRole === "super_admin" || (!isCampaignSpentRestricted && !isUserSpentRestricted);
+
+  const isVideoType = ["Video", "CTV", "Youtube"].includes(campaignType);
 
   useEffect(() => {
     if (!chartRef.current) return;
@@ -119,13 +121,11 @@ const TrendChart = ({ tableData, campaignPermissions = [], campaignPricing = { c
         const datePriceCPM = getPriceForDate(campaignPricing?.cpm, rowDate);
         const datePriceCPC = getPriceForDate(campaignPricing?.cpc, rowDate);
 
-        // FORCE: Always calculate spent locally for consistent graph display
         if (datePriceCPM !== undefined) {
           return (rowImp / 1000) * datePriceCPM;
         } else if (datePriceCPC !== undefined) {
           return rowClicks * datePriceCPC;
         } else {
-          // Fallback calculation using row's own pricing if no override
           const rowCPM = Number(row.CPM || row.cpm || 0);
           const rowCPC = Number(row.CPC || row.cpc || 0);
           return rowCPM > 0 ? (rowImp / 1000) * rowCPM : (rowClicks * rowCPC);
@@ -146,7 +146,10 @@ const TrendChart = ({ tableData, campaignPermissions = [], campaignPricing = { c
         borderWidth: 2,
         yAxisID: 'y',
       },
-      {
+    ];
+
+    if (campaignType !== "CTV") {
+      datasets.push({
         label: "Clicks",
         data: clicks,
         borderColor: "#1F6FEB",
@@ -158,8 +161,11 @@ const TrendChart = ({ tableData, campaignPermissions = [], campaignPricing = { c
         pointBackgroundColor: "#1F6FEB",
         borderWidth: 2,
         yAxisID: 'y1',
-      },
-      {
+      });
+    }
+
+    if (!isVideoType) {
+      datasets.push({
         label: "CTR",
         data: ctr,
         borderColor: "#9B59B6",
@@ -171,8 +177,8 @@ const TrendChart = ({ tableData, campaignPermissions = [], campaignPricing = { c
         pointBackgroundColor: "#9B59B6",
         borderWidth: 2,
         yAxisID: 'y2',
-      }
-    ];
+      });
+    }
 
     if (hasSpent) {
       datasets.push({
@@ -238,13 +244,13 @@ const TrendChart = ({ tableData, campaignPermissions = [], campaignPricing = { c
       },
     });
     return () => { if (chartInstance.current) chartInstance.current.destroy(); };
-  }, [tableData, hasSpent, campaignPricing]);
+  }, [tableData, hasSpent, campaignPricing, isVideoType]);
 
   const legendItems = [
     { color: '#2ECC71', label: 'Impressions' },
     { color: '#1F6FEB', label: 'Clicks' },
-    { color: '#9B59B6', label: 'CTR' }
   ];
+  if (!isVideoType) legendItems.push({ color: '#9B59B6', label: 'CTR' });
   if (hasSpent) legendItems.push({ color: '#F1C40F', label: 'Cost' });
 
   return (
@@ -270,7 +276,7 @@ const TrendChart = ({ tableData, campaignPermissions = [], campaignPricing = { c
   );
 };
 
-export const PerformanceDashboard = ({ tableData, currencySymbol = "$", campaignPermissions = [], campaignPricing = { cpm: {}, cpc: {} } }) => {
+export const PerformanceDashboard = ({ tableData, currencySymbol = "$", campaignPermissions = [], campaignPricing = { cpm: {}, cpc: {} }, campaignType = "" }) => {
   const { data: session } = useSession();
   
   const userRole = session?.user?.role || "";
@@ -354,18 +360,20 @@ export const PerformanceDashboard = ({ tableData, currencySymbol = "$", campaign
                 </div>
               </div>
               <div className="row py-5 align-items-center">
-                <div className="col-6 d-flex flex-column align-items-center">
+                <div className={`${campaignType === "CTV" ? "col-12" : "col-6"} d-flex flex-column align-items-center`}>
                   <DonutLarge percentage={stats.ReachPct} label="Reach" color="#3B82F6" />
                 </div>
-                <div className="col-6 d-flex flex-column align-items-center border-start border-light" style={{ height: '220px', justifyContent: 'center' }}>
-                  <DonutLarge 
-                    value={stats.total.Clicks.toLocaleString()} 
-                    percentage={stats.CTR} 
-                    label="Clicks" 
-                    color="#3B82F6" 
-                    showBoth 
-                  />
-                </div>
+                {campaignType !== "CTV" && (
+                  <div className="col-6 d-flex flex-column align-items-center border-start border-light" style={{ height: '220px', justifyContent: 'center' }}>
+                    <DonutLarge 
+                      value={stats.total.Clicks.toLocaleString()} 
+                      percentage={stats.CTR} 
+                      label="Clicks" 
+                      color="#3B82F6" 
+                      showBoth 
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
@@ -375,11 +383,13 @@ export const PerformanceDashboard = ({ tableData, currencySymbol = "$", campaign
                 <h5 className="fw-bold text-dark mb-0" style={{ fontSize: '18px' }}>Performance</h5>
               </div>
               <div className="d-flex flex-column gap-4 w-100 px-4">
-                <div className="d-flex justify-content-between align-items-center">
-                  <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>CTR</span>
-                  <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{stats.CTR}%</span>
-                </div>
-                {hasCPMValue && (
+                {!["Video", "CTV", "Youtube"].includes(campaignType) && (
+                  <div className="d-flex justify-content-between align-items-center">
+                    <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>CTR</span>
+                    <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{stats.CTR}%</span>
+                  </div>
+                )}
+                {hasCPMValue && !["Video", "CTV", "Youtube"].includes(campaignType) && (
                   <>
                     <div className="d-flex justify-content-between align-items-center">
                       <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>eCPC</span>
@@ -390,6 +400,12 @@ export const PerformanceDashboard = ({ tableData, currencySymbol = "$", campaign
                       <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{currencySymbol}{stats.CPM}</span>
                     </div>
                   </>
+                )}
+                {hasCPMValue && ["Video", "CTV", "Youtube"].includes(campaignType) && (
+                  <div className="d-flex justify-content-between align-items-center">
+                    <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>eCPM</span>
+                    <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{currencySymbol}{stats.CPM}</span>
+                  </div>
                 )}
                 {hasSpent && (
                   <div className="d-flex justify-content-between align-items-center">
@@ -404,6 +420,7 @@ export const PerformanceDashboard = ({ tableData, currencySymbol = "$", campaign
                 tableData={tableData} 
                 campaignPermissions={campaignPermissions}
                 campaignPricing={campaignPricing}
+                campaignType={campaignType}
               />
             </div>
           </div>

@@ -130,6 +130,7 @@ const CampaignDashboard = () => {
     insertionOrderId: "",
     audienceId: "",
     currency: "",
+    campaignType: "",
   });
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -930,6 +931,7 @@ const CampaignDashboard = () => {
                 currencySymbol={getCurrencySymbol(filters.currency)}
                 campaignPermissions={campaignPermissions}
                 campaignPricing={campaignPricing}
+                campaignType={filters.campaignType}
               />
             </div>
           )}
@@ -941,6 +943,7 @@ const CampaignDashboard = () => {
                 currencySymbol={getCurrencySymbol(filters.currency)}
                 campaignPermissions={campaignPermissions}
                 campaignPricing={campaignPricing}
+                campaignType={filters.campaignType}
                 // TableWithDynamicColumns handles its internal column permissions (cpm/spent) separately
               />
             </div>
@@ -1013,6 +1016,7 @@ const CampaignDashboard = () => {
                 campaignPermissions={campaignPermissions}
                 campaignPricing={campaignPricing}
                 globalEffectiveMetrics={globalEffectiveMetrics}
+                campaignType={filters.campaignType}
               />
             </div>
           )}
@@ -1030,6 +1034,7 @@ const CampaignDashboard = () => {
                 campaignPermissions={campaignPermissions}
                 campaignPricing={campaignPricing}
                 globalEffectiveMetrics={globalEffectiveMetrics}
+                campaignType={filters.campaignType}
               />
             </div>
           )}
@@ -1052,6 +1057,7 @@ const CampaignDashboard = () => {
                 campaignPermissions={campaignPermissions}
                 campaignPricing={campaignPricing}
                 globalEffectiveMetrics={globalEffectiveMetrics}
+                campaignType={filters.campaignType}
               />
             </div>
           )}
@@ -1083,6 +1089,7 @@ const CampaignDashboard = () => {
                 campaignPermissions={campaignPermissions}
                 campaignPricing={campaignPricing}
                 globalEffectiveMetrics={globalEffectiveMetrics}
+                campaignType={filters.campaignType}
               />
             </div>
           )}
@@ -1107,6 +1114,7 @@ const CampaignDashboard = () => {
                 campaignPermissions={campaignPermissions}
                 campaignPricing={campaignPricing}
                 globalEffectiveMetrics={globalEffectiveMetrics}
+                campaignType={filters.campaignType}
               />
             </div>
           )}

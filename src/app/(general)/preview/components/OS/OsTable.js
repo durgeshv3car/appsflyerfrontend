@@ -15,13 +15,13 @@ const columnsList = [
   { name: "Spent", defaultVisible: true, permission: "spent" },
   { name: "Total Conversions", defaultVisible: true },
   // Video metrics — hidden by default, selectable via Columns modal
-  { name: "Views", defaultVisible: false },
-  { name: "Complete Views", defaultVisible: false },
-  { name: "First Quartile Views", defaultVisible: false },
-  { name: "Midpoint Views", defaultVisible: false },
-  { name: "Third Quartile Views", defaultVisible: false },
-  { name: "Cpcv", defaultVisible: false },
-  { name: "Cpv", defaultVisible: false },
+  { name: "Views", defaultVisible: true},
+  { name: "Complete Views", defaultVisible: true },
+  { name: "First Quartile Views", defaultVisible: true },
+  { name: "Midpoint Views", defaultVisible: true },
+  { name: "Third Quartile Views", defaultVisible: true },
+  { name: "CPCV", defaultVisible: true },
+  { name: "CPV", defaultVisible: true },
 ];
 
 const getPriceForDate = (pricingObj, targetDate) => {
@@ -49,11 +49,25 @@ const OsTable = ({
   currencySymbol = "$", 
   campaignPermissions = [], 
   campaignPricing = { cpm: {}, cpc: {} },
-  globalEffectiveMetrics = { eCPM: 0, eCPC: 0 }
+  globalEffectiveMetrics = { eCPM: 0, eCPC: 0 },
+  campaignType = ""
 }) => {
   const { data: session } = useSession();
 
-  const filteredColumnsByPermission = columnsList.filter(col => {
+  const filteredColumnsByType = React.useMemo(() => {
+    const isVideoType = ["Video", "CTV", "Youtube"].includes(campaignType);
+    return columnsList.filter(col => {
+      if (isVideoType) {
+        if (col.name === "CTR" || col.name === "eCPC") return false;
+        if (campaignType === "CTV" && col.name === "Clicks") return false;
+      } else if (campaignType === "Banner") {
+        if (["Views", "Complete Views", "First Quartile Views", "Midpoint Views", "Third Quartile Views", "CPCV", "CPV"].includes(col.name)) return false;
+      }
+      return true;
+    });
+  }, [campaignType]);
+
+  const filteredColumnsByPermission = filteredColumnsByType.filter(col => {
     if (session?.user?.role === "super_admin") return true;
     if (!col.permission) return true;
     const perm = col.permission.toLowerCase();
@@ -68,11 +82,13 @@ const OsTable = ({
   useEffect(() => {
     if (filteredColumnsByPermission.length > 0) {
       const allowedNames = filteredColumnsByPermission.map(c => c.name);
+      const defaults = filteredColumnsByPermission.filter(c => c.defaultVisible).map(c => c.name);
+      
       setVisibleColumns(prev => {
-        if (prev.length === 0) {
-          return filteredColumnsByPermission.filter(col => col.defaultVisible).map(col => col.name);
-        }
-        return prev.filter(name => allowedNames.includes(name));
+        if (prev.length === 0) return defaults;
+        const currentVisible = prev.filter(name => allowedNames.includes(name));
+        // Merge with defaults to ensure new mandatory fields appear
+        return Array.from(new Set([...currentVisible, ...defaults]));
       });
     }
   }, [session, filteredColumnsByPermission.length]);
@@ -93,13 +109,13 @@ const OsTable = ({
       const cnv = Number(row.TotalConversions || row.totalConversions || row.total_conversions || 0);
       const rowDate = row.Date || row.date || "";
 
-      const videoComplete = Number(row.completeViewsVideo || row.CompleteViewsVideo || 0);
-      const videoFirstQ = Number(row.firstQuartileViewsVideo || row.FirstQuartileViewsVideo || 0);
-      const videoMidpoint = Number(row.midpointViewsVideo || row.MidpointViewsVideo || 0);
-      const videoThirdQ = Number(row.thirdQuartileViewsVideo || row.ThirdQuartileViewsVideo || 0);
-      const videoViews = Number(row.Views || row.views || row.VideoViews || 0); 
-      const videoCPCV = row.Cpcv || row.cpcv || 0;
-      const videoCPV = row.Cpv || row.cpv || 0;
+      const videoComplete = Number(row.completeViewsVideo || row.CompleteViewsVideo || row["Complete Views"] || 0);
+      const videoFirstQ = Number(row.firstQuartileViewsVideo || row.FirstQuartileViewsVideo || row["First Quartile Views"] || 0);
+      const videoMidpoint = Number(row.midpointViewsVideo || row.MidpointViewsVideo || row["Midpoint Views"] || 0);
+      const videoThirdQ = Number(row.thirdQuartileViewsVideo || row.ThirdQuartileViewsVideo || row["Third Quartile Views"] || 0);
+      const videoViews = Number(row.Views || row.views || row.VideoViews || 0);
+      const videoCPCV = row.CPCV || row.Cpcv || row.cpcv || 0;
+      const videoCPV = row.CPV || row.Cpv || row.cpv || 0;
 
       let rowSpent = 0;
       if (globalEffectiveMetrics.eCPM > 0) {
@@ -132,8 +148,8 @@ const OsTable = ({
           "Midpoint Views": 0,
           "Third Quartile Views": 0,
           "Views": 0,
-          Cpcv: 0,
-          Cpv: 0
+          CPCV: 0,
+          CPV: 0
         };
       }
       
@@ -146,8 +162,8 @@ const OsTable = ({
       groups[title]["Midpoint Views"] += videoMidpoint;
       groups[title]["Third Quartile Views"] += videoThirdQ;
       groups[title]["Views"] += videoViews;
-      groups[title].Cpcv += videoCPCV;
-      groups[title].Cpv += videoCPV;
+      groups[title].CPCV += videoCPCV;
+      groups[title].CPV += videoCPV;
     });
 
     return Object.values(groups).map(g => ({
@@ -184,8 +200,6 @@ const OsTable = ({
     "Midpoint Views": (acc["Midpoint Views"] || 0) + row["Midpoint Views"],
     "Third Quartile Views": (acc["Third Quartile Views"] || 0) + row["Third Quartile Views"],
     "Views": (acc["Views"] || 0) + row["Views"],
-    Cpcv: (acc.Cpcv || 0) + row.Cpcv,
-    Cpv: (acc.Cpv || 0) + row.Cpv,
     SumCPM: (acc.SumCPM || 0) + (row.eCPM * row.Impressions), // For weighted total footer
     SumCPC: (acc.SumCPC || 0) + (row.eCPC * row.Clicks),
   }), { 
@@ -198,8 +212,6 @@ const OsTable = ({
     "Midpoint Views": 0,
     "Third Quartile Views": 0,
     "Views": 0,
-    Cpcv: 0,
-    Cpv: 0,
     SumCPM: 0, 
     SumCPC: 0 
   });
@@ -215,8 +227,8 @@ const OsTable = ({
       col === "Midpoint Views" ||
       col === "Third Quartile Views" ||
       col === "Views" ||
-      col === "Cpcv" ||
-      col === "Cpv"
+      col === "CPCV" ||
+      col === "CPV"
     ) {
       return isNaN(Number(value)) ? (value || "0") : Number(value).toLocaleString();
     }
@@ -269,8 +281,8 @@ const OsTable = ({
                     else if (col === "First Quartile Views") val = row["First Quartile Views"] || 0;
                     else if (col === "Midpoint Views") val = row["Midpoint Views"] || 0;
                     else if (col === "Third Quartile Views") val = row["Third Quartile Views"] || 0;
-                    else if (col === "Cpcv") val = row.Cpcv || 0;
-                    else if (col === "Cpv") val = row.Cpv || 0;
+                    else if (col === "CPCV") val = row.CPCV || 0;
+                    else if (col === "CPV") val = row.CPV || 0;
                     else if (col === "CTR") val = imp > 0 ? (cks / imp) * 100 : 0;
                     else if (col === "Spent") val = row.Spent || 0;
                     else if (col === "eCPM") val = row.eCPM || 0;
@@ -294,6 +306,8 @@ const OsTable = ({
                          col === "CTR" ? (totals.Impressions ? ((totals.Clicks / totals.Impressions) * 100).toFixed(2) + "%" : "0.00%") :
                          col === "eCPM" ? (totals.Impressions ? currencySymbol + ((totals.Spent / totals.Impressions) * 1000).toFixed(2) : currencySymbol + "0.00") :
                          col === "eCPC" ? (totals.Clicks ? currencySymbol + (totals.Spent / totals.Clicks).toFixed(2) : currencySymbol + "0.00") :
+                         col === "CPCV" ? (totals["Complete Views"] ? currencySymbol + (totals.Spent / totals["Complete Views"]).toFixed(2) : currencySymbol + "0.00") :
+                         col === "CPV" ? (totals["Views"] ? currencySymbol + (totals.Spent / totals["Views"]).toFixed(2) : currencySymbol + "0.00") :
                          formatValue(col, totals[col])}
                        </span>
                     </td>

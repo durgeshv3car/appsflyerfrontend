@@ -157,6 +157,7 @@ const ReportsFilter = ({
              insertionOrderId: aud.insertionOrderId || "",
              audienceId: getAudId(aud),
              currency: aud.currency || "",
+             campaignType: aud.campaignType || "",
            });
            setIsLoaded(true);
            lastQueryRef.current = targetId;
@@ -175,6 +176,7 @@ const ReportsFilter = ({
                 insertionOrderId: match.insertionOrderId || "",
                 audienceId: getAudId(match),
                 currency: match.currency || "",
+                campaignType: match.campaignType || "",
               });
               setIsLoaded(true);
               lastQueryRef.current = targetId;
@@ -199,6 +201,7 @@ const ReportsFilter = ({
           insertionOrderId: firstAudience.insertionOrderId || "",
           audienceId: getAudId(firstAudience),
           currency: firstAudience.currency || "",
+          campaignType: firstAudience.campaignType || "",
         });
       }
       setIsLoaded(true);
@@ -707,6 +710,7 @@ const ReportsFilter = ({
                     insertionOrderId: advertiserObj.insertionOrderId || "",
                     audienceId: getAudId(advertiserObj),
                     currency: advertiserObj.currency || "",
+                    campaignType: advertiserObj.campaignType || "",
                     campaign: [],
                   }));
                 }}

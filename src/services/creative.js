@@ -13,6 +13,7 @@ export const createReportsDataCreative = async (params) => {
         dataRange: params.dataRange,
         startDate: params.startDate,
         endDate: params.endDate,
+        campaignType: params.campaignType,
       },
       {
         headers: {

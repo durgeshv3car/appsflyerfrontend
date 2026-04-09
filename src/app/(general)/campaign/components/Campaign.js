@@ -37,6 +37,7 @@ const emptyCampaign = {
   cpm: {},
   cpc: {},
   currency: "",
+  campaignType: "CTV", // New field added
   source: "DV360", // Default source
   active: true, // New field
 };
@@ -264,6 +265,7 @@ const Campaign = () => {
     const isValid =
       campaignData?.reportName?.trim() &&
       campaignData?.advertiserId?.trim() &&
+      campaignData?.campaignType?.trim() &&
       Object.keys(campaignData?.cpm || {}).length > 0;
 
     if (!isValid) {
@@ -295,6 +297,7 @@ const Campaign = () => {
         const params = {
           audienceId: res.audience._id,
           dataRange: "ALL_TIME",
+          campaignType: campaignData.campaignType,
         };
 
         const reportTasks = [
@@ -401,7 +404,7 @@ const Campaign = () => {
     const stringId = id?.$oid || id;
     
     // Combine existing campaign fields with the update to prevent backend from clearing them
-    const { reportName, insertionOrderId, advertiserId, campaignId, cpm, cpc, currency } = selectedPermissionCampaign;
+    const { reportName, insertionOrderId, advertiserId, campaignId, cpm, cpc, currency, campaignType } = selectedPermissionCampaign;
     const payload = {
       reportName,
       insertionOrderId,
@@ -410,6 +413,7 @@ const Campaign = () => {
       cpm,
       cpc,
       currency,
+      campaignType,
       ...updatedData
     };
 
@@ -494,6 +498,7 @@ const Campaign = () => {
                 <th>CPM</th>
                 <th>CPC</th>
                 <th>Currency</th>
+                <th>Campaign Type</th>
                 <th>Cron Status</th>
                 <th className="text-end">Actions</th>
               </tr>
@@ -546,6 +551,11 @@ const Campaign = () => {
                       ) : (c.cpc || '-')}
                     </td>
                     <td className="align-middle">{c.currency || '-'}</td>
+                    <td className="align-middle">
+                      <span className="badge bg-light text-dark border">
+                        {c.campaignType || '-'}
+                      </span>
+                    </td>
                     <td className="align-middle">
                        <div className="form-check form-switch">
                          <input
@@ -924,6 +934,25 @@ const Campaign = () => {
                     </div>
 
                     <div className="row mb-3">
+                      <div className="col-4 d-flex align-items-center">
+                        <label className="fw-semibold mb-0">Campaign Type</label>
+                      </div>
+                      <div className="col-8">
+                        <select
+                          name="campaignType"
+                          value={campaignData?.campaignType || "CTV"}
+                          onChange={handleInputChange}
+                          className="form-select"
+                        >
+                          <option value="CTV">CTV</option>
+                          <option value="Banner">Banner</option>
+                          <option value="Video">Video</option>
+                          <option value="Youtube">Youtube</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="row mb-3">
                        <div className="col-4 d-flex align-items-center">
                          <label className="fw-semibold mb-0">Campaign Status</label>
                        </div>
@@ -960,6 +989,7 @@ const Campaign = () => {
                         !(
                           campaignData?.reportName?.trim() &&
                           campaignData?.advertiserId?.trim() &&
+                          campaignData?.campaignType?.trim() &&
                           Object.keys(campaignData?.cpm || {}).length > 0 &&
                           (campaignData.source === "Eskimi" || (campaignData.campaignId?.trim() && campaignData.insertionOrderId?.trim()))
                         )
