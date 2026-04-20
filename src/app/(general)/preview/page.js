@@ -182,6 +182,11 @@ const CampaignDashboard = () => {
         cpm: typeof selectedAud?.cpm === 'object' ? selectedAud.cpm : {},
         cpc: typeof selectedAud?.cpc === 'object' ? selectedAud.cpc : {}
       });
+
+      // Sync reportName if it's missing or different
+      if (selectedAud && filters.reportName !== selectedAud.reportName) {
+        setFilters(prev => ({ ...prev, reportName: selectedAud.reportName }));
+      }
     } else {
       setCampaignPermissions([]);
       setCampaignPricing({ cpm: {}, cpc: {} });
@@ -962,6 +967,18 @@ const CampaignDashboard = () => {
               />
             </div>
           )}
+              {hasPermission("creative_performance_graph_table") && (
+            <div className="col-12">
+              <CreativeTable
+                CreativeTableData={CreativeTableData.tableData}
+                currencySymbol={getCurrencySymbol(filters.currency)}
+                campaignPermissions={campaignPermissions}
+                campaignPricing={campaignPricing}
+                globalEffectiveMetrics={globalEffectiveMetrics}
+                campaignType={filters.campaignType}
+              />
+            </div>
+          )}
 
           <div className="col-lg-12">
             <div className="row g-4 mt-2">
@@ -1003,11 +1020,11 @@ const CampaignDashboard = () => {
             </div>
           </div>
 
-          {hasPermission("browser_graph") && (
+          {/* {hasPermission("browser_graph") && (
             <div className="col-12 mt-4">
               <BrowserPerformance browserData={browserData.graphData} />
             </div>
-          )}
+          )} */}
           {hasPermission("browser_table") && (
             <div className="col-12">
               <BrowserTable
@@ -1021,11 +1038,11 @@ const CampaignDashboard = () => {
             </div>
           )}
 
-          {hasPermission("operator_graph") && (
+          {/* {hasPermission("operator_graph") && (
             <div className="col-12 mt-4">
               <OperatorPerformance operatorData={operatorData.graphData} />
             </div>
-          )}
+          )} */}
           {hasPermission("operator_table") && (
             <div className="col-12">
               <OperatorTable
@@ -1039,11 +1056,11 @@ const CampaignDashboard = () => {
             </div>
           )}
 
-          {hasPermission("os_graph") && (
+          {/* {hasPermission("os_graph") && (
             <div className="col-12 mt-5">
               <OsPerformance osData={osData.graphData} />
             </div>
-          )}
+          )} */}
           {hasPermission("os_distribution") && (
             <div className="col-12">
               <OsDistribution osData={osData.graphData} />
@@ -1081,18 +1098,7 @@ const CampaignDashboard = () => {
             </div>
           </div>
 
-           {hasPermission("creative_performance_graph_table") && (
-            <div className="col-12">
-              <CreativeTable
-                CreativeTableData={CreativeTableData.tableData}
-                currencySymbol={getCurrencySymbol(filters.currency)}
-                campaignPermissions={campaignPermissions}
-                campaignPricing={campaignPricing}
-                globalEffectiveMetrics={globalEffectiveMetrics}
-                campaignType={filters.campaignType}
-              />
-            </div>
-          )}
+       
 
           {hasPermission("url_distribution") && (
             <div className="col-12 mt-4">
@@ -1100,11 +1106,11 @@ const CampaignDashboard = () => {
             </div>
           )}
 
-          {hasPermission("url_graph") && (
+          {/* {hasPermission("url_graph") && (
             <div className="col-12 mt-4">
               <UrlPerformance urlData={urlData.graphData} />
             </div>
-          )}
+          )} */}
 
           {hasPermission("url_table") && (
             <div className="col-12">

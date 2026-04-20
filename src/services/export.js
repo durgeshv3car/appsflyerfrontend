@@ -10,6 +10,7 @@ export const downloadCSV = async (filters) => {
       `${API_URL}/export/download/all/csv`,
       {
         ...filters,
+        reportName: filters.reportName,
         advertiserId: filters.advertiser,
         startDate: filters.dateRange.startDate,
         endDate: filters.dateRange.endDate,
@@ -25,7 +26,7 @@ export const downloadCSV = async (filters) => {
     const url = window.URL.createObjectURL(new Blob([res.data]));
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `report_${filters.advertiser}_${new Date().getTime()}.csv`);
+    link.setAttribute("download", `${filters.reportName}.csv`);
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -37,11 +38,13 @@ export const downloadCSV = async (filters) => {
 
 export const downloadExcel = async (filters) => {
   try {
+    console.log("filters", filters);
     const token = await getToken();
     const res = await axios.post(
       `${API_URL}/export/download/all/excel`,
       {
         ...filters,
+        reportName: filters.reportName,
         advertiserId: filters.advertiser,
         startDate: filters.dateRange.startDate,
         endDate: filters.dateRange.endDate,
@@ -57,7 +60,7 @@ export const downloadExcel = async (filters) => {
     const url = window.URL.createObjectURL(new Blob([res.data]));
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `report_${filters.advertiser}_${new Date().getTime()}.xlsx`);
+    link.setAttribute("download", `${filters.reportName}.xlsx`);
     document.body.appendChild(link);
     link.click();
     link.remove();

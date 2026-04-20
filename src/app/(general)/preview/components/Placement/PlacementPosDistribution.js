@@ -73,7 +73,7 @@ const PlacementPosDistribution = ({ placementPosData = [] }) => {
   return (
     <div className="card border-0 shadow-sm h-100">
       <div className="card-header bg-white border-0 pt-4 px-4 pb-3">
-        <h5 className="mb-0 fw-bold text-dark" style={{ fontSize: '1.2rem' }}>Placement positions</h5>
+        <h5 className="mb-0 fw-bold text-dark" style={{ fontSize: '1.2rem' }}>Placement Positions</h5>
       </div>
       <div className="card-body p-4 pt-1">
         <div className="row align-items-center h-100">

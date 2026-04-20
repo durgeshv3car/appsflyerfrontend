@@ -137,10 +137,19 @@ const PerformanceTable = ({
     );
   };
 
-  const totalPages = Math.ceil((tableData?.length || 0) / rowsPerPage);
+  const sortedTableData = React.useMemo(() => {
+    if (!tableData) return [];
+    return [...tableData].sort((a, b) => {
+      const dateA = new Date(a.Date || a.date || 0);
+      const dateB = new Date(b.Date || b.date || 0);
+      return dateB - dateA;
+    });
+  }, [tableData]);
+
+  const totalPages = Math.ceil((sortedTableData?.length || 0) / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
   const paginatedData =
-    tableData?.slice(startIndex, startIndex + rowsPerPage) || [];
+    sortedTableData?.slice(startIndex, startIndex + rowsPerPage) || [];
 
   const totals = tableData?.reduce(
     (acc, row) => {
@@ -591,8 +600,8 @@ const PerformanceTable = ({
                 }}
               >
                 {startIndex + 1}-
-                {Math.min(startIndex + rowsPerPage, tableData.length)} of{" "}
-                {tableData.length}
+                {Math.min(startIndex + rowsPerPage, sortedTableData.length)} of{" "}
+                {sortedTableData.length}
               </span>
 
               <div className="d-flex gap-2">

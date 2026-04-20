@@ -180,7 +180,7 @@ const WeekdayDistribution = ({ tableData = [], weekData = [] }) => {
     <div className="card border-0 shadow-sm mb-4">
       <div className="card-header bg-white border-0 pt-4 px-4 pb-3">
         <div className="d-flex justify-content-between align-items-center w-100">
-          <h5 className="mb-0 fw-bold text-dark" style={{ fontSize: '1.2rem' }}>Delivery by weekday</h5>
+          <h5 className="mb-0 fw-bold text-dark" style={{ fontSize: '1.2rem' }}>Delivery by Weekday</h5>
           <div className="d-flex gap-4">
             <div className="d-flex align-items-center gap-2">
               <span style={{ width: '12px', height: '12px', backgroundColor: '#3B82F6', display: 'inline-block' }}></span>

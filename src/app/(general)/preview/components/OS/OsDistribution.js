@@ -73,7 +73,7 @@ const OsDistribution = ({ osData = [] }) => {
     <div className="card border-0 shadow-sm mb-4">
       <div className="card-header bg-white border-0 pt-4 px-4 pb-3">
         <div className="d-flex justify-content-between align-items-center w-100">
-            <h5 className="mb-0 fw-bold text-dark" style={{ fontSize: '1.2rem' }}>Operating systems</h5>
+            <h5 className="mb-0 fw-bold text-dark" style={{ fontSize: '1.2rem' }}>Operating Systems</h5>
         </div>
       </div>
       <div className="card-body p-4 pt-1">

@@ -64,7 +64,7 @@ const CampaignLoader = ({ progress, status }) => {
         </div>
 
         <h4 style={{ fontWeight: "700", color: "#031035", marginBottom: "10px" }}>
-          Creating Campaign Reports
+          Generating Campaign Reports
         </h4>
         <p style={{ color: "#64748b", fontSize: "0.95rem", marginBottom: "25px", height: "1.5rem" }}>
           {status}
@@ -333,7 +333,7 @@ const Campaign = () => {
               // Scale progress from 20% to 95%
               const currentProgress = 20 + Math.floor((completedCount / totalTasks) * 75);
               setProgress(currentProgress);
-              setLoadingStatus(`Verified ${task.name} data (${completedCount}/${totalTasks})`);
+              setLoadingStatus(`Verifying ${task.name} data (${completedCount}/${totalTasks})`);
             } catch (err) {
               console.error(`Task ${task.name} failed:`, err);
               completedCount++; // Still count towards progress to avoid UI hang

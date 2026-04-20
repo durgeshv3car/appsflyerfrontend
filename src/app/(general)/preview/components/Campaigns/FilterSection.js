@@ -156,6 +156,7 @@ const ReportsFilter = ({
              source: isDV360 ? "DV360" : "Eskimi",
              insertionOrderId: aud.insertionOrderId || "",
              audienceId: getAudId(aud),
+             reportName: aud.reportName || "",
              currency: aud.currency || "",
              campaignType: aud.campaignType || "",
            });
@@ -175,6 +176,7 @@ const ReportsFilter = ({
                 source: isDV360 ? "DV360" : "Eskimi",
                 insertionOrderId: match.insertionOrderId || "",
                 audienceId: getAudId(match),
+                reportName: match.reportName || "",
                 currency: match.currency || "",
                 campaignType: match.campaignType || "",
               });
@@ -200,6 +202,7 @@ const ReportsFilter = ({
           source: isDV360 ? "DV360" : "Eskimi",
           insertionOrderId: firstAudience.insertionOrderId || "",
           audienceId: getAudId(firstAudience),
+          reportName: firstAudience.reportName || "",
           currency: firstAudience.currency || "",
           campaignType: firstAudience.campaignType || "",
         });
@@ -578,7 +581,7 @@ const ReportsFilter = ({
       pdf.addImage(imgData, 'JPEG', 0, HDR_MM, PAGE_W_MM, IMG_H_MM);
 
       // ── 5. Save ──────────────────────────────────────────────────────
-      pdf.save(`Report_${audienceName.replace(/\s+/g, '_')}_${format(new Date(), "yyyyMMdd")}.pdf`);
+      pdf.save(`${audienceName}.pdf`);
 
       // DEBUG: Append the generated image to the body so we can see it via subagent
       const debugImg = document.createElement('img');
@@ -709,6 +712,7 @@ const ReportsFilter = ({
                     source: isDV360 ? "DV360" : "Eskimi",
                     insertionOrderId: advertiserObj.insertionOrderId || "",
                     audienceId: getAudId(advertiserObj),
+                    reportName: advertiserObj.reportName || "",
                     currency: advertiserObj.currency || "",
                     campaignType: advertiserObj.campaignType || "",
                     campaign: [],
