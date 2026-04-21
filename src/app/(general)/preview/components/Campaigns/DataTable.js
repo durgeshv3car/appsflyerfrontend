@@ -14,20 +14,19 @@ const columnsList = [
   { name: "Impressions", defaultVisible: true },
   { name: "Reach", defaultVisible: true },
   { name: "Frequency", defaultVisible: true },
-  { name: "Clicks", defaultVisible: true },
-  { name: "CTR", defaultVisible: true },
   { name: "CPM", defaultVisible: true, permission: "cpm" },
+  { name: "Views", defaultVisible: true },
+  { name: "CPV", defaultVisible: true },
+  { name: "Clicks", defaultVisible: true },
   { name: "CPC", defaultVisible: true, permission: "cpm" },
-  { name: "Spent", defaultVisible: true, permission: "spent" },
-  { name: "Total Conversions", defaultVisible: true },
-  // Video metrics — hidden by default, selectable via Columns modal
-  { name: "Complete Views", defaultVisible: true },
-  { name: "Views", defaultVisible: true},
   { name: "First Quartile Views", defaultVisible: true },
   { name: "Midpoint Views", defaultVisible: true },
   { name: "Third Quartile Views", defaultVisible: true },
+  { name: "Complete view", defaultVisible: true },
   { name: "CPCV", defaultVisible: true },
-  { name: "CPV", defaultVisible: true },
+  { name: "Total Conversions", defaultVisible: true },
+  { name: "CTR", defaultVisible: false },
+  { name: "Spent", defaultVisible: false, permission: "spent" },
 ];
 
 const getPriceForDate = (pricingObj, targetDate) => {
@@ -71,7 +70,7 @@ const PerformanceTable = ({
         if (
           [
             "Views",
-            "Complete Views",
+            "Complete view",
             "First Quartile Views",
             "Midpoint Views",
             "Third Quartile Views",
@@ -218,8 +217,8 @@ const PerformanceTable = ({
         Spent: acc.Spent + spent,
         Reach: acc.Reach + reach,
         "Views": (acc["Views"] || 0) + videoViews,
-        "Total Conversions": (acc["Total Conversions"] || 0) + totalConversions,
-        "Complete Views": (acc["Complete Views"] || 0) + videoComplete,
+        "Conversions": (acc["Conversions"] || 0) + totalConversions,
+        "Complete view": (acc["Complete view"] || 0) + videoComplete,
         "First Quartile Views": (acc["First Quartile Views"] || 0) + videoFirstQ,
         "Midpoint Views": (acc["Midpoint Views"] || 0) + videoMidpoint,
         "Third Quartile Views": (acc["Third Quartile Views"] || 0) + videoThirdQ,
@@ -233,8 +232,8 @@ const PerformanceTable = ({
       Clicks: 0,
       Reach: 0,
       Spent: 0,
-      "Total Conversions": 0,
-      "Complete Views": 0,
+      "Conversions": 0,
+      "Complete view": 0,
       "First Quartile Views": 0,
       "Midpoint Views": 0,
       "Third Quartile Views": 0,
@@ -252,8 +251,8 @@ const PerformanceTable = ({
       col === "Impressions" ||
       col === "Clicks" ||
       col === "Reach" ||
-      col === "Total Conversions" ||
-      col === "Complete Views" ||
+      col === "Conversions" ||
+      col === "Complete view" ||
       col === "First Quartile Views" ||
       col === "Midpoint Views" ||
       col === "Third Quartile Views" ||
@@ -349,7 +348,7 @@ const PerformanceTable = ({
                       row[col.toLowerCase()] ||
                       row[col.charAt(0).toLowerCase() + col.slice(1)];
 
-                    const videoComplete = Number(row.completeViewsVideo || row.CompleteViewsVideo || row["Complete Views"] || 0);
+                    const videoComplete = Number(row.completeViewsVideo || row.CompleteViewsVideo || row["Complete view"] || 0);
                     const videoFirstQ = Number(row.firstQuartileViewsVideo || row.FirstQuartileViewsVideo || row["First Quartile Views"] || 0);
                     const videoMidpoint = Number(row.midpointViewsVideo || row.MidpointViewsVideo || row["Midpoint Views"] || 0);
                     const videoThirdQ = Number(row.thirdQuartileViewsVideo || row.ThirdQuartileViewsVideo || row["Third Quartile Views"] || 0);
@@ -361,14 +360,14 @@ const PerformanceTable = ({
                     if (col === "Impressions") val = imp;
                     else if (col === "Clicks") val = cks;
                     else if (col === "Reach") val = rch;
-                    else if (col === "Complete Views") val = videoComplete;
                     else if (col === "First Quartile Views") val = videoFirstQ;
                     else if (col === "Midpoint Views") val = videoMidpoint;
                     else if (col === "Third Quartile Views") val = videoThirdQ;
+                    else if (col === "Complete view") val = videoComplete;
                     else if (col === "Views") val = videoViews;
                     else if (col === "CPCV") val = videoCPCV;
                     else if (col === "CPV") val = videoCPV;
-                    else if (col === "Total Conversions") val = cnv;
+                    else if (col === "Conversions") val = cnv;
 
                     // Force consistent derived metrics
                     const rowDate = row.Date || row.date || "";
@@ -455,9 +454,7 @@ const PerformanceTable = ({
                     // New columns resolution
                     if (col === "Views")
                       val =row.Views || row.views || row.VideoViews || 0;
-                    if (col === "Complete Views")
-                      val =
-                        row.completeViewsVideo || row.CompleteViewsVideo || 0;
+                    
                     if (col === "First Quartile Views")
                       val =
                         row.firstQuartileViewsVideo ||
@@ -471,6 +468,9 @@ const PerformanceTable = ({
                         row.thirdQuartileViewsVideo ||
                         row.ThirdQuartileViewsVideo ||
                         0;
+                    if (col === "Complete view")
+                      val =
+                        row.completeViewsVideo || row.CompleteViewsVideo || 0;    
                     if (col === "Cpcv") {
                       val = row.Cpcv || row.cpcv || 0;
                     }
@@ -521,9 +521,9 @@ const PerformanceTable = ({
                                       (totals.Spent / totals.Clicks).toFixed(2)
                                     : currencySymbol + "0.00"
                                   : col === "CPCV"
-                                    ? totals["Complete Views"]
+                                    ? totals["Complete view"]
                                       ? currencySymbol +
-                                        (totals.Spent / totals["Complete Views"]).toFixed(2)
+                                        (totals.Spent / totals["Complete view"]).toFixed(2)
                                       : currencySymbol + "0.00"
                                     : col === "CPV"
                                       ? totals["Views"]
