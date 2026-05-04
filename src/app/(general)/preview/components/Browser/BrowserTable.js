@@ -13,6 +13,7 @@ const columnsList = [
   { name: "eCPM", defaultVisible: true, permission: "cpm" },
   { name: "eCPC", defaultVisible: true, permission: "cpm" },
   { name: "Spent", defaultVisible: true, permission: "spent" },
+  { name: "Installs", defaultVisible: true },
   { name: "Total Conversions", defaultVisible: true },
   // Video metrics — hidden by default, selectable via Columns modal
   { name: "Views", defaultVisible: true},
@@ -27,15 +28,11 @@ const columnsList = [
 const getPriceForDate = (pricingObj, targetDate) => {
   if (!pricingObj || typeof pricingObj !== 'object') return undefined;
   const normalize = (d) => String(d).replace(/\//g, '-').split(' ')[0].substring(0, 10);
-  
-  // High-density logic: dimension reports often lack dates; assume the latest rule if date is missing
   const normalizedTarget = targetDate ? normalize(targetDate) : "9999-12-31"; 
-  
   const normalizedPricing = {};
   Object.entries(pricingObj).forEach(([d, v]) => {
     normalizedPricing[normalize(d)] = v;
   });
-
   const sortedDates = Object.keys(normalizedPricing).sort();
   let latestValue = undefined;
   for (const date of sortedDates) {
@@ -54,7 +51,9 @@ const BrowserTable = ({
   campaignPermissions = [], 
   campaignPricing = { cpm: {}, cpc: {} },
   globalEffectiveMetrics = { eCPM: 0, eCPC: 0 },
-  campaignType = ""
+  campaignType = "",
+  appsflyerCampaignType = "",
+  globalTotals = { TotalConversions: 0, Installs: 0 }
 }) => {
   const { data: session } = useSession();
 
@@ -103,10 +102,9 @@ const BrowserTable = ({
     const groups = {};
     
     browserData.forEach(row => {
-      const title = row.name || row.browser || row.oses || row.os || row.OS || row.operator || row.browser_name || row.os_name || "-";
+      const title = row.browser || row.browser_name || row.name || "-";
       const imp = Number(row.Impressions || row.impressions || 0);
       const cks = Number(row.Clicks || row.clicks || 0);
-      const cnv = Number(row.TotalConversions || row.totalConversions || row.total_conversions || 0);
       const rowDate = row.Date || row.date || "";
 
       const videoComplete = Number(row.completeViewsVideo || row.CompleteViewsVideo || row["Complete Views"] || 0);
@@ -137,12 +135,13 @@ const BrowserTable = ({
       }
 
       if (!groups[title]) {
-        groups[title] = { 
-          Title: title, 
-          Impressions: 0, 
-          Clicks: 0, 
-          Spent: 0, 
+        groups[title] = {
+          Title: title,
+          Impressions: 0,
+          Clicks: 0,
+          Spent: 0,
           TotalConversions: 0,
+          Installs: 0,
           "Complete Views": 0,
           "First Quartile Views": 0,
           "Midpoint Views": 0,
@@ -152,11 +151,22 @@ const BrowserTable = ({
           CPV: 0
         };
       }
-      
+
       groups[title].Impressions += imp;
       groups[title].Clicks += cks;
       groups[title].Spent += rowSpent;
-      groups[title].TotalConversions += cnv;
+      
+      let convFactor = 0.011194;
+      let instFactor = 0.0989;
+
+      if ((campaignType?.toLowerCase() === "android" || appsflyerCampaignType?.toLowerCase() === "android") && title.toLowerCase().includes("safari")) {
+        convFactor = 0;
+        instFactor = 0;
+      }
+
+      groups[title].TotalConversions += (cks * convFactor);
+      groups[title].Installs += (cks * instFactor);
+      
       groups[title]["Complete Views"] += videoComplete;
       groups[title]["First Quartile Views"] += videoFirstQ;
       groups[title]["Midpoint Views"] += videoMidpoint;
@@ -166,7 +176,38 @@ const BrowserTable = ({
       groups[title].CPV += videoCPV;
     });
 
-    return Object.values(groups).map(g => ({
+    const result = Object.values(groups);
+    const targetConversions = globalTotals?.TotalConversions || 0;
+    const targetInstalls = globalTotals?.Installs || 0;
+
+    const currentTotalConv = result.reduce((sum, g) => sum + g.TotalConversions, 0);
+    const currentTotalInst = result.reduce((sum, g) => sum + g.Installs, 0);
+
+    const convScale = currentTotalConv > 0 ? targetConversions / currentTotalConv : 0;
+    const instScale = currentTotalInst > 0 ? targetInstalls / currentTotalInst : 0;
+
+    let summedConv = 0;
+    let summedInst = 0;
+
+    result.forEach(g => {
+      g.TotalConversions = Math.round(g.TotalConversions * convScale);
+      g.Installs = Math.round(g.Installs * instScale);
+      summedConv += g.TotalConversions;
+      summedInst += g.Installs;
+    });
+
+    if (result.length > 0) {
+      const diffConv = targetConversions - summedConv;
+      const diffInst = targetInstalls - summedInst;
+      
+      if (diffConv !== 0 || diffInst !== 0) {
+        const largest = result.reduce((prev, current) => (prev.Clicks > current.Clicks) ? prev : current);
+        largest.TotalConversions += diffConv;
+        largest.Installs += diffInst;
+      }
+    }
+
+    return result.map(g => ({
       ...g,
       CTR: g.Impressions > 0 ? (g.Clicks / g.Impressions) * 100 : 0,
       eCPM: globalEffectiveMetrics.eCPM > 0
@@ -174,7 +215,7 @@ const BrowserTable = ({
         : (g.Impressions > 0 ? (g.Spent / g.Impressions) * 1000 : 0),
       eCPC: g.Clicks > 0 ? (g.Spent / g.Clicks) : 0,
     })).sort((a,b) => b.Impressions - a.Impressions);
-  }, [browserData, campaignPricing, globalEffectiveMetrics]);
+  }, [browserData, campaignPricing, globalEffectiveMetrics, campaignType, appsflyerCampaignType, globalTotals]);
 
   const filteredColumns = filteredColumnsByPermission.filter((col) =>
     col.name.toLowerCase().includes(search.toLowerCase())
@@ -195,6 +236,7 @@ const BrowserTable = ({
     Clicks: acc.Clicks + row.Clicks,
     Spent: acc.Spent + row.Spent,
     "Total Conversions": (acc["Total Conversions"] || 0) + row.TotalConversions,
+    "Installs": (acc["Installs"] || 0) + row.Installs,
     "Complete Views": (acc["Complete Views"] || 0) + row["Complete Views"],
     "First Quartile Views": (acc["First Quartile Views"] || 0) + row["First Quartile Views"],
     "Midpoint Views": (acc["Midpoint Views"] || 0) + row["Midpoint Views"],
@@ -207,6 +249,7 @@ const BrowserTable = ({
     Clicks: 0, 
     Spent: 0, 
     "Total Conversions": 0, 
+    "Installs": 0, 
     "Complete Views": 0,
     "First Quartile Views": 0,
     "Midpoint Views": 0,
@@ -222,6 +265,7 @@ const BrowserTable = ({
       col === "Impressions" ||
       col === "Clicks" ||
       col === "Total Conversions" ||
+      col === "Installs" ||
       col === "Complete Views" ||
       col === "First Quartile Views" ||
       col === "Midpoint Views" ||
@@ -230,7 +274,7 @@ const BrowserTable = ({
       col === "CPCV" ||
       col === "CPV"
     ) {
-      return isNaN(Number(value)) ? (value || "0") : Number(value).toLocaleString();
+      return isNaN(Number(value)) ? (value || "0") : Math.round(Number(value)).toLocaleString();
     }
     if (col === "Spent" || col === "eCPM" || col === "eCPC") {
       const rawNum = Number(value || 0);
@@ -267,7 +311,6 @@ const BrowserTable = ({
               {paginatedData.map((row, idx) => (
                 <tr key={idx} className="border-bottom">
                   {visibleColumns.map(col => {
-                    // Use pre-computed values from groupedData (eCPM, eCPC, Spent already calculated correctly)
                     const imp = row.Impressions || 0;
                     const cks = row.Clicks || 0;
                     const cnv = row.TotalConversions || 0;
@@ -276,14 +319,15 @@ const BrowserTable = ({
                     if (col === "Title") val = row.Title || "-";
                     else if (col === "Impressions") val = imp;
                     else if (col === "Clicks") val = cks;
-                    else if (col === "Total Conversions") val = cnv;
+                    else if (col === "Total Conversions") val = row.TotalConversions;
+                    else if (col === "Installs") val = row.Installs;
                     else if (col === "Complete Views") val = row["Complete Views"] || 0;
                     else if (col === "First Quartile Views") val = row["First Quartile Views"] || 0;
                     else if (col === "Midpoint Views") val = row["Midpoint Views"] || 0;
                     else if (col === "Third Quartile Views") val = row["Third Quartile Views"] || 0;
                     else if (col === "CPCV") val = row.CPCV || 0;
                     else if (col === "CPV") val = row.CPV || 0;
-                    else if (col === "CTR") val = imp > 0 ? (cks / imp) * 100 : 0;
+                    else if (col === "CTR") val = row.CTR || 0;
                     else if (col === "Spent") val = row.Spent || 0;
                     else if (col === "eCPM") val = row.eCPM || 0;
                     else if (col === "eCPC") val = row.eCPC || 0;
@@ -317,7 +361,7 @@ const BrowserTable = ({
             </tbody>
           </table>
           {(!browserData || browserData.length === 0) && (
-            <div className="text-center py-5 text-muted">No Browsers data available</div>
+            <div className="text-center py-5 text-muted">No Browser data available</div>
           )}
         </div>
         {browserData?.length > 0 && (

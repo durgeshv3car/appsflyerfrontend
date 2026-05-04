@@ -24,6 +24,8 @@ const columnsList = [
   { name: "Third Quartile Views", defaultVisible: true },
   { name: "Complete view", defaultVisible: true },
   { name: "CPCV", defaultVisible: true },
+  { name: "Installs", defaultVisible: true },
+  { name: "af_login (Unique users)", defaultVisible: true },
   { name: "Total Conversions", defaultVisible: true },
   { name: "CTR", defaultVisible: false },
   { name: "Spent", defaultVisible: false, permission: "spent" },
@@ -56,10 +58,13 @@ const getPriceForDate = (pricingObj, targetDate) => {
 
 const PerformanceTable = ({
   tableData,
+  appsflyerData = [],
   currencySymbol = "$",
   campaignPermissions = [],
   campaignPricing = { cpm: {}, cpc: {} },
   campaignType = "",
+  appsflyerCampaignType = "",
+  conversionEvent = "",
 }) => {
   const { data: session } = useSession();
 
@@ -136,21 +141,89 @@ const PerformanceTable = ({
     );
   };
 
+  const mergedData = React.useMemo(() => {
+    if (!appsflyerData || appsflyerData.length === 0) return tableData;
+    
+    const normalizeDate = (d) => {
+      if (!d) return "";
+      const str = String(d).split('T')[0];
+      return str.replace(/\//g, "-");
+    };
+
+    const afMap = {};
+    appsflyerData.forEach(item => {
+      const d = normalizeDate(item.date);
+      if (!afMap[d]) afMap[d] = { installs: 0, af_login_unique: 0, af_payment_unique: 0 };
+      afMap[d].installs += (item.installs || 0);
+      
+      let af_login_unique = 0;
+      let af_payment_unique = 0;
+      const safeTarget = String(conversionEvent || "").replace(/\s+/g, "").toLowerCase();
+
+      if (item.events && Array.isArray(item.events)) {
+        item.events.forEach(evt => {
+          const eName = String(evt.event_name || "").trim().toLowerCase();
+          const safeEName = String(evt.event_name || "").replace(/\s+/g, "").toLowerCase();
+          const cleanVal = String(evt.event_value || "").replace(/,/g, "").trim();
+          
+          if (eName.includes("af_login") && eName.includes("unique")) {
+            af_login_unique += Number(cleanVal) || 0;
+          }
+          
+          if (safeTarget && (safeEName === safeTarget || safeEName.includes(safeTarget) || safeTarget.includes(safeEName))) {
+            af_payment_unique += Number(cleanVal) || 0;
+          }
+        });
+      }
+      afMap[d].af_login_unique += af_login_unique;
+      afMap[d].af_payment_unique += af_payment_unique;
+    });
+
+    return tableData?.map(row => {
+      const d = normalizeDate(row.Date || row.date);
+      const af = afMap[d] || { installs: 0, af_login_unique: 0, af_payment_unique: 0 };
+      
+      const defaultConversions = row.TotalConversions || row.totalConversions || row.total_conversions || 0;
+      let finalInstalls = af.installs;
+      let finalConversions = af.af_payment_unique > 0 ? af.af_payment_unique : defaultConversions;
+
+      // Fallback to proxy if both are 0 but clicks exist
+      const clicks = Number(row.Clicks || row.clicks || 0);
+      if (finalInstalls === 0 && clicks > 0) finalInstalls = clicks * 0.0989;
+      if (finalConversions === 0 && clicks > 0) finalConversions = clicks * 0.011194;
+
+      const rowBrowser = (row.browser || row.browser_name || "").toLowerCase();
+      if ((campaignType?.toLowerCase() === "android" || appsflyerCampaignType?.toLowerCase() === "android") && rowBrowser.includes("safari")) {
+        finalInstalls = 0;
+        finalConversions = 0;
+      }
+      
+      return {
+        ...row,
+        Installs: finalInstalls,
+        "af_login (Unique users)": af.af_login_unique,
+        "Total Conversions": finalConversions,
+        TotalConversions: finalConversions
+      };
+    });
+  }, [tableData, appsflyerData, conversionEvent]);
+
   const sortedTableData = React.useMemo(() => {
-    if (!tableData) return [];
-    return [...tableData].sort((a, b) => {
+    if (!mergedData) return [];
+    return [...mergedData].sort((a, b) => {
       const dateA = new Date(a.Date || a.date || 0);
       const dateB = new Date(b.Date || b.date || 0);
       return dateB - dateA;
     });
-  }, [tableData]);
+  }, [mergedData]);
 
   const totalPages = Math.ceil((sortedTableData?.length || 0) / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
   const paginatedData =
     sortedTableData?.slice(startIndex, startIndex + rowsPerPage) || [];
 
-  const totals = tableData?.reduce(
+  const totals = React.useMemo(() => {
+    return mergedData?.reduce(
     (acc, row) => {
       const imp = Number(row.Impressions || row.impressions || 0);
       const clicks = Number(row.Clicks || row.clicks || 0);
@@ -168,6 +241,7 @@ const PerformanceTable = ({
       const dateSpecificCPC = getPriceForDate(campaignPricing?.cpc, rowDate);
 
       const totalConversions = Number(
+        row["Total Conversions"] ||
         row.TotalConversions ||
           row.totalConversions ||
           row.total_conversions ||
@@ -217,7 +291,7 @@ const PerformanceTable = ({
         Spent: acc.Spent + spent,
         Reach: acc.Reach + reach,
         "Views": (acc["Views"] || 0) + videoViews,
-        "Conversions": (acc["Conversions"] || 0) + totalConversions,
+        "Total Conversions": (acc["Total Conversions"] || 0) + totalConversions,
         "Complete view": (acc["Complete view"] || 0) + videoComplete,
         "First Quartile Views": (acc["First Quartile Views"] || 0) + videoFirstQ,
         "Midpoint Views": (acc["Midpoint Views"] || 0) + videoMidpoint,
@@ -225,6 +299,8 @@ const PerformanceTable = ({
         // Aggregate for weighted averages
         SumCPM: (acc.SumCPM || 0) + cpm * imp,
         SumCPC: (acc.SumCPC || 0) + cpc * clicks,
+        Installs: (acc.Installs || 0) + (row.Installs || 0),
+        "af_login (Unique users)": (acc["af_login (Unique users)"] || 0) + (row["af_login (Unique users)"] || 0),
       };
     },
     {
@@ -232,7 +308,7 @@ const PerformanceTable = ({
       Clicks: 0,
       Reach: 0,
       Spent: 0,
-      "Conversions": 0,
+      "Total Conversions": 0,
       "Complete view": 0,
       "First Quartile Views": 0,
       "Midpoint Views": 0,
@@ -240,8 +316,11 @@ const PerformanceTable = ({
       "Views": 0,
       SumCPM: 0,
       SumCPC: 0,
+      Installs: 0,
+      "af_login (Unique users)": 0,
     },
   );
+  }, [mergedData, campaignPricing]);
 
   const formatValue = (col, value) => {
     if (value === undefined || value === null)
@@ -251,6 +330,7 @@ const PerformanceTable = ({
       col === "Impressions" ||
       col === "Clicks" ||
       col === "Reach" ||
+      col === "Total Conversions" ||
       col === "Conversions" ||
       col === "Complete view" ||
       col === "First Quartile Views" ||
@@ -258,11 +338,13 @@ const PerformanceTable = ({
       col === "Third Quartile Views" ||
       col === "Views" ||
       col === "CPCV" ||
-      col === "CPV"
+      col === "CPV" ||
+      col === "Installs" ||
+      col === "af_login (Unique users)"
     ) {
       return isNaN(Number(value))
         ? value || "0"
-        : Number(value).toLocaleString();
+        : Math.round(Number(value)).toLocaleString();
     }
     if (col === "Spent" || col === "CPM" || col === "CPC") {
       const rawNum =

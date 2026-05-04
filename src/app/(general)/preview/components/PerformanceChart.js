@@ -276,7 +276,7 @@ const TrendChart = ({ tableData, campaignPermissions = [], campaignPricing = { c
   );
 };
 
-export const PerformanceDashboard = ({ tableData, currencySymbol = "$", campaignPermissions = [], campaignPricing = { cpm: {}, cpc: {} }, campaignType = "" }) => {
+export const PerformanceDashboard = ({ tableData, appsflyerData = [], currencySymbol = "$", campaignPermissions = [], campaignPricing = { cpm: {}, cpc: {} }, campaignType = "" }) => {
   const { data: session } = useSession();
   
   const userRole = session?.user?.role || "";

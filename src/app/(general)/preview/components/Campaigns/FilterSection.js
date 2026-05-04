@@ -21,6 +21,12 @@ import "react-date-range/dist/theme/default.css";
 import { getCampaignIdData, getSiteIdData } from "@/services/creativeData";
 import { getAudience } from "@/services/createaudience";
 import { downloadCSV, downloadExcel } from "@/services/export";
+import { 
+  getAllAppsFlyerData, 
+  getSingleAppsFlyerData, 
+  deleteAppsFlyerData,
+  getAppsFlyerByAudienceId
+} from "@/services/appsflyer";
 
 /** ✅ SAFE DATE FORMATTER (NO UTC BUG) */
 const formatDateToYMD = (date) => {
@@ -46,6 +52,8 @@ const ReportsFilter = ({
   fetchPlacementTypeData,
   fetchDeviceData,
   fetchCityData,
+  fetchUrlData,
+  fetchAppsflyerData,
   handleUpdate,
   isUpdating,
 }) => {
@@ -57,6 +65,8 @@ const ReportsFilter = ({
   const [isPdfLoading, setIsPdfLoading] = useState(false);
   const [isCsvLoading, setIsCsvLoading] = useState(false);
   const [isExcelLoading, setIsExcelLoading] = useState(false);
+  
+  const [isAppsFlyerLoading, setIsAppsFlyerLoading] = useState(false);
 
   const [showCalendar, setShowCalendar] = useState(false);
 
@@ -128,6 +138,7 @@ const ReportsFilter = ({
        fetchDeviceData(targetFilters);
        fetchCityData(targetFilters);
        if (typeof fetchUrlData === 'function') fetchUrlData(targetFilters);
+       if (typeof fetchAppsflyerData === 'function') fetchAppsflyerData(targetFilters);
     };
 
     const handleInitialState = async () => {
@@ -217,6 +228,46 @@ const ReportsFilter = ({
     }
   }, [session, queryAdvertiser]); 
 
+  // Auto-fetch AppsFlyer data when audience changes
+  useEffect(() => {
+    if (filters.audienceId && isLoaded) {
+      autoFetchAppsFlyer(filters.audienceId);
+    }
+  }, [filters.audienceId, isLoaded]);
+
+  const autoFetchAppsFlyer = async (audienceId) => {
+    try {
+      setIsAppsFlyerLoading(true);
+      const res = await getAppsFlyerByAudienceId(audienceId);
+      if (res.success && res.data && res.data.length > 0) {
+        // Take the latest or first entry
+        const item = res.data[0];
+        if (item.from && item.to) {
+          const start = new Date(item.from);
+          const end = new Date(item.to);
+          setRange([{ startDate: start, endDate: end, key: "selection" }]);
+          
+          setFilters(prev => ({
+            ...prev,
+            dateRange: {
+              startDate: formatDateToYMD(start),
+              endDate: formatDateToYMD(end),
+            },
+            app_id: item.app_id, // Update app_id
+            appsflyerCampaignType: item.campaignType || "",
+            appflyerDatalength: res.data.length,
+          }));
+        }
+      } else {
+        setFilters(prev => ({ ...prev, app_id: "" }));
+      }
+    } catch (err) {
+      console.error("Error auto-fetching AppsFlyer data", err);
+      setFilters(prev => ({ ...prev, app_id: "" }));
+    } finally {
+      setIsAppsFlyerLoading(false);
+    }
+  };
 
   // Save to localStorage when filters change (DISABLED AUTOMATIC SAVE)
   /*
@@ -360,6 +411,7 @@ const ReportsFilter = ({
        fetchDeviceData(filters);
        fetchCityData(filters);
        if (typeof fetchUrlData === 'function') fetchUrlData(filters);
+       if (typeof fetchAppsflyerData === 'function') fetchAppsflyerData(filters);
     }
   };
 
