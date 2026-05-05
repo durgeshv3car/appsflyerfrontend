@@ -205,33 +205,6 @@ const CampaignDashboard = () => {
           return changed ? updated : prev;
         });
 
-        // Fetch AppflyerAudience config to get the correct conversionEvent
-        const fetchAppflyerConfig = async () => {
-          try {
-            const res = await getAppsFlyerByAudienceId(targetId);
-            if (res?.success && res?.data?.length > 0) {
-              const conversionEvent = res.data[0].conversionEvent;
-              const afCampaignType = res.data[0].campaignType || res.data[0].campaign_type;
-              const dataLength = res.data.length;
-              setFilters(prev => {
-                if (prev.conversionEvent !== conversionEvent || prev.appsflyerCampaignType !== afCampaignType || prev.appsflyerDataLength !== dataLength) {
-                  return { ...prev, conversionEvent, appsflyerCampaignType: afCampaignType, appsflyerDataLength: dataLength };
-                }
-                return prev;
-              });
-            } else {
-              setFilters(prev => {
-                if (prev.appsflyerDataLength !== 0) {
-                  return { ...prev, appsflyerDataLength: 0, app_id: "", conversionEvent: "", appsflyerCampaignType: "" };
-                }
-                return prev;
-              });
-            }
-          } catch (err) {
-            console.error("Failed to fetch AppflyerAudience config", err);
-          }
-        };
-        fetchAppflyerConfig();
       }
     } else {
       setCampaignPermissions([]);
