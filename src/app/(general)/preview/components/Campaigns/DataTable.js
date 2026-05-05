@@ -64,6 +64,7 @@ const PerformanceTable = ({
   campaignPricing = { cpm: {}, cpc: {} },
   campaignType = "",
   appsflyerCampaignType = "",
+  appsflyerDataLength = 0,
   conversionEvent = "",
 }) => {
   const { data: session } = useSession();
@@ -104,6 +105,11 @@ const PerformanceTable = ({
     const isUserRestricted = session?.user?.permissions?.some(
       (p) => p.toLowerCase() === perm,
     );
+    // HIDE INSTALLS AND CONVERSION EVENT IF NO APPSFLYER DATA
+    if (appsflyerDataLength === 0 && (col.name === "Installs" || col.name === "af_login (Unique users)")) {
+      return false;
+    }
+
     return !isUserRestricted;
   });
 
@@ -117,13 +123,17 @@ const PerformanceTable = ({
           const isVideoType = ["Video", "CTV", "Youtube"].includes(campaignType);
           if (isVideoType && ["Clicks", "CTR", "CPC"].includes(c.name))
             return false;
+
+          // HIDE INSTALLS AND AF LOGIN IF NO APPSFLYER DATA
+          if (appsflyerDataLength === 0 && (c.name === "Installs" || c.name === "af_login (Unique users)")) return false;
+
           return true;
         })
         .map((c) => c.name);
 
       setVisibleColumns(defaults);
     }
-  }, [campaignType, filteredColumnsByPermission.length]);
+  }, [campaignType, filteredColumnsByPermission.length, appsflyerDataLength]);
   const [show, setShow] = useState(false);
   const [search, setSearch] = useState("");
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -187,10 +197,14 @@ const PerformanceTable = ({
       let finalInstalls = af.installs;
       let finalConversions = af.af_payment_unique > 0 ? af.af_payment_unique : defaultConversions;
 
-      // Fallback to proxy if both are 0 but clicks exist
+      // Fallback to proxy if both are 0 but clicks exist, ONLY if AppsFlyer config exists
       const clicks = Number(row.Clicks || row.clicks || 0);
-      if (finalInstalls === 0 && clicks > 0) finalInstalls = clicks * 0.0989;
-      if (finalConversions === 0 && clicks > 0) finalConversions = clicks * 0.011194;
+      const hasAFConfig = (appsflyerDataLength > 0);
+      
+      if (hasAFConfig) {
+        if (finalInstalls === 0 && clicks > 0) finalInstalls = clicks * 0.0989;
+        if (finalConversions === 0 && clicks > 0) finalConversions = clicks * 0.011194;
+      }
 
       const rowBrowser = (row.browser || row.browser_name || "").toLowerCase();
       if ((campaignType?.toLowerCase() === "android" || appsflyerCampaignType?.toLowerCase() === "android") && rowBrowser.includes("safari")) {
@@ -206,7 +220,7 @@ const PerformanceTable = ({
         TotalConversions: finalConversions
       };
     });
-  }, [tableData, appsflyerData, conversionEvent]);
+  }, [tableData, appsflyerData, conversionEvent, appsflyerDataLength]);
 
   const sortedTableData = React.useMemo(() => {
     if (!mergedData) return [];

@@ -110,6 +110,11 @@ const ReportsFilter = ({
     if (savedFilters) {
       initialFilters = JSON.parse(savedFilters);
       if (!initialFilters.currency) initialFilters.currency = "";
+      // Reset transient AppsFlyer data when loading from storage to force a fresh fetch
+      initialFilters.appsflyerDataLength = 0;
+      initialFilters.app_id = "";
+      initialFilters.conversionEvent = "";
+      initialFilters.appsflyerCampaignType = "";
     }
 
     const applyFilters = (targetFilters) => {
@@ -255,15 +260,25 @@ const ReportsFilter = ({
             },
             app_id: item.app_id, // Update app_id
             appsflyerCampaignType: item.campaignType || "",
-            appflyerDatalength: res.data.length,
+            appsflyerDataLength: res.data.length,
           }));
         }
       } else {
-        setFilters(prev => ({ ...prev, app_id: "" }));
+        setFilters(prev => ({ 
+          ...prev, 
+          app_id: "", 
+          appsflyerDataLength: 0,
+          appsflyerCampaignType: "" 
+        }));
       }
     } catch (err) {
       console.error("Error auto-fetching AppsFlyer data", err);
-      setFilters(prev => ({ ...prev, app_id: "" }));
+      setFilters(prev => ({ 
+        ...prev, 
+        app_id: "", 
+        appsflyerDataLength: 0,
+        appsflyerCampaignType: "" 
+      }));
     } finally {
       setIsAppsFlyerLoading(false);
     }
@@ -397,7 +412,13 @@ const ReportsFilter = ({
        handleUpdate();
     } else {
        // Fallback logic
-       localStorage.setItem("campaignFilteredData", JSON.stringify(filters));
+       const filtersToSave = { ...filters };
+       delete filtersToSave.appsflyerDataLength;
+       delete filtersToSave.app_id;
+       delete filtersToSave.conversionEvent;
+       delete filtersToSave.appsflyerCampaignType;
+       
+       localStorage.setItem("campaignFilteredData", JSON.stringify(filtersToSave));
        fetchCampaignData(filters);
        fetchCreativeTableData(filters);
        fetchAgeData(filters);
@@ -768,6 +789,10 @@ const ReportsFilter = ({
                     currency: advertiserObj.currency || "",
                     campaignType: advertiserObj.campaignType || "",
                     campaign: [],
+                    appsflyerDataLength: 0,
+                    app_id: "",
+                    appsflyerCampaignType: "",
+                    conversionEvent: "",
                   }));
                 }}
               />

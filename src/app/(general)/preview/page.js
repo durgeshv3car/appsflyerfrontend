@@ -134,12 +134,18 @@ const CampaignDashboard = () => {
     currency: "",
     campaignType: "",
     appsflyerCampaignType: "", // Added appsflyerCampaignType
+    appsflyerDataLength: 0, 
     app_id: "", // Added app_id
   });
   const [isUpdating, setIsUpdating] = useState(false);
 
   const handleUpdate = () => {
-    localStorage.setItem("campaignFilteredData", JSON.stringify(filters));
+    const filtersToSave = { ...filters };
+    delete filtersToSave.appsflyerDataLength;
+    delete filtersToSave.app_id;
+    delete filtersToSave.conversionEvent;
+    delete filtersToSave.appsflyerCampaignType;
+    localStorage.setItem("campaignFilteredData", JSON.stringify(filtersToSave));
     setIsUpdating(true);
     
     // Explicitly fetch data when the update button is clicked
@@ -206,9 +212,17 @@ const CampaignDashboard = () => {
             if (res?.success && res?.data?.length > 0) {
               const conversionEvent = res.data[0].conversionEvent;
               const afCampaignType = res.data[0].campaignType || res.data[0].campaign_type;
+              const dataLength = res.data.length;
               setFilters(prev => {
-                if (prev.conversionEvent !== conversionEvent || prev.appsflyerCampaignType !== afCampaignType) {
-                  return { ...prev, conversionEvent, appsflyerCampaignType: afCampaignType };
+                if (prev.conversionEvent !== conversionEvent || prev.appsflyerCampaignType !== afCampaignType || prev.appsflyerDataLength !== dataLength) {
+                  return { ...prev, conversionEvent, appsflyerCampaignType: afCampaignType, appsflyerDataLength: dataLength };
+                }
+                return prev;
+              });
+            } else {
+              setFilters(prev => {
+                if (prev.appsflyerDataLength !== 0) {
+                  return { ...prev, appsflyerDataLength: 0, app_id: "", conversionEvent: "", appsflyerCampaignType: "" };
                 }
                 return prev;
               });
@@ -979,16 +993,21 @@ const CampaignDashboard = () => {
       let finalConversions = af.af_payment_unique > 0 ? af.af_payment_unique : defaultConversions;
       let finalInstalls = af.installs;
 
-      // Fallback to proxy if both are 0
-      if (finalConversions === 0 && clicks > 0) finalConversions = clicks * 0.011194;
-      if (finalInstalls === 0 && clicks > 0) finalInstalls = clicks * 0.0989;
+      // Fallback to proxy if both are 0, BUT ONLY if we have AppsFlyer config (datalength > 0)
+      // If datalength is 0, we use advertiser data (defaultConversions) directly.
+      const hasAFConfig = (filters.appsflyerDataLength > 0);
+      
+      if (hasAFConfig) {
+        if (finalConversions === 0 && clicks > 0) finalConversions = clicks * 0.011194;
+        if (finalInstalls === 0 && clicks > 0) finalInstalls = clicks * 0.0989;
+      }
 
       totalConversions += finalConversions;
       totalInstalls += finalInstalls;
     });
 
     return { TotalConversions: Math.round(totalConversions), Installs: Math.round(totalInstalls) };
-  }, [tableData.tableData, appsflyerData, filters.conversionEvent]);
+  }, [tableData.tableData, appsflyerData, filters.conversionEvent, filters.appsflyerDataLength]);
 
   return (
     <div className="bg-light min-vh-100 ">
@@ -1060,6 +1079,7 @@ const CampaignDashboard = () => {
                 campaignPricing={campaignPricing}
                 campaignType={filters.campaignType}
                 appsflyerCampaignType={filters.appsflyerCampaignType}
+                appsflyerDataLength={filters.appsflyerDataLength}
                 conversionEvent={filters.conversionEvent}
                 globalTotals={globalTotals}
               />
@@ -1089,6 +1109,7 @@ const CampaignDashboard = () => {
                 globalEffectiveMetrics={globalEffectiveMetrics}
                 campaignType={filters.campaignType}
                 appsflyerCampaignType={filters.appsflyerCampaignType}
+                appsflyerDataLength={filters.appsflyerDataLength}
                 globalTotals={globalTotals}
               />
             </div>
@@ -1149,6 +1170,7 @@ const CampaignDashboard = () => {
                 globalEffectiveMetrics={globalEffectiveMetrics}
                 campaignType={filters.campaignType}
                 appsflyerCampaignType={filters.appsflyerCampaignType}
+                appsflyerDataLength={filters.appsflyerDataLength}
                 globalTotals={globalTotals}
               />
             </div>
@@ -1169,6 +1191,7 @@ const CampaignDashboard = () => {
                 globalEffectiveMetrics={globalEffectiveMetrics}
                 campaignType={filters.campaignType}
                 appsflyerCampaignType={filters.appsflyerCampaignType}
+                appsflyerDataLength={filters.appsflyerDataLength}
                 globalTotals={globalTotals}
               />
             </div>
@@ -1194,6 +1217,7 @@ const CampaignDashboard = () => {
                 globalEffectiveMetrics={globalEffectiveMetrics}
                 campaignType={filters.campaignType}
                 appsflyerCampaignType={filters.appsflyerCampaignType}
+                appsflyerDataLength={filters.appsflyerDataLength}
                 globalTotals={globalTotals}
               />
             </div>
@@ -1242,6 +1266,7 @@ const CampaignDashboard = () => {
                 globalEffectiveMetrics={globalEffectiveMetrics}
                 campaignType={filters.campaignType}
                 appsflyerCampaignType={filters.appsflyerCampaignType}
+                appsflyerDataLength={filters.appsflyerDataLength}
                 globalTotals={globalTotals}
               />
             </div>

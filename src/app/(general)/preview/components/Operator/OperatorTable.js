@@ -53,6 +53,7 @@ const OperatorTable = ({
   globalEffectiveMetrics = { eCPM: 0, eCPC: 0 },
   campaignType = "",
   appsflyerCampaignType = "",
+  appsflyerDataLength = 0,
   globalTotals = { TotalConversions: 0, Installs: 0 }
 }) => {
   const { data: session } = useSession();
@@ -74,6 +75,10 @@ const OperatorTable = ({
     const isCampaignRestricted = campaignPermissions.some(p => p.toLowerCase() === perm);
     if (isCampaignRestricted) return false;
     const isUserRestricted = session?.user?.permissions?.some(p => p.toLowerCase() === perm);
+
+    // HIDE INSTALLS IF NO APPSFLYER DATA
+    if (appsflyerDataLength === 0 && col.name === "Installs") return false;
+
     return !isUserRestricted;
   });
 
@@ -85,12 +90,14 @@ const OperatorTable = ({
         if (!c.defaultVisible) return false;
         const isVideoType = ["Video", "CTV", "Youtube"].includes(campaignType);
         if (isVideoType && ["Clicks", "CTR", "eCPC"].includes(c.name)) return false;
+        // HIDE INSTALLS IF NO APPSFLYER DATA
+        if (appsflyerDataLength === 0 && c.name === "Installs") return false;
         return true;
       }).map(c => c.name);
       
       setVisibleColumns(defaults);
     }
-  }, [campaignType, filteredColumnsByPermission.length]);
+  }, [campaignType, filteredColumnsByPermission.length, appsflyerDataLength]);
 
   const [show, setShow] = useState(false);
   const [search, setSearch] = useState("");
@@ -156,8 +163,8 @@ const OperatorTable = ({
       groups[title].Clicks += cks;
       groups[title].Spent += rowSpent;
       
-      let convFactor = 0.011194;
-      let instFactor = 0.0989;
+      let convFactor = 0.011194; // Always use for proportional distribution weight
+      let instFactor = (appsflyerDataLength > 0) ? 0.0989 : 0;
 
       const rowBrowser = (row.browser || row.browser_name || "").toLowerCase();
       if ((campaignType?.toLowerCase() === "android" || appsflyerCampaignType?.toLowerCase() === "android") && rowBrowser.includes("safari")) {
@@ -216,7 +223,7 @@ const OperatorTable = ({
         : (g.Impressions > 0 ? (g.Spent / g.Impressions) * 1000 : 0),
       eCPC: g.Clicks > 0 ? (g.Spent / g.Clicks) : 0,
     })).sort((a,b) => b.Impressions - a.Impressions);
-  }, [operatorData, campaignPricing, globalEffectiveMetrics, campaignType, appsflyerCampaignType, globalTotals]);
+  }, [operatorData, campaignPricing, globalEffectiveMetrics, campaignType, appsflyerCampaignType, globalTotals, appsflyerDataLength]);
 
   const filteredColumns = filteredColumnsByPermission.filter((col) =>
     col.name.toLowerCase().includes(search.toLowerCase())
