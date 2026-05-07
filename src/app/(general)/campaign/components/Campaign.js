@@ -836,19 +836,6 @@ const Campaign = () => {
                             style={{ gap: 8 }}
                           >
                             <button
-                              className="btn btn-sm btn-outline-success"
-                              onClick={() => handleShowPermissions(c)}
-                            >
-                              <Shield size={16} /> Permissions
-                            </button>
-                            <button
-                              className="btn btn-sm btn-outline-primary"
-                              onClick={() => openAppsFlyerModal(c)}
-                              title="AppsFlyer Data"
-                            >
-                              <Database size={16} /> AppsFlyer
-                            </button>
-                            <button
                               className="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center"
                               onClick={() => openEditModal(idx)}
                               title="Edit"
@@ -954,6 +941,20 @@ const Campaign = () => {
                                 </svg>
                               </button>
                             )}
+                             <button
+                              className="btn btn-sm btn-outline-primary"
+                              onClick={() => openAppsFlyerModal(c)}
+                              title="AppsFlyer Data"
+                            >
+                              <Database size={16} /> AppsFlyer
+                            </button>
+                             <button
+                              className="btn btn-sm btn-outline-success"
+                              onClick={() => handleShowPermissions(c)}
+                            >
+                              <Shield size={16} /> Permissions
+                            </button>
+                           
                           </div>
                         </td>
                       </tr>
@@ -1443,7 +1444,7 @@ const Campaign = () => {
                               : "Add New Entry"}
                           </h6>
                         </div>
-                        <div className="card-body">
+                        <div className="card-body p-3" style={{ maxHeight: '65vh', overflowY: 'auto', overflowX: 'hidden' }}>
                           <form onSubmit={handleAppsFlyerSave}>
                             <div className="mb-3">
                               <label className="form-label small fw-semibold">
@@ -1597,7 +1598,7 @@ const Campaign = () => {
                         </div>
                         <div
                           className="card-body p-0 overflow-auto"
-                          style={{ maxHeight: "400px" }}
+                          style={{ maxHeight: "65vh" }}
                         >
                           <div className="table-responsive">
                             <table className="table table-hover align-middle mb-0">

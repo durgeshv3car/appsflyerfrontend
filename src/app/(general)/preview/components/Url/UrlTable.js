@@ -50,6 +50,15 @@ const UrlTable = ({
   globalTotals = { TotalConversions: 0, Installs: 0 }
 }) => {
   const { data: session } = useSession();
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isMobile = windowWidth < 768;
 
   const filteredColumnsByType = React.useMemo(() => {
     const isVideoType = ["Video", "CTV", "Youtube"].includes(campaignType);
@@ -236,9 +245,21 @@ const UrlTable = ({
   return (
     <div className="card border-0 shadow-sm mb-4">
       <div className="card-header bg-white border-0 pt-4 px-4 pb-3">
-        <div className="d-flex justify-content-between align-items-center w-100">
-            <h5 className="mb-0 fw-bold text-dark" style={{ fontSize: '1.2rem' }}>URLs/Domains</h5>
-            <button data-html2canvas-ignore="true" data-print-hide className="btn btn-primary d-flex align-items-center gap-2" onClick={() => setShow(true)} style={{ borderRadius: '8px', padding: '8px 16px', fontSize: '14px' }}>
+        <div className={`d-flex ${isMobile ? 'flex-column gap-3 align-items-start' : 'justify-content-between align-items-center'} w-100`}>
+            <h5 className="mb-0 fw-bold text-dark" style={{ fontSize: isMobile ? '1.1rem' : '1.2rem' }}>URLs/Domains</h5>
+            <button 
+              data-html2canvas-ignore="true" 
+              data-print-hide 
+              className="btn btn-primary d-flex align-items-center gap-2" 
+              onClick={() => setShow(true)} 
+              style={{ 
+                borderRadius: '8px', 
+                padding: isMobile ? '6px 12px' : '8px 16px', 
+                fontSize: isMobile ? '13px' : '14px',
+                width: isMobile ? '100%' : 'auto',
+                justifyContent: isMobile ? 'center' : 'flex-start'
+              }}
+            >
                 <FiPlus size={18} />
                 <span>Columns</span>
             </button>
@@ -309,8 +330,13 @@ const UrlTable = ({
           )}
         </div>
         {groupedData?.length > 0 && (
-          <div data-html2canvas-ignore="true" data-print-hide className="d-flex justify-content-end align-items-center gap-4 py-3 px-4 text-muted border-top bg-light-subtle" style={{ borderBottomLeftRadius: '12px', borderBottomRightRadius: '12px' }}>
-              <div className="d-flex align-items-center gap-3">
+          <div 
+            data-html2canvas-ignore="true" 
+            data-print-hide 
+            className={`d-flex ${isMobile ? 'flex-column gap-3' : 'justify-content-end align-items-center gap-4'} py-3 px-4 text-muted border-top bg-light-subtle`} 
+            style={{ borderBottomLeftRadius: '12px', borderBottomRightRadius: '12px' }}
+          >
+              <div className={`d-flex align-items-center ${isMobile ? 'justify-content-between w-100' : 'gap-3'}`}>
                   <span style={{ fontSize: '13px', fontWeight: '500' }}>Rows per page:</span>
                   <div className="position-relative">
                     <select 
@@ -337,8 +363,8 @@ const UrlTable = ({
                   </div>
               </div>
               
-              <div className="d-flex align-items-center gap-3">
-                <span style={{ fontSize: '13px', fontWeight: '500', minWidth: '80px', textAlign: 'center' }}>
+              <div className={`d-flex align-items-center ${isMobile ? 'justify-content-between w-100' : 'gap-3'}`}>
+                <span style={{ fontSize: '13px', fontWeight: '500', minWidth: isMobile ? 'auto' : '80px', textAlign: 'center' }}>
                   {startIndex + 1}-{Math.min(startIndex + rowsPerPage, groupedData.length)} of {groupedData.length}
                 </span>
                 

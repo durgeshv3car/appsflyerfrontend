@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Chart } from "chart.js";
 import "@/lib/chart";
 import { filterMetadataRows } from "@/utils/filterMetadata";
@@ -7,6 +7,15 @@ import { filterMetadataRows } from "@/utils/filterMetadata";
 const CreativePerformance = ({ CreativeTableData = [] }) => {
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isMobile = windowWidth < 768;
 
   const filteredData = React.useMemo(() => filterMetadataRows(CreativeTableData), [CreativeTableData]);
 
@@ -158,7 +167,7 @@ const CreativePerformance = ({ CreativeTableData = [] }) => {
   return (
     <div className="card border-0 shadow-sm mb-4 overflow-hidden">
       <div className="card-header bg-white border-0 pt-4 px-4 pb-0">
-        <div className="d-flex justify-content-between align-items-center w-100">
+        <div className={`d-flex ${isMobile ? 'flex-column gap-3' : 'justify-content-between align-items-center'} w-100`}>
           <h5 className="mb-0 fw-bold text-dark" style={{ fontSize: '1.2rem' }}>Creatives Performance</h5>
           <div className="d-flex gap-4">
             <div className="d-flex align-items-center gap-2">
@@ -173,9 +182,9 @@ const CreativePerformance = ({ CreativeTableData = [] }) => {
         </div>
       </div>
       <div className="card-body p-4">
-        <div className="row g-4" style={{ height: "450px" }}>
+        <div className="row g-4" style={{ height: isMobile ? 'auto' : '450px' }}>
           {/* Left Side: Names Column */}
-          <div className="col-md-4 h-100 border-end pr-3" style={{ overflowY: 'auto' }}>
+          <div className={`${isMobile ? 'col-12' : 'col-md-4'} h-100 border-end pr-3`} style={{ overflowY: 'auto', maxHeight: isMobile ? '200px' : '100%' }}>
             <div className="d-flex flex-column gap-3 py-2">
               {filteredData.map((item, index) => {
                 const title = item.Title || item.title || item.creative_name || item.Creative || item.name || "Unknown";
@@ -198,7 +207,7 @@ const CreativePerformance = ({ CreativeTableData = [] }) => {
           </div>
 
           {/* Right Side: Graph */}
-          <div className="col-md-8 h-100">
+          <div className={`${isMobile ? 'col-12' : 'col-md-8'} h-100`} style={{ height: isMobile ? '300px' : '100%' }}>
             {filteredData.length > 0 ? (
                 <canvas ref={chartRef}></canvas>
             ) : (

@@ -68,6 +68,15 @@ const PerformanceTable = ({
   conversionEvent = "",
 }) => {
   const { data: session } = useSession();
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isMobile = windowWidth < 768;
 
   const filteredColumnsByType = React.useMemo(() => {
     const isVideoType = ["Video", "CTV", "Youtube"].includes(campaignType);
@@ -423,8 +432,8 @@ const PerformanceTable = ({
   return (
     <div className="card border-0 shadow-sm mb-4">
       <div className="card-header bg-white border-0 pt-4 px-4 pb-3">
-        <div className="d-flex justify-content-between align-items-center w-100">
-          <h5 className="mb-0 fw-bold text-dark" style={{ fontSize: "1.2rem" }}>
+        <div className={`d-flex ${isMobile ? 'flex-column gap-3 align-items-start' : 'justify-content-between align-items-center'} w-100`}>
+          <h5 className="mb-0 fw-bold text-dark" style={{ fontSize: isMobile ? "1.1rem" : "1.2rem" }}>
             Performance
           </h5>
           <button
@@ -433,8 +442,10 @@ const PerformanceTable = ({
             onClick={() => setShow(true)}
             style={{
               borderRadius: "8px",
-              padding: "8px 16px",
-              fontSize: "14px",
+              padding: isMobile ? "6px 12px" : "8px 16px",
+              fontSize: isMobile ? "13px" : "14px",
+              width: isMobile ? "100%" : "auto",
+              justifyContent: isMobile ? "center" : "flex-start"
             }}
           >
             <FiPlus size={18} />
@@ -683,13 +694,13 @@ const PerformanceTable = ({
         {tableData?.length > 0 && (
           <div
             data-html2canvas-ignore="true"
-            className="d-flex justify-content-end align-items-center gap-4 py-3 px-4 text-muted border-top bg-light-subtle"
+            className={`d-flex ${isMobile ? 'flex-column gap-3' : 'justify-content-end align-items-center gap-4'} py-3 px-4 text-muted border-top bg-light-subtle`}
             style={{
               borderBottomLeftRadius: "12px",
               borderBottomRightRadius: "12px",
             }}
           >
-            <div className="d-flex align-items-center gap-3">
+            <div className={`d-flex align-items-center ${isMobile ? 'justify-content-between w-100' : 'gap-3'}`}>
               <span style={{ fontSize: "13px", fontWeight: "500" }}>
                 Rows per page:
               </span>
@@ -706,9 +717,8 @@ const PerformanceTable = ({
                     height: "36px",
                     borderRadius: "8px",
                     fontSize: "14px",
-                    padding: "0 24px 0 12px",
+                    padding: "0 12px",
                     cursor: "pointer",
-                    appearance: "none",
                     backgroundColor: "#fff",
                     lineHeight: "36px",
                   }}
@@ -717,25 +727,15 @@ const PerformanceTable = ({
                   <option value={20}>20</option>
                   <option value={50}>50</option>
                 </select>
-                <FiChevronDown
-                  className="position-absolute text-muted"
-                  style={{
-                    top: "50%",
-                    right: "10px",
-                    transform: "translateY(-50%)",
-                    pointerEvents: "none",
-                  }}
-                  size={14}
-                />
               </div>
             </div>
 
-            <div className="d-flex align-items-center gap-3">
+            <div className={`d-flex align-items-center ${isMobile ? 'justify-content-between w-100' : 'gap-3'}`}>
               <span
                 style={{
                   fontSize: "13px",
                   fontWeight: "500",
-                  minWidth: "80px",
+                  minWidth: isMobile ? "auto" : "80px",
                   textAlign: "center",
                 }}
               >

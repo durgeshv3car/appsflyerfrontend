@@ -69,6 +69,16 @@ const ReportsFilter = ({
   const [isAppsFlyerLoading, setIsAppsFlyerLoading] = useState(false);
 
   const [showCalendar, setShowCalendar] = useState(false);
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isMobile = windowWidth < 768;
+  const isTablet = windowWidth >= 768 && windowWidth < 1024;
 
   const initializedRef = useRef(false);
   const lastQueryRef = useRef(null);
@@ -743,57 +753,40 @@ const ReportsFilter = ({
   };
 
   return (
-    <div>
-      {/* Header */}
-      <div className="bg-white border-bottom">
-        <div className="container-fluid py-3 px-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
-          <h1 className="h4 mb-0">Reports</h1>
-          
-          <div className="d-flex gap-2">
-            <button 
-              className="btn btn-outline-danger btn-sm d-flex align-items-center gap-2 px-3 py-2" 
-              onClick={handleExportPDF}
-              disabled={isPdfLoading}
-              style={{ borderRadius: '8px', fontWeight: '600', fontSize: '13px', transition: 'all 0.2s', minWidth: 120 }}
-            >
-               {isPdfLoading ? (
-                 <><span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Generating…</>
-               ) : (
-                 <><FiFileText size={16} /> Export PDF</>
-               )}
-            </button>
-            {/* <button 
-              className="btn btn-outline-success btn-sm d-flex align-items-center gap-2 px-3 py-2" 
-              onClick={() => handleExportData('csv')} 
-              disabled={isCsvLoading}
-              style={{ borderRadius: '8px', fontWeight: '600', fontSize: '13px', transition: 'all 0.2s', minWidth: 120 }}
-            >
-               {isCsvLoading ? (
-                 <><span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Downloading…</>
-               ) : (
-                 <><FiDownload size={16} /> Export CSV</>
-               )}
-            </button> */}
-            <button 
-              className="btn btn-outline-primary btn-sm d-flex align-items-center gap-2 px-3 py-2" 
-              onClick={() => handleExportData('excel')} 
-              disabled={isExcelLoading}
-              style={{ borderRadius: '8px', fontWeight: '600', fontSize: '13px', transition: 'all 0.2s', minWidth: 120 }}
-            >
-               {isExcelLoading ? (
-                 <><span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Downloading…</>
-               ) : (
-                 <><FiDownload size={16} /> Export Excel</>
-               )}
-            </button>
-          </div>
-        </div>
-      </div>
-
+    <div data-html2canvas-ignore="true">
       {/* Filter Section */}
       <div className="bg-white border-bottom shadow-sm">
-        <div className="container-fluid py-2 px-4">
-          <h2 className="h6 mb-2">Filter</h2>
+        <div className="container-fluid py-3 px-4">
+          
+          {/* Header Row: Reports + Export Buttons */}
+          <div className="d-flex justify-content-between align-items-center mb-4">
+            <h2 className="h4 fw-bold text-dark mb-0">Reports</h2>
+            <div className="d-flex gap-2">
+              <button 
+                className="btn btn-outline-danger d-flex align-items-center gap-2 px-3" 
+                onClick={handleExportPDF}
+                disabled={isPdfLoading}
+                style={{ height: '38px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', letterSpacing: '0.02em' }}
+              >
+                {isPdfLoading ? <span className="spinner-border spinner-border-sm"></span> : <FiFileText size={14} />}
+                <span>EXPORT PDF</span>
+              </button>
+              <button 
+                className="btn btn-outline-primary d-flex align-items-center gap-2 px-3" 
+                onClick={() => handleExportData('excel')} 
+                disabled={isExcelLoading}
+                style={{ height: '38px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', letterSpacing: '0.02em' }}
+              >
+                {isExcelLoading ? <span className="spinner-border spinner-border-sm"></span> : <FiDownload size={14} />}
+                <span>EXPORT EXCEL</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Subheader Row: Filter */}
+          <div className="mb-2">
+            <h6 className="small fw-bold text-dark mb-0">Filter</h6>
+          </div>
 
           <div className="row g-3 align-items-end" ref={wrapperRef}>
             {/* Advertiser */}
@@ -879,7 +872,7 @@ const ReportsFilter = ({
             )}
 
             {/* Unified Date Range Column */}
-            <div className={`${filters.source !== "DV360" ? 'col-lg-4' : 'col-lg-7'} col-md-6 position-relative`}>
+            <div className={`${filters.source === "DV360" ? "col-lg-6" : "col-lg-4"} col-md-6 position-relative`}>
               <label className="form-label small fw-bold text-muted mb-2">Date Range</label>
               <div 
                 className="form-control d-flex align-items-center justify-content-between cursor-pointer border" 
@@ -892,29 +885,43 @@ const ReportsFilter = ({
                      {format(range[0].startDate, "dd MMM, yyyy")} - {format(range[0].endDate, "dd MMM, yyyy")}
                    </span>
                 </div>
-                <FiChevronDown className="text-muted" size={16} />
+                <FiChevronDown className="text-muted" />
               </div>
 
               {showCalendar && (
                 <div 
                   className="position-absolute shadow-lg bg-white border rounded mt-2 d-flex flex-column" 
-                  style={{ zIndex: 1050, top: '100%', right: 0, minWidth: '850px', overflow: 'hidden', borderRadius: '12px' }}
+                  style={{ 
+                    zIndex: 1050, 
+                    top: '100%', 
+                    left: isMobile ? '-10px' : 0, 
+                    right: 'auto',
+                    width: isMobile ? 'calc(100vw - 40px)' : 'auto',
+                    minWidth: isMobile ? 'auto' : (isTablet ? '450px' : '820px'), 
+                    overflow: 'hidden', 
+                    borderRadius: '12px' 
+                  }}
                 >
                   <style>{`
-                    .rdrMonth { width: 330px !important; padding: 0 15px !important; }
-                    .rdrCalendarWrapper { font-size: 12px !important; color: #334155 !important; border-radius: 12px !important; }
+                    .rdrMonth { width: ${isMobile ? '100%' : '330px'} !important; padding: ${isMobile ? '0' : '0 15px'} !important; }
+                    .rdrCalendarWrapper { font-size: 12px !important; color: #334155 !important; border-radius: 12px !important; width: 100% !important; }
                     .rdrDateDisplayWrapper { display: none !important; }
                     .rdrDay { height: 2.8em !important; line-height: 2.8em !important; }
                     .rdrMonthAndYearWrapper { padding: 10px 0 !important; height: 45px !important; }
-                    .rdrMonths { gap: 20px !important; padding: 10px !important; }
+                    .rdrMonths { 
+                      gap: ${isMobile ? '0' : '20px'} !important; 
+                      padding: 10px !important; 
+                      flex-direction: ${isMobile ? 'column' : 'row'} !important;
+                    }
                     .rdrMonthName { font-weight: 700 !important; color: #0f172a !important; padding-bottom: 10px !important; }
                     .rdrDayNumber span { color: #334155 !important; font-weight: 500 !important; }
                     .rdrDayToday .rdrDayNumber span:after { background: #4c84ff !important; bottom: 4px !important; }
                   `}</style>
-                  <div className="d-flex flex-row-reverse bg-white">
-                    {/* Sidebar Presets - Now on Right */}
-                    <div className="border-start p-2 bg-light d-flex flex-column gap-1 shadow-sm" style={{ width: '150px' }}>
-                      <label className="fw-bold text-muted mb-2 px-2 pt-2" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Quick Select</label>
+                  <div className={`d-flex ${isMobile ? 'flex-column' : 'flex-row-reverse'} bg-white`}>
+                    {/* Sidebar Presets - Now on Right (or Top on Mobile) */}
+                    <div className={`${isMobile ? 'border-bottom' : 'border-start'} p-3 bg-light d-flex ${isMobile ? 'flex-row flex-wrap justify-content-center' : 'flex-column'} gap-1 shadow-sm`} style={{ width: isMobile ? '100%' : '170px' }}>
+                      <label className="fw-bold text-muted mb-3 px-2 pt-1 w-100" style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: isMobile ? 'center' : 'left' }}>Quick Select</label>
+
                       { [
                         { label: 'Today', key: 'today' },
                         { label: 'Yesterday', key: 'yesterday' },
@@ -925,26 +932,27 @@ const ReportsFilter = ({
                       ].map((btn) => (
                         <button 
                           key={btn.key} 
-                          className="btn btn-sm text-start px-3 py-2 rounded-2"
-                          style={{ fontSize: '12px', border: 'none', background: 'transparent', transition: 'all 0.2s', fontWeight: '500' }}
+                          className="btn btn-sm text-start px-3 py-2 rounded-2 border-0"
+                          style={{ fontSize: '11px', background: 'transparent', transition: 'all 0.2s', fontWeight: '600', flex: isMobile ? '1 1 auto' : 'none', color: '#475569', textTransform: 'uppercase' }}
                           onClick={() => setPreset(btn.key)}
-                          onMouseOver={(e) => {e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#0061ff'}}
-                          onMouseOut={(e) => {e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'inherit'}}
+                          onMouseOver={(e) => {e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#0061ff'}}
+                          onMouseOut={(e) => {e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#475569'}}
                         >
                           {btn.label}
                         </button>
                       ))}
                     </div>
 
+
                     {/* Calendar - Now on Left */}
-                    <div className="bg-white p-2">
+                    <div className="bg-white p-2 overflow-auto" style={{ maxWidth: '100%' }}>
                       <DateRange
                         editableDateInputs={false}
                         onChange={item => setRange([item.selection])}
                         moveRangeOnFirstSelection={false}
                         ranges={range}
-                        months={2}
-                        direction="horizontal"
+                        months={isMobile ? 1 : 2}
+                        direction={isMobile ? "vertical" : "horizontal"}
                         showDateDisplay={false}
                         rangeColors={['#4c84ff']}
                       />
@@ -953,15 +961,15 @@ const ReportsFilter = ({
 
                   <div className="d-flex justify-content-end gap-2 p-1 px-3 border-top align-items-center bg-light">
                     <button 
-                      className="btn btn-link btn-sm text-decoration-none text-secondary fw-bold" 
+                      className="btn btn-link btn-sm text-decoration-none text-muted fw-bold px-3" 
                       onClick={() => setShowCalendar(false)}
-                      style={{ fontSize: '12px' }}
+                      style={{ fontSize: '11px', textTransform: 'uppercase' }}
                     >
                       Cancel
                     </button>
                     <button 
-                      className="btn btn-primary btn-sm rounded-pill" 
-                      style={{ padding: '4px 15px', fontSize: '12px' }}
+                      className="btn btn-primary btn-sm rounded-pill fw-bold" 
+                      style={{ padding: '6px 20px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}
                       onClick={handleApply}
                     >
                       Apply Range
@@ -971,30 +979,28 @@ const ReportsFilter = ({
               )}
             </div>
 
-            {/* Update Button */}
-            <div className="col-lg-2 col-md-6">
+            {/* Action Buttons */}
+            <div className="ms-auto col-lg-auto col-md-12 mt-lg-0 mt-3">
               <button 
-                className="btn btn-primary w-100 fw-bold d-flex align-items-center justify-content-center gap-2" 
+                className="btn btn-primary fw-bold d-flex align-items-center justify-content-center gap-2" 
                 style={{ 
                   height: '42px', 
                   borderRadius: '8px', 
+                  minWidth: isMobile ? '100%' : '180px',
+                  whiteSpace: 'nowrap',
+                  fontSize: '13px',
+                  textTransform: 'uppercase',
                   backgroundColor: isUpdating ? '#6c757d' : '#0061ff', 
                   border: 'none', 
                   boxShadow: isUpdating ? 'none' : '0 4px 6px rgba(0, 97, 255, 0.2)',
-                  opacity: isUpdating ? 0.8 : 1,
                   transition: 'all 0.3s'
                 }}
                 onClick={UpdateData}
                 disabled={isUpdating}
               >
                 {isUpdating ? (
-                  <>
-                    <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                    <span>Updating...</span>
-                  </>
-                ) : (
-                  "Update Result"
-                )}
+                  <><span className="spinner-border spinner-border-sm" role="status"></span> Updating...</>
+                ) : "Update Result"}
               </button>
             </div>
           </div>

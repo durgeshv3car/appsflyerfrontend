@@ -66,7 +66,7 @@ const DonutLarge = ({ value, percentage, label, color, showBoth }) => {
     <div className="text-center">
       <div
         className="position-relative d-inline-block"
-        style={{ width: "150px", height: "150px" }}
+        style={{ width: "100%", maxWidth: "150px", height: "150px" }}
       >
         <canvas ref={chartRef}></canvas>
         <div
@@ -128,6 +128,15 @@ const TrendChart = ({
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
   const { data: session } = useSession();
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isMobile = windowWidth < 768;
 
   const userRole = session?.user?.role || "";
   const userPerms = session?.user?.permissions || [];
@@ -309,37 +318,27 @@ const TrendChart = ({
 
   return (
     <div className="bg-white p-0 pb-4 mt-3 rounded shadow-sm border-0 overflow-hidden">
-      <div className="d-flex align-items-center mb-0 px-4 pt-4 pb-2">
+      <div className={`d-flex ${isMobile ? 'flex-column gap-3' : 'align-items-center mb-0'} px-4 pt-4 pb-2`}>
         <div className="d-flex align-items-center gap-2 me-auto">
           <span className="fw-bold text-dark" style={{ fontSize: "15px" }}>
-            Result
+            Trend Analysis
           </span>
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="3"
-            className="text-secondary opacity-50"
-          >
-            <path d="M6 9l6 6 6-6" />
-          </svg>
         </div>
-        <div className="d-flex gap-5">
+        <div className={`d-flex ${isMobile ? 'flex-wrap gap-2 justify-content-start' : 'gap-4'}`}>
           {legendItems.map((item, idx) => (
             <div key={idx} className="d-flex align-items-center gap-2">
               <span
                 style={{
-                  width: "12px",
-                  height: "12px",
+                  width: "10px",
+                  height: "10px",
                   backgroundColor: item.color,
                   display: "inline-block",
+                  borderRadius: "2px"
                 }}
               ></span>
               <span
-                className="text-dark fw-bold"
-                style={{ fontSize: "13px", opacity: 0.7 }}
+                className="text-muted fw-bold"
+                style={{ fontSize: "12px" }}
               >
                 {item.label}
               </span>
@@ -347,7 +346,7 @@ const TrendChart = ({
           ))}
         </div>
       </div>
-      <div style={{ height: "350px", width: "100%" }} className="mt-3">
+      <div style={{ height: isMobile ? "280px" : "350px", width: "100%" }} className="mt-2 px-2">
         <canvas ref={chartRef}></canvas>
       </div>
     </div>
@@ -363,6 +362,16 @@ export const PerformanceDashboard = ({
   campaignType = "",
 }) => {
   const { data: session } = useSession();
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isMobile = windowWidth < 768;
+  const isTablet = windowWidth >= 768 && windowWidth < 1024;
 
   const userRole = session?.user?.role || "";
   const userPerms = session?.user?.permissions || [];
@@ -482,9 +491,10 @@ export const PerformanceDashboard = ({
   }, [tableData, campaignPricing]);
 
   return (
-    <div className="mb-4">
+    <div className="mb-5">
       {/* Tabs */}
       <div className="d-flex mb-0">
+
         <div
           className="px-5 py-3 fw-bold text-dark border-bottom border-primary border-4 bg-white"
           style={{
@@ -506,58 +516,29 @@ export const PerformanceDashboard = ({
         <div className="card-body p-0">
           <div className="row g-0">
             {/* Left Content */}
-            <div className="col-lg-9 border-end border-light">
+            <div className={`${isMobile ? 'col-12' : 'col-lg-9'} border-end border-light`}>
               <div className="row g-0 text-center">
-                <div
-                  className="col-6 py-4"
-                  style={{ backgroundColor: "#D6E4FF" }}
-                >
-                  <h3
-                    className="fw-bold text-dark mb-1"
-                    style={{ fontSize: "24px" }}
-                  >
-                    {stats.total.Imp.toLocaleString()}
-                  </h3>
-                  <p className="text-dark small fw-bold mb-0 opacity-75">
-                    Impressions
-                  </p>
+                <div className="col-6 py-3" style={{ backgroundColor: '#D6E4FF' }}>
+                  <h3 className="fw-bold text-dark mb-0" style={{ fontSize: isMobile ? '18px' : '22px' }}>{stats.total.Imp.toLocaleString()}</h3>
+                  <p className="text-dark small fw-bold mb-0 opacity-75" style={{ fontSize: '11px' }}>Impressions</p>
                 </div>
-                <div
-                  className="col-6 py-4"
-                  style={{ backgroundColor: "#EDF2FF" }}
-                >
-                  <h3
-                    className="fw-bold text-dark mb-1"
-                    style={{ fontSize: "24px" }}
-                  >
-                    {stats.total.Reach.toLocaleString()}
-                  </h3>
-                  <p className="text-dark small fw-bold mb-0 opacity-75">
-                    Reach
-                  </p>
+                <div className="col-6 py-3" style={{ backgroundColor: '#EDF2FF' }}>
+                  <h3 className="fw-bold text-dark mb-0" style={{ fontSize: isMobile ? '18px' : '22px' }}>{stats.total.Reach.toLocaleString()}</h3>
+                  <p className="text-dark small fw-bold mb-0 opacity-75" style={{ fontSize: '11px' }}>Reach</p>
                 </div>
               </div>
-              <div className="row py-5 align-items-center">
-                <div
-                  className={`${campaignType === "CTV" ? "col-12" : "col-6"} d-flex flex-column align-items-center`}
-                >
-                  <DonutLarge
-                    percentage={stats.ReachPct}
-                    label="Reach"
-                    color="#3B82F6"
-                  />
+              <div className={`row ${isMobile ? 'py-4 px-2' : 'py-5'} align-items-center`}>
+                <div className={`${campaignType === "CTV" ? "col-12" : (isMobile ? "col-12 mb-5" : "col-6")} d-flex flex-column align-items-center`}>
+                  <DonutLarge percentage={stats.ReachPct} label="Reach" color="#3B82F6" />
                 </div>
                 {campaignType !== "CTV" && (
-                  <div
-                    className="col-6 d-flex flex-column align-items-center border-start border-light"
-                    style={{ height: "220px", justifyContent: "center" }}
-                  >
-                    <DonutLarge
-                      value={stats.total.Clicks.toLocaleString()}
-                      percentage={stats.CTR}
-                      label="Clicks"
-                      color="#3B82F6"
-                      showBoth
+                  <div className={`${isMobile ? "col-12" : "col-6 border-start border-light"} d-flex flex-column align-items-center`} style={{ height: isMobile ? 'auto' : '220px', justifyContent: 'center' }}>
+                    <DonutLarge 
+                      value={stats.total.Clicks.toLocaleString()} 
+                      percentage={stats.CTR} 
+                      label="Clicks" 
+                      color="#3B82F6" 
+                      showBoth 
                     />
                   </div>
                 )}
@@ -565,154 +546,64 @@ export const PerformanceDashboard = ({
             </div>
 
             {/* Right Sidebar */}
-            <div className="col-lg-3 p-4 bg-white d-flex flex-column align-items-center">
-              <div className="mb-5 w-100 text-end pe-4 mt-2">
-                <h5
-                  className="fw-bold text-dark mb-0"
-                  style={{ fontSize: "18px" }}
-                >
-                  Performance
-                </h5>
+            <div className={`${isMobile ? 'col-12 border-top p-3' : 'col-lg-3 p-4'} bg-white d-flex flex-column align-items-center`}>
+
+              <div className={`mb-5 w-100 ${isMobile ? 'text-center' : 'text-end pe-4'} mt-2`}>
+                <h5 className="fw-bold text-dark mb-0" style={{ fontSize: '18px' }}>Performance</h5>
               </div>
-              <div className="d-flex flex-column gap-4 w-100 px-4">
+              <div className={`d-flex flex-column gap-4 w-100 ${isMobile ? 'px-2' : 'px-4'}`}>
                 {!["Video", "CTV", "Youtube"].includes(campaignType) && (
                   <div className="d-flex justify-content-between align-items-center">
-                    <span
-                      className="text-secondary small fw-bold"
-                      style={{ fontSize: "13px" }}
-                    >
-                      CTR
-                    </span>
-                    <span
-                      className="text-dark fw-bold"
-                      style={{ fontSize: "14px" }}
-                    >
-                      {stats.CTR}%
-                    </span>
+                    <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>CTR</span>
+                    <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{stats.CTR}%</span>
                   </div>
                 )}
-
-                {hasCPMValue &&
-                  !["Video", "CTV", "Youtube"].includes(campaignType) && (
-                    <>
-                      <div className="d-flex justify-content-between align-items-center">
-                        <span
-                          className="text-secondary small fw-bold"
-                          style={{ fontSize: "13px" }}
-                        >
-                          eCPC
-                        </span>
-                        <span
-                          className="text-dark fw-bold"
-                          style={{ fontSize: "14px" }}
-                        >
-                          {currencySymbol}
-                          {stats.CPC}
-                        </span>
-                      </div>
-                      <div className="d-flex justify-content-between align-items-center">
-                        <span
-                          className="text-secondary small fw-bold"
-                          style={{ fontSize: "13px" }}
-                        >
-                          eCPM
-                        </span>
-                        <span
-                          className="text-dark fw-bold"
-                          style={{ fontSize: "14px" }}
-                        >
-                          {currencySymbol}
-                          {stats.CPM}
-                        </span>
-                      </div>
-                    </>
-                  )}
-                {!["Banner"].includes(campaignType) && (
-                  <div className="d-flex justify-content-between align-items-center">
-                    <span
-                      className="text-secondary small fw-bold"
-                      style={{ fontSize: "13px" }}
-                    >
-                      Views
-                    </span>
-                    <span
-                      className="text-dark fw-bold"
-                      style={{ fontSize: "14px" }}
-                    >
-                      {stats.Views}
-                    </span>
-                  </div>
-                )}
-                {!["Banner"].includes(campaignType) && (
-                  <div className="d-flex justify-content-between align-items-center">
-                    <span
-                      className="text-secondary small fw-bold"
-                      style={{ fontSize: "13px" }}
-                    >
-                      CPCV
-                    </span>
-                    <span
-                      className="text-dark fw-bold"
-                      style={{ fontSize: "14px" }}
-                    >
-                      {stats.CPCV}
-                    </span>
-                  </div>
-                )}
-                {!["Banner"].includes(campaignType) && (
-                  <div className="d-flex justify-content-between align-items-center">
-                    <span
-                      className="text-secondary small fw-bold"
-                      style={{ fontSize: "13px" }}
-                    >
-                      CPV
-                    </span>
-                    <span
-                      className="text-dark fw-bold"
-                      style={{ fontSize: "14px" }}
-                    >
-                      {stats.CPV}
-                    </span>
-                  </div>
-                )}
-                {hasCPMValue &&
-                  ["Video", "CTV", "Youtube"].includes(campaignType) && (
+               
+                {hasCPMValue && !["Video", "CTV", "Youtube"].includes(campaignType) && (
+                  <>
                     <div className="d-flex justify-content-between align-items-center">
-                      <span
-                        className="text-secondary small fw-bold"
-                        style={{ fontSize: "13px" }}
-                      >
-                        eCPM
-                      </span>
-                      <span
-                        className="text-dark fw-bold"
-                        style={{ fontSize: "14px" }}
-                      >
-                        {currencySymbol}
-                        {stats.CPM}
-                      </span>
+                      <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>eCPC</span>
+                      <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{currencySymbol}{stats.CPC}</span>
                     </div>
-                  )}
+                    <div className="d-flex justify-content-between align-items-center">
+                      <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>eCPM</span>
+                      <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{currencySymbol}{stats.CPM}</span>
+                    </div>
+                  </>
+                )}
+                {!["Banner"].includes(campaignType) && (
+                  <div className="d-flex justify-content-between align-items-center">
+                    <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>Views</span>
+                    <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{stats.Views}</span>
+                  </div>
+                )}
+                   {!["Banner"].includes(campaignType) && (
+                  <div className="d-flex justify-content-between align-items-center">
+                    <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>CPCV</span>
+                    <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{stats.CPCV}</span>
+                  </div>
+                )}
+                {!["Banner"].includes(campaignType) && (
+                  <div className="d-flex justify-content-between align-items-center">
+                    <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>CPV</span>
+                    <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{stats.CPV}</span>
+                  </div>
+                )}
+                {hasCPMValue && ["Video", "CTV", "Youtube"].includes(campaignType) && (
+                  <div className="d-flex justify-content-between align-items-center">
+                    <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>eCPM</span>
+                    <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{currencySymbol}{stats.CPM}</span>
+                  </div>
+                )}
                 {hasSpent && (
                   <div className="d-flex justify-content-between align-items-center">
-                    <span
-                      className="text-secondary small fw-bold"
-                      style={{ fontSize: "13px" }}
-                    >
-                      Spent
-                    </span>
-                    <span
-                      className="text-dark fw-bold"
-                      style={{ fontSize: "14px" }}
-                    >
-                      {currencySymbol}
-                      {stats.Spent}
-                    </span>
+                    <span className="text-secondary small fw-bold" style={{ fontSize: '13px' }}>Spent</span>
+                    <span className="text-dark fw-bold" style={{ fontSize: '14px' }}>{currencySymbol}{stats.Spent}</span>
                   </div>
                 )}
               </div>
             </div>
-            <div className="col-12 mt-4">
+            <div className="col-12 mt-5">
               <TrendChart
                 tableData={tableData}
                 campaignPermissions={campaignPermissions}
