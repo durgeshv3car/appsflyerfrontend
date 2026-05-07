@@ -328,11 +328,12 @@ const Campaign = () => {
       campaignData?.reportName?.trim() &&
       campaignData?.advertiserId?.trim() &&
       campaignData?.campaignType?.trim() &&
-      Object.keys(campaignData?.cpm || {}).length > 0;
+      (Object.keys(campaignData?.cpm || {}).length > 0 ||
+        Object.keys(campaignData?.cpc || {}).length > 0);
 
     if (!isValid) {
       toast.warning(
-        "Please fill all required fields and add at least one CPM entry",
+        "Please fill all required fields and add at least one CPM or CPC entry",
       );
       return;
     }
@@ -1334,7 +1335,8 @@ const Campaign = () => {
                               campaignData?.reportName?.trim() &&
                               campaignData?.advertiserId?.trim() &&
                               campaignData?.campaignType?.trim() &&
-                              Object.keys(campaignData?.cpm || {}).length > 0 &&
+                              (Object.keys(campaignData?.cpm || {}).length > 0 ||
+                                Object.keys(campaignData?.cpc || {}).length > 0) &&
                               (campaignData.source === "Eskimi" ||
                                 (campaignData.campaignId?.trim() &&
                                   campaignData.insertionOrderId?.trim()))

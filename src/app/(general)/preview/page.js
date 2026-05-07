@@ -321,9 +321,9 @@ const CampaignDashboard = () => {
       const pCPC = getPriceForDate(pricing?.cpc, rowDate);
 
       let spent = 0;
-      if (pCPM !== undefined) {
+      if (pCPM > 0) {
         spent = (imp / 1000) * pCPM;
-      } else if (pCPC !== undefined) {
+      } else if (pCPC > 0) {
         spent = cks * pCPC;
       } else {
         // Match DataTable: check row.eCPM / row.CPM / row.cpm from the API

@@ -106,7 +106,10 @@ const PerformanceTable = ({
       (p) => p.toLowerCase() === perm,
     );
     // HIDE INSTALLS AND CONVERSION EVENT IF NO APPSFLYER DATA
-    if (appsflyerDataLength === 0 && (col.name === "Installs" || col.name === "af_login (Unique users)")) {
+    if (
+      appsflyerDataLength === 0 &&
+      (col.name === "Installs" || col.name === "af_login (Unique users)")
+    ) {
       return false;
     }
 
@@ -120,12 +123,18 @@ const PerformanceTable = ({
       const defaults = filteredColumnsByPermission
         .filter((c) => {
           if (!c.defaultVisible) return false;
-          const isVideoType = ["Video", "CTV", "Youtube"].includes(campaignType);
+          const isVideoType = ["Video", "CTV", "Youtube"].includes(
+            campaignType,
+          );
           if (isVideoType && ["Clicks", "CTR", "CPC"].includes(c.name))
             return false;
 
           // HIDE INSTALLS AND AF LOGIN IF NO APPSFLYER DATA
-          if (appsflyerDataLength === 0 && (c.name === "Installs" || c.name === "af_login (Unique users)")) return false;
+          if (
+            appsflyerDataLength === 0 &&
+            (c.name === "Installs" || c.name === "af_login (Unique users)")
+          )
+            return false;
 
           return true;
         })
@@ -153,34 +162,48 @@ const PerformanceTable = ({
 
   const mergedData = React.useMemo(() => {
     if (!appsflyerData || appsflyerData.length === 0) return tableData;
-    
+
     const normalizeDate = (d) => {
       if (!d) return "";
-      const str = String(d).split('T')[0];
+      const str = String(d).split("T")[0];
       return str.replace(/\//g, "-");
     };
 
     const afMap = {};
-    appsflyerData.forEach(item => {
+    appsflyerData.forEach((item) => {
       const d = normalizeDate(item.date);
-      if (!afMap[d]) afMap[d] = { installs: 0, af_login_unique: 0, af_payment_unique: 0 };
-      afMap[d].installs += (item.installs || 0);
-      
+      if (!afMap[d])
+        afMap[d] = { installs: 0, af_login_unique: 0, af_payment_unique: 0 };
+      afMap[d].installs += item.installs || 0;
+
       let af_login_unique = 0;
       let af_payment_unique = 0;
-      const safeTarget = String(conversionEvent || "").replace(/\s+/g, "").toLowerCase();
+      const safeTarget = String(conversionEvent || "")
+        .replace(/\s+/g, "")
+        .toLowerCase();
 
       if (item.events && Array.isArray(item.events)) {
-        item.events.forEach(evt => {
-          const eName = String(evt.event_name || "").trim().toLowerCase();
-          const safeEName = String(evt.event_name || "").replace(/\s+/g, "").toLowerCase();
-          const cleanVal = String(evt.event_value || "").replace(/,/g, "").trim();
-          
+        item.events.forEach((evt) => {
+          const eName = String(evt.event_name || "")
+            .trim()
+            .toLowerCase();
+          const safeEName = String(evt.event_name || "")
+            .replace(/\s+/g, "")
+            .toLowerCase();
+          const cleanVal = String(evt.event_value || "")
+            .replace(/,/g, "")
+            .trim();
+
           if (eName.includes("af_login") && eName.includes("unique")) {
             af_login_unique += Number(cleanVal) || 0;
           }
-          
-          if (safeTarget && (safeEName === safeTarget || safeEName.includes(safeTarget) || safeTarget.includes(safeEName))) {
+
+          if (
+            safeTarget &&
+            (safeEName === safeTarget ||
+              safeEName.includes(safeTarget) ||
+              safeTarget.includes(safeEName))
+          ) {
             af_payment_unique += Number(cleanVal) || 0;
           }
         });
@@ -189,35 +212,49 @@ const PerformanceTable = ({
       afMap[d].af_payment_unique += af_payment_unique;
     });
 
-    return tableData?.map(row => {
+    return tableData?.map((row) => {
       const d = normalizeDate(row.Date || row.date);
-      const af = afMap[d] || { installs: 0, af_login_unique: 0, af_payment_unique: 0 };
-      
-      const defaultConversions = row.TotalConversions || row.totalConversions || row.total_conversions || 0;
+      const af = afMap[d] || {
+        installs: 0,
+        af_login_unique: 0,
+        af_payment_unique: 0,
+      };
+
+      const defaultConversions =
+        row.TotalConversions ||
+        row.totalConversions ||
+        row.total_conversions ||
+        0;
       let finalInstalls = af.installs;
-      let finalConversions = af.af_payment_unique > 0 ? af.af_payment_unique : defaultConversions;
+      let finalConversions =
+        af.af_payment_unique > 0 ? af.af_payment_unique : defaultConversions;
 
       // Fallback to proxy if both are 0 but clicks exist, ONLY if AppsFlyer config exists
       const clicks = Number(row.Clicks || row.clicks || 0);
-      const hasAFConfig = (appsflyerDataLength > 0);
-      
+      const hasAFConfig = appsflyerDataLength > 0;
+
       if (hasAFConfig) {
         if (finalInstalls === 0 && clicks > 0) finalInstalls = clicks * 0.0989;
-        if (finalConversions === 0 && clicks > 0) finalConversions = clicks * 0.011194;
+        if (finalConversions === 0 && clicks > 0)
+          finalConversions = clicks * 0.011194;
       }
 
       const rowBrowser = (row.browser || row.browser_name || "").toLowerCase();
-      if ((campaignType?.toLowerCase() === "android" || appsflyerCampaignType?.toLowerCase() === "android") && rowBrowser.includes("safari")) {
+      if (
+        (campaignType?.toLowerCase() === "android" ||
+          appsflyerCampaignType?.toLowerCase() === "android") &&
+        rowBrowser.includes("safari")
+      ) {
         finalInstalls = 0;
         finalConversions = 0;
       }
-      
+
       return {
         ...row,
         Installs: finalInstalls,
         "af_login (Unique users)": af.af_login_unique,
         "Total Conversions": finalConversions,
-        TotalConversions: finalConversions
+        TotalConversions: finalConversions,
       };
     });
   }, [tableData, appsflyerData, conversionEvent, appsflyerDataLength]);
@@ -238,102 +275,107 @@ const PerformanceTable = ({
 
   const totals = React.useMemo(() => {
     return mergedData?.reduce(
-    (acc, row) => {
-      const imp = Number(row.Impressions || row.impressions || 0);
-      const clicks = Number(row.Clicks || row.clicks || 0);
-      const reach = Number(
-        row.Reach ||
-          row.reach ||
-          row.total_reach ||
-          row.uniqueReachImpressionReach ||
-          0,
-      );
-      const rowDate = row.Date || row.date || "";
+      (acc, row) => {
+        const imp = Number(row.Impressions || row.impressions || 0);
+        const clicks = Number(row.Clicks || row.clicks || 0);
+        const reach = Number(
+          row.Reach ||
+            row.reach ||
+            row.total_reach ||
+            row.uniqueReachImpressionReach ||
+            0,
+        );
+        const rowDate = row.Date || row.date || "";
 
-      // Range-based pricing lookup
-      const dateSpecificCPM = getPriceForDate(campaignPricing?.cpm, rowDate);
-      const dateSpecificCPC = getPriceForDate(campaignPricing?.cpc, rowDate);
+        // Range-based pricing lookup
+        const dateSpecificCPM = getPriceForDate(campaignPricing?.cpm, rowDate);
+        const dateSpecificCPC = getPriceForDate(campaignPricing?.cpc, rowDate);
 
-      const totalConversions = Number(
-        row["Total Conversions"] ||
-        row.TotalConversions ||
-          row.totalConversions ||
-          row.total_conversions ||
-          0,
-      );
+        const totalConversions = Number(
+          row["Total Conversions"] ||
+            row.TotalConversions ||
+            row.totalConversions ||
+            row.total_conversions ||
+            0,
+        );
 
-      // Determine effective CPM/CPC
-      let cpm =
-        dateSpecificCPM !== undefined
-          ? dateSpecificCPM
-          : Number(row.CPM || row.cpm || 0);
-      let cpc =
-        dateSpecificCPC !== undefined
-          ? dateSpecificCPC
-          : Number(row.CPC || row.cpc || 0);
+        // Determine effective CPM/CPC
+        let spent = 0;
+        if (dateSpecificCPM > 0) {
+          spent = (imp / 1000) * dateSpecificCPM;
+        } else if (dateSpecificCPC > 0) {
+          spent = clicks * dateSpecificCPC;
+        } else {
+          const rowCPM = Number(row.CPM || row.cpm || 0);
+          const rowCPC = Number(row.CPC || row.cpc || 0);
+          spent = rowCPM > 0 ? (imp / 1000) * rowCPM : clicks * rowCPC;
+        }
 
-      // FORCE: Always calculate locally
-      let spent = 0;
-      if (dateSpecificCPM !== undefined) {
-        spent = (imp / 1000) * cpm;
-      } else if (dateSpecificCPC !== undefined) {
-        spent = clicks * cpc;
-      } else {
-        spent = cpm > 0 ? (imp / 1000) * cpm : clicks * cpc;
-      }
+        const cpm =
+          dateSpecificCPM > 0
+            ? dateSpecificCPM
+            : Number(row.CPM || row.cpm || 0);
+        const cpc =
+          dateSpecificCPC > 0
+            ? dateSpecificCPC
+            : Number(row.CPC || row.cpc || 0);
 
-      if (!cpm && imp > 0) cpm = (spent / imp) * 1000;
-      if (!cpc && clicks > 0) cpc = spent / clicks;
+        const videoComplete = Number(
+          row.completeViewsVideo || row.CompleteViewsVideo || 0,
+        );
+        const videoFirstQ = Number(
+          row.firstQuartileViewsVideo || row.FirstQuartileViewsVideo || 0,
+        );
+        const videoMidpoint = Number(
+          row.midpointViewsVideo || row.MidpointViewsVideo || 0,
+        );
+        const videoThirdQ = Number(
+          row.thirdQuartileViewsVideo || row.ThirdQuartileViewsVideo || 0,
+        );
+        const videoViews = Number(
+          row.Views || row.views || row.VideoViews || 0,
+        );
 
-      const videoComplete = Number(
-        row.completeViewsVideo || row.CompleteViewsVideo || 0,
-      );
-      const videoFirstQ = Number(
-        row.firstQuartileViewsVideo || row.FirstQuartileViewsVideo || 0,
-      );
-      const videoMidpoint = Number(
-        row.midpointViewsVideo || row.MidpointViewsVideo || 0,
-      );
-      const videoThirdQ = Number(
-        row.thirdQuartileViewsVideo || row.ThirdQuartileViewsVideo || 0,
-      );
-      const videoViews = Number(row.Views || row.views || row.VideoViews || 0);
-
-      return {
-        Impressions: acc.Impressions + imp,
-        Clicks: acc.Clicks + clicks,
-        Spent: acc.Spent + spent,
-        Reach: acc.Reach + reach,
-        "Views": (acc["Views"] || 0) + videoViews,
-        "Total Conversions": (acc["Total Conversions"] || 0) + totalConversions,
-        "Complete view": (acc["Complete view"] || 0) + videoComplete,
-        "First Quartile Views": (acc["First Quartile Views"] || 0) + videoFirstQ,
-        "Midpoint Views": (acc["Midpoint Views"] || 0) + videoMidpoint,
-        "Third Quartile Views": (acc["Third Quartile Views"] || 0) + videoThirdQ,
-        // Aggregate for weighted averages
-        SumCPM: (acc.SumCPM || 0) + cpm * imp,
-        SumCPC: (acc.SumCPC || 0) + cpc * clicks,
-        Installs: (acc.Installs || 0) + (row.Installs || 0),
-        "af_login (Unique users)": (acc["af_login (Unique users)"] || 0) + (row["af_login (Unique users)"] || 0),
-      };
-    },
-    {
-      Impressions: 0,
-      Clicks: 0,
-      Reach: 0,
-      Spent: 0,
-      "Total Conversions": 0,
-      "Complete view": 0,
-      "First Quartile Views": 0,
-      "Midpoint Views": 0,
-      "Third Quartile Views": 0,
-      "Views": 0,
-      SumCPM: 0,
-      SumCPC: 0,
-      Installs: 0,
-      "af_login (Unique users)": 0,
-    },
-  );
+        return {
+          Impressions: acc.Impressions + imp,
+          Clicks: acc.Clicks + clicks,
+          Spent: acc.Spent + spent,
+          Reach: acc.Reach + reach,
+          Views: (acc["Views"] || 0) + videoViews,
+          "Total Conversions":
+            (acc["Total Conversions"] || 0) + totalConversions,
+          "Complete view": (acc["Complete view"] || 0) + videoComplete,
+          "First Quartile Views":
+            (acc["First Quartile Views"] || 0) + videoFirstQ,
+          "Midpoint Views": (acc["Midpoint Views"] || 0) + videoMidpoint,
+          "Third Quartile Views":
+            (acc["Third Quartile Views"] || 0) + videoThirdQ,
+          // Aggregate for weighted averages
+          SumCPM: (acc.SumCPM || 0) + cpm * imp,
+          SumCPC: (acc.SumCPC || 0) + cpc * clicks,
+          Installs: (acc.Installs || 0) + (row.Installs || 0),
+          "af_login (Unique users)":
+            (acc["af_login (Unique users)"] || 0) +
+            (row["af_login (Unique users)"] || 0),
+        };
+      },
+      {
+        Impressions: 0,
+        Clicks: 0,
+        Reach: 0,
+        Spent: 0,
+        "Total Conversions": 0,
+        "Complete view": 0,
+        "First Quartile Views": 0,
+        "Midpoint Views": 0,
+        "Third Quartile Views": 0,
+        Views: 0,
+        SumCPM: 0,
+        SumCPC: 0,
+        Installs: 0,
+        "af_login (Unique users)": 0,
+      },
+    );
   }, [mergedData, campaignPricing]);
 
   const formatValue = (col, value) => {
@@ -444,11 +486,33 @@ const PerformanceTable = ({
                       row[col.toLowerCase()] ||
                       row[col.charAt(0).toLowerCase() + col.slice(1)];
 
-                    const videoComplete = Number(row.completeViewsVideo || row.CompleteViewsVideo || row["Complete view"] || 0);
-                    const videoFirstQ = Number(row.firstQuartileViewsVideo || row.FirstQuartileViewsVideo || row["First Quartile Views"] || 0);
-                    const videoMidpoint = Number(row.midpointViewsVideo || row.MidpointViewsVideo || row["Midpoint Views"] || 0);
-                    const videoThirdQ = Number(row.thirdQuartileViewsVideo || row.ThirdQuartileViewsVideo || row["Third Quartile Views"] || 0);
-                    const videoViews = Number(row.Views || row.views || row.VideoViews || 0);
+                    const videoComplete = Number(
+                      row.completeViewsVideo ||
+                        row.CompleteViewsVideo ||
+                        row["Complete view"] ||
+                        0,
+                    );
+                    const videoFirstQ = Number(
+                      row.firstQuartileViewsVideo ||
+                        row.FirstQuartileViewsVideo ||
+                        row["First Quartile Views"] ||
+                        0,
+                    );
+                    const videoMidpoint = Number(
+                      row.midpointViewsVideo ||
+                        row.MidpointViewsVideo ||
+                        row["Midpoint Views"] ||
+                        0,
+                    );
+                    const videoThirdQ = Number(
+                      row.thirdQuartileViewsVideo ||
+                        row.ThirdQuartileViewsVideo ||
+                        row["Third Quartile Views"] ||
+                        0,
+                    );
+                    const videoViews = Number(
+                      row.Views || row.views || row.VideoViews || 0,
+                    );
                     const videoCPCV = row.CPCV || row.Cpcv || row.cpcv || 0;
                     const videoCPV = row.CPV || row.Cpv || row.cpv || 0;
 
@@ -477,9 +541,9 @@ const PerformanceTable = ({
                         campaignPricing?.cpc,
                         rowDate,
                       );
-                      if (dateSpecificCPM !== undefined) {
+                      if (dateSpecificCPM > 0) {
                         val = (imp / 1000) * dateSpecificCPM;
-                      } else if (dateSpecificCPC !== undefined) {
+                      } else if (dateSpecificCPC > 0) {
                         val = cks * dateSpecificCPC;
                       } else {
                         const rowCPM = Number(rawCPM || 0);
@@ -492,28 +556,11 @@ const PerformanceTable = ({
                         campaignPricing?.cpm,
                         rowDate,
                       );
-                      if (dateSpecificCPM !== undefined) {
+                      if (dateSpecificCPM > 0) {
                         val = dateSpecificCPM;
                       } else {
-                        const definedCPM = Number(rawCPM || 0);
-                        if (definedCPM > 0) {
-                          val = definedCPM;
-                        } else if (imp > 0) {
-                          const dateSpecificCPC = getPriceForDate(
-                            campaignPricing?.cpc,
-                            rowDate,
-                          );
-                          let calcSpent = 0;
-                          if (dateSpecificCPC !== undefined) {
-                            calcSpent = cks * dateSpecificCPC;
-                          } else {
-                            const rowCPC = Number(rawCPC || 0);
-                            calcSpent = cks * rowCPC;
-                          }
-                          val = (calcSpent / imp) * 1000;
-                        } else {
-                          val = 0;
-                        }
+                        // CPM is explicitly 0 or not set — don't derive from CPC spend
+                        val = 0;
                       }
                     }
                     if (col === "CPC") {
@@ -521,36 +568,19 @@ const PerformanceTable = ({
                         campaignPricing?.cpc,
                         rowDate,
                       );
-                      if (dateSpecificCPC !== undefined) {
+
+                      if (dateSpecificCPC > 0) {
                         val = dateSpecificCPC;
                       } else {
-                        const definedCPC = Number(rawCPC || 0);
-                        if (definedCPC > 0) {
-                          val = definedCPC;
-                        } else if (cks > 0) {
-                          const dateSpecificCPM = getPriceForDate(
-                            campaignPricing?.cpm,
-                            rowDate,
-                          );
-                          let calcSpent = 0;
-                          if (dateSpecificCPM !== undefined) {
-                            calcSpent = (imp / 1000) * dateSpecificCPM;
-                          } else {
-                            const rowCPM = Number(rawCPM || 0);
-                            calcSpent = (imp / 1000) * rowCPM;
-                          }
-                          val = calcSpent / cks;
-                        } else {
-                          val = 0;
-                        }
+                        val = Number(rawCPC || 0);
                       }
                     }
                     if (col === "Frequency") val = rch > 0 ? imp / rch : 0;
 
                     // New columns resolution
                     if (col === "Views")
-                      val =row.Views || row.views || row.VideoViews || 0;
-                    
+                      val = row.Views || row.views || row.VideoViews || 0;
+
                     if (col === "First Quartile Views")
                       val =
                         row.firstQuartileViewsVideo ||
@@ -566,7 +596,7 @@ const PerformanceTable = ({
                         0;
                     if (col === "Complete view")
                       val =
-                        row.completeViewsVideo || row.CompleteViewsVideo || 0;    
+                        row.completeViewsVideo || row.CompleteViewsVideo || 0;
                     if (col === "Cpcv") {
                       val = row.Cpcv || row.cpcv || 0;
                     }
@@ -604,13 +634,23 @@ const PerformanceTable = ({
                                   ).toFixed(2) + "%"
                                 : "0.00%"
                               : col === "CPM"
-                                ? totals.Impressions
-                                  ? currencySymbol +
-                                    (
-                                      (totals.Spent / totals.Impressions) *
-                                      1000
-                                    ).toFixed(2)
-                                  : currencySymbol + "0.00"
+                                ? (() => {
+                                    const cpmRate = getPriceForDate(
+                                      campaignPricing?.cpm,
+                                      null,
+                                    );
+                                    const isCpmCampaign =
+                                      cpmRate !== undefined &&
+                                      Number(cpmRate) > 0;
+                                    return isCpmCampaign && totals.Impressions
+                                      ? currencySymbol +
+                                          (
+                                            (totals.Spent /
+                                              totals.Impressions) *
+                                            1000
+                                          ).toFixed(2)
+                                      : currencySymbol + "0.00";
+                                  })()
                                 : col === "CPC"
                                   ? totals.Clicks
                                     ? currencySymbol +
@@ -619,14 +659,18 @@ const PerformanceTable = ({
                                   : col === "CPCV"
                                     ? totals["Complete view"]
                                       ? currencySymbol +
-                                        (totals.Spent / totals["Complete view"]).toFixed(2)
+                                        (
+                                          totals.Spent / totals["Complete view"]
+                                        ).toFixed(2)
                                       : currencySymbol + "0.00"
                                     : col === "CPV"
                                       ? totals["Views"]
                                         ? currencySymbol +
-                                          (totals.Spent / totals["Views"]).toFixed(2)
+                                          (
+                                            totals.Spent / totals["Views"]
+                                          ).toFixed(2)
                                         : currencySymbol + "0.00"
-                                    : formatValue(col, totals[col], totals)}
+                                      : formatValue(col, totals[col], totals)}
                       </span>
                     </td>
                   ))}

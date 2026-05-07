@@ -97,95 +97,102 @@ const UrlTable = ({
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const groupedData = React.useMemo(() => {
-    const groups = {};
-    
-    urlData.forEach(row => {
-      const title = row.name || row.url || row.domain || row.site || "-";
-      const imp = Number(row.Impressions || row.impressions || 0);
-      const cks = Number(row.Clicks || row.clicks || 0);
-      const rowDate = row.Date || row.date || "";
+ const groupedData = React.useMemo(() => {
+  const groups = {};
 
-      let rowSpent = 0;
-      if (globalEffectiveMetrics.eCPM > 0) {
-        rowSpent = (imp / 1000) * globalEffectiveMetrics.eCPM;
-      } else if (globalEffectiveMetrics.eCPC > 0) {
-        rowSpent = cks * globalEffectiveMetrics.eCPC;
-      } else {
-        const datePriceCPM = getPriceForDate(campaignPricing?.cpm, rowDate);
-        const datePriceCPC = getPriceForDate(campaignPricing?.cpc, rowDate);
-        if (datePriceCPM !== undefined) {
-          rowSpent = (imp / 1000) * datePriceCPM;
-        } else if (datePriceCPC !== undefined) {
-          rowSpent = cks * datePriceCPC;
-        } else {
-          const rCPM = Number(row.CPM || row.cpm || 0);
-          const rCPC = Number(row.CPC || row.cpc || 0);
-          rowSpent = rCPM > 0 ? (imp / 1000) * rCPM : (cks * rCPC);
-        }
-      }
+  urlData.forEach(row => {
+    const title = row.name || row.url || row.domain || row.site || "-";
+    const imp = Number(row.Impressions || row.impressions || 0);
+    const cks = Number(row.Clicks || row.clicks || 0);
+    const rowDate = row.Date || row.date || "";
 
-      if (!groups[title]) {
-        groups[title] = { Title: title, Impressions: 0, Clicks: 0, Spent: 0, TotalConversions: 0, Installs: 0 };
-      }
-      
-      groups[title].Impressions += imp;
-      groups[title].Clicks += cks;
-      groups[title].Spent += rowSpent;
-      
-      let convFactor = 0.011194; // Always use for proportional distribution weight
-      let instFactor = (appsflyerDataLength > 0) ? 0.0989 : 0;
+    const datePriceCPM = getPriceForDate(campaignPricing?.cpm, rowDate);
+    const datePriceCPC = getPriceForDate(campaignPricing?.cpc, rowDate);
 
-      const rowBrowser = (row.browser || row.browser_name || "").toLowerCase();
-      if ((campaignType?.toLowerCase() === "android" || appsflyerCampaignType?.toLowerCase() === "android") && rowBrowser.includes("safari")) {
-        convFactor = 0;
-        instFactor = 0;
-      }
-
-      groups[title].TotalConversions += (cks * convFactor);
-      groups[title].Installs += (cks * instFactor);
-    });
-
-    const result = Object.values(groups);
-    const targetConversions = globalTotals?.TotalConversions || 0;
-    const targetInstalls = globalTotals?.Installs || 0;
-
-    const currentTotalConv = result.reduce((sum, g) => sum + g.TotalConversions, 0);
-    const currentTotalInst = result.reduce((sum, g) => sum + g.Installs, 0);
-
-    const convScale = currentTotalConv > 0 ? targetConversions / currentTotalConv : 0;
-    const instScale = currentTotalInst > 0 ? targetInstalls / currentTotalInst : 0;
-
-    let summedConv = 0;
-    let summedInst = 0;
-
-    result.forEach(g => {
-      g.TotalConversions = Math.round(g.TotalConversions * convScale);
-      g.Installs = Math.round(g.Installs * instScale);
-      summedConv += g.TotalConversions;
-      summedInst += g.Installs;
-    });
-
-    if (result.length > 0) {
-      const diffConv = targetConversions - summedConv;
-      const diffInst = targetInstalls - summedInst;
-      
-      if (diffConv !== 0 || diffInst !== 0) {
-        const largest = result.reduce((prev, current) => (prev.Clicks > current.Clicks) ? prev : current);
-        largest.TotalConversions += diffConv;
-        largest.Installs += diffInst;
-      }
+    let rowSpent = 0;
+    if (datePriceCPM > 0) {
+      rowSpent = (imp / 1000) * datePriceCPM;
+    } else if (datePriceCPC > 0) {
+      rowSpent = cks * datePriceCPC;
+    } else if (globalEffectiveMetrics.eCPM > 0) {
+      rowSpent = (imp / 1000) * globalEffectiveMetrics.eCPM;
+    } else if (globalEffectiveMetrics.eCPC > 0) {
+      rowSpent = cks * globalEffectiveMetrics.eCPC;
+    } else {
+      const rCPM = Number(row.CPM || row.cpm || 0);
+      const rCPC = Number(row.CPC || row.cpc || 0);
+      rowSpent = rCPM > 0 ? (imp / 1000) * rCPM : (cks * rCPC);
     }
 
-    return result.map(g => ({
-      ...g,
-      CTR: g.Impressions > 0 ? (g.Clicks / g.Impressions) * 100 : 0,
-      eCPM: globalEffectiveMetrics.eCPM > 0
-        ? globalEffectiveMetrics.eCPM
-        : (g.Impressions > 0 ? (g.Spent / g.Impressions) * 1000 : 0),
-      eCPC: g.Clicks > 0 ? (g.Spent / g.Clicks) : 0,
-    })).sort((a,b) => b.Impressions - a.Impressions);
-  }, [urlData, campaignPricing, globalEffectiveMetrics, campaignType, appsflyerCampaignType, globalTotals, appsflyerDataLength]);
+    if (!groups[title]) {
+      groups[title] = { Title: title, Impressions: 0, Clicks: 0, Spent: 0, TotalConversions: 0, Installs: 0 };
+    }
+
+    groups[title].Impressions += imp;
+    groups[title].Clicks += cks;
+    groups[title].Spent += rowSpent;
+
+    let convFactor = 0.011194;
+    let instFactor = (appsflyerDataLength > 0) ? 0.0989 : 0;
+
+    const rowBrowser = (row.browser || row.browser_name || "").toLowerCase();
+    if (
+      (campaignType?.toLowerCase() === "android" || appsflyerCampaignType?.toLowerCase() === "android") &&
+      rowBrowser.includes("safari")
+    ) {
+      convFactor = 0;
+      instFactor = 0;
+    }
+
+    groups[title].TotalConversions += (cks * convFactor);
+    groups[title].Installs += (cks * instFactor);
+  });
+
+  const result = Object.values(groups);
+  const targetConversions = globalTotals?.TotalConversions || 0;
+  const targetInstalls = globalTotals?.Installs || 0;
+
+  const currentTotalConv = result.reduce((sum, g) => sum + g.TotalConversions, 0);
+  const currentTotalInst = result.reduce((sum, g) => sum + g.Installs, 0);
+
+  const convScale = currentTotalConv > 0 ? targetConversions / currentTotalConv : 0;
+  const instScale = currentTotalInst > 0 ? targetInstalls / currentTotalInst : 0;
+
+  let summedConv = 0;
+  let summedInst = 0;
+
+  result.forEach(g => {
+    g.TotalConversions = Math.round(g.TotalConversions * convScale);
+    g.Installs = Math.round(g.Installs * instScale);
+    summedConv += g.TotalConversions;
+    summedInst += g.Installs;
+  });
+
+  if (result.length > 0) {
+    const diffConv = targetConversions - summedConv;
+    const diffInst = targetInstalls - summedInst;
+
+    if (diffConv !== 0 || diffInst !== 0) {
+      const largest = result.reduce((prev, current) => (prev.Clicks > current.Clicks) ? prev : current);
+      largest.TotalConversions += diffConv;
+      largest.Installs += diffInst;
+    }
+  }
+
+  // Determine if this is a CPM or CPC campaign from raw pricing
+  const anyCpmRate = getPriceForDate(campaignPricing?.cpm, null);
+  const isCpmCampaign = anyCpmRate !== undefined && Number(anyCpmRate) > 0;
+
+  return result.map(g => ({
+    ...g,
+    CTR: g.Impressions > 0 ? (g.Clicks / g.Impressions) * 100 : 0,
+    eCPM: isCpmCampaign
+      ? (g.Impressions > 0 ? (g.Spent / g.Impressions) * 1000 : 0)
+      : 0,
+    eCPC: g.Clicks > 0 ? (g.Spent / g.Clicks) : 0,
+  })).sort((a, b) => b.Impressions - a.Impressions);
+
+}, [urlData, campaignPricing, globalEffectiveMetrics, campaignType, appsflyerCampaignType, globalTotals, appsflyerDataLength]);
 
   const filteredColumns = filteredColumnsByPermission.filter((col) =>
     col.name.toLowerCase().includes(search.toLowerCase())
@@ -281,7 +288,13 @@ const UrlTable = ({
                        <span className="small">
                         {col === "Title" ? "Total:" : 
                          col === "CTR" ? (totals.Impressions ? ((totals.Clicks / totals.Impressions) * 100).toFixed(2) + "%" : "0.00%") :
-                         col === "eCPM" ? (totals.Impressions ? currencySymbol + ((totals.Spent / totals.Impressions) * 1000).toFixed(2) : currencySymbol + "0.00") :
+                         col === "eCPM" ? (() => {
+                                    const cpmRate = getPriceForDate(campaignPricing?.cpm, null);
+                                    const isCpmCampaign = cpmRate !== undefined && Number(cpmRate) > 0;
+                                    return isCpmCampaign && totals.Impressions
+                                      ? currencySymbol + ((totals.Spent / totals.Impressions) * 1000).toFixed(2)
+                                      : currencySymbol + "0.00";
+                                  })() :
                          col === "eCPC" ? (totals.Clicks ? currencySymbol + (totals.Spent / totals.Clicks).toFixed(2) : currencySymbol + "0.00") :
                          formatValue(col, totals[col])}
                        </span>

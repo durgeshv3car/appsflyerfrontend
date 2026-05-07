@@ -122,23 +122,22 @@ const OperatorTable = ({
       const videoCPCV = row.CPCV || row.Cpcv || row.cpcv || 0;
       const videoCPV = row.CPV || row.Cpv || row.cpv || 0;
 
+      const datePriceCPM = getPriceForDate(campaignPricing?.cpm, rowDate);
+      const datePriceCPC = getPriceForDate(campaignPricing?.cpc, rowDate);
+
       let rowSpent = 0;
-      if (globalEffectiveMetrics.eCPM > 0) {
+      if (datePriceCPM > 0) {
+        rowSpent = (imp / 1000) * datePriceCPM;
+      } else if (datePriceCPC > 0) {
+        rowSpent = cks * datePriceCPC;
+      } else if (globalEffectiveMetrics.eCPM > 0) {
         rowSpent = (imp / 1000) * globalEffectiveMetrics.eCPM;
       } else if (globalEffectiveMetrics.eCPC > 0) {
         rowSpent = cks * globalEffectiveMetrics.eCPC;
       } else {
-        const datePriceCPM = getPriceForDate(campaignPricing?.cpm, rowDate);
-        const datePriceCPC = getPriceForDate(campaignPricing?.cpc, rowDate);
-        if (datePriceCPM !== undefined) {
-          rowSpent = (imp / 1000) * datePriceCPM;
-        } else if (datePriceCPC !== undefined) {
-          rowSpent = cks * datePriceCPC;
-        } else {
-          const rCPM = Number(row.CPM || row.cpm || 0);
-          const rCPC = Number(row.CPC || row.cpc || 0);
-          rowSpent = rCPM > 0 ? (imp / 1000) * rCPM : (cks * rCPC);
-        }
+        const rCPM = Number(row.CPM || row.cpm || 0);
+        const rCPC = Number(row.CPC || row.cpc || 0);
+        rowSpent = rCPM > 0 ? (imp / 1000) * rCPM : (cks * rCPC);
       }
 
       if (!groups[title]) {
@@ -215,12 +214,16 @@ const OperatorTable = ({
       }
     }
 
+    // Determine if this is a CPM or CPC campaign from raw pricing
+    const anyCpmRate = getPriceForDate(campaignPricing?.cpm, null);
+    const isCpmCampaign = anyCpmRate !== undefined && Number(anyCpmRate) > 0;
+
     return result.map(g => ({
       ...g,
       CTR: g.Impressions > 0 ? (g.Clicks / g.Impressions) * 100 : 0,
-      eCPM: globalEffectiveMetrics.eCPM > 0
-        ? globalEffectiveMetrics.eCPM
-        : (g.Impressions > 0 ? (g.Spent / g.Impressions) * 1000 : 0),
+      eCPM: isCpmCampaign
+        ? (g.Impressions > 0 ? (g.Spent / g.Impressions) * 1000 : 0)
+        : 0,
       eCPC: g.Clicks > 0 ? (g.Spent / g.Clicks) : 0,
     })).sort((a,b) => b.Impressions - a.Impressions);
   }, [operatorData, campaignPricing, globalEffectiveMetrics, campaignType, appsflyerCampaignType, globalTotals, appsflyerDataLength]);
@@ -356,7 +359,13 @@ const OperatorTable = ({
                        <span className="small">
                         {col === "Title" ? "Total:" : 
                          col === "CTR" ? (totals.Impressions ? ((totals.Clicks / totals.Impressions) * 100).toFixed(2) + "%" : "0.00%") :
-                         col === "eCPM" ? (totals.Impressions ? currencySymbol + ((totals.Spent / totals.Impressions) * 1000).toFixed(2) : currencySymbol + "0.00") :
+                         col === "eCPM" ? (() => {
+                                    const cpmRate = getPriceForDate(campaignPricing?.cpm, null);
+                                    const isCpmCampaign = cpmRate !== undefined && Number(cpmRate) > 0;
+                                    return isCpmCampaign && totals.Impressions
+                                      ? currencySymbol + ((totals.Spent / totals.Impressions) * 1000).toFixed(2)
+                                      : currencySymbol + "0.00";
+                                  })() :
                          col === "eCPC" ? (totals.Clicks ? currencySymbol + (totals.Spent / totals.Clicks).toFixed(2) : currencySymbol + "0.00") :
                          col === "CPCV" ? (totals["Complete Views"] ? currencySymbol + (totals.Spent / totals["Complete Views"]).toFixed(2) : currencySymbol + "0.00") :
                          col === "CPV" ? (totals["Views"] ? currencySymbol + (totals.Spent / totals["Views"]).toFixed(2) : currencySymbol + "0.00") :
