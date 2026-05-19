@@ -97,11 +97,35 @@ const UrlTable = ({
         return true;
       }).map(c => c.name);
 
+      const stored = localStorage.getItem("visible_columns_url");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            const availableNames = filteredColumnsByPermission.map(c => c.name);
+            const filteredStored = parsed.filter(name => availableNames.includes(name));
+            if (filteredStored.length > 0) {
+              setVisibleColumns(filteredStored);
+              return;
+            }
+          }
+        } catch (e) {
+          console.error("Failed to parse stored columns for URL table", e);
+        }
+      }
       setVisibleColumns(defaults);
     }
   }, [campaignType, filteredColumnsByPermission.length, appsflyerDataLength]);
 
   const [show, setShow] = useState(false);
+  const [tempVisibleColumns, setTempVisibleColumns] = useState([]);
+
+  useEffect(() => {
+    if (show) {
+      setTempVisibleColumns(visibleColumns);
+    }
+  }, [show, visibleColumns]);
+
   const [search, setSearch] = useState("");
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
@@ -207,10 +231,16 @@ const UrlTable = ({
     col.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const toggleColumn = (colName) => {
-    setVisibleColumns(prev => 
+  const handleToggleTempColumn = (colName) => {
+    setTempVisibleColumns(prev =>
       prev.includes(colName) ? prev.filter(c => c !== colName) : [...prev, colName]
     );
+  };
+
+  const handleApplyColumns = () => {
+    setVisibleColumns(tempVisibleColumns);
+    localStorage.setItem("visible_columns_url", JSON.stringify(tempVisibleColumns));
+    setShow(false);
   };
 
   const totalPages = Math.ceil((groupedData?.length || 0) / rowsPerPage);
@@ -425,13 +455,21 @@ const UrlTable = ({
                 type="checkbox"
                 id={`url-check-${col.name}`}
                 label={col.name}
-                checked={visibleColumns.includes(col.name)}
-                onChange={() => toggleColumn(col.name)}
+                checked={tempVisibleColumns.includes(col.name)}
+                onChange={() => handleToggleTempColumn(col.name)}
                 className="mb-2"
               />
             ))}
           </div>
         </Modal.Body>
+        <Modal.Footer className="border-0 pt-0">
+          <Button variant="secondary" onClick={() => setShow(false)} style={{ borderRadius: '8px' }}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={handleApplyColumns} style={{ borderRadius: '8px' }}>
+            Apply
+          </Button>
+        </Modal.Footer>
       </Modal>
 
       <style jsx>{`
