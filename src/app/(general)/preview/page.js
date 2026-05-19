@@ -1084,6 +1084,7 @@ const CampaignDashboard = () => {
                 appsflyerCampaignType={filters.appsflyerCampaignType}
                 appsflyerDataLength={filters.appsflyerDataLength}
                 globalTotals={globalTotals}
+                audienceId={filters.audienceId}
               />
             </div>
           )}

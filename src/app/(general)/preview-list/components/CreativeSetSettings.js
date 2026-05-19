@@ -12,9 +12,10 @@ const creativeFormats = [
 
 
 
-const CreativeSetSettings = ({ onCancel, onSave }) => {
+const CreativeSetSettings = ({ onCancel, onSave, audiences = [], defaultAudienceId = "" }) => {
   const [title, setTitle] = useState("");
   const [selectedFormat, setSelectedFormat] = useState("banner");
+  const [audienceId, setAudienceId] = useState(defaultAudienceId || "");
   const [file, setFile] = useState(null);
   const [fileUrl, setFileUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -33,6 +34,10 @@ const CreativeSetSettings = ({ onCancel, onSave }) => {
         if (file) formData.append("file", file);
       }
 
+      if (audienceId) {
+        formData.append("audienceId", audienceId);
+      }
+
       const response = await fetch(`${apiBaseUrl}/upload`, {
         method: "POST",
         body: formData,
@@ -40,7 +45,7 @@ const CreativeSetSettings = ({ onCancel, onSave }) => {
 
       if (response.ok) {
         const data = await response.json().catch(() => ({}));
-        onSave({ title, selectedFormat, file, fileUrl, responseData: data });
+        onSave({ title, selectedFormat, file, fileUrl, audienceId, responseData: data });
       } else {
         const errText = await response.text().catch(() => "Unknown error");
         console.error("Upload failed:", errText);
@@ -77,27 +82,55 @@ const CreativeSetSettings = ({ onCancel, onSave }) => {
     <div className="bg-white rounded-3 shadow-sm p-5 m-3" style={{ border: "1px solid #f1f5f9", minHeight: '80vh' }}>
       <h4 className="mb-5 fw-bold text-dark" style={{ fontSize: '1.25rem' }}>Creative Set Settings</h4>
 
-      <div className="mb-5">
-        <label className="d-flex align-items-center gap-2 mb-3">
-          <span className="fw-semibold text-muted" style={{ fontSize: "0.85rem", letterSpacing: '0.3px' }}>Creative Set Title</span>
-          <div className="bg-light rounded-circle d-flex align-items-center justify-content-center" style={{ width: '18px', height: '18px' }}>
-            <Info size={12} className="text-primary" />
-          </div>
-        </label>
-        <input
-          type="text"
-          className="form-control"
-          placeholder="Enter a creative set title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          style={{ 
-            maxWidth: "600px", 
-            padding: "12px 16px", 
-            borderColor: "#e2e8f0", 
-            borderRadius: '8px',
-            fontSize: '0.95rem'
-          }}
-        />
+      <div className="row mb-5 g-4">
+        <div className="col-md-6">
+          <label className="d-flex align-items-center gap-2 mb-3">
+            <span className="fw-semibold text-muted" style={{ fontSize: "0.85rem", letterSpacing: '0.3px' }}>Creative Set Title</span>
+            <div className="bg-light rounded-circle d-flex align-items-center justify-content-center" style={{ width: '18px', height: '18px' }}>
+              <Info size={12} className="text-primary" />
+            </div>
+          </label>
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Enter a creative set title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            style={{ 
+              padding: "12px 16px", 
+              borderColor: "#e2e8f0", 
+              borderRadius: '8px',
+              fontSize: '0.95rem'
+            }}
+          />
+        </div>
+
+        <div className="col-md-6">
+          <label className="d-flex align-items-center gap-2 mb-3">
+            <span className="fw-semibold text-muted" style={{ fontSize: "0.85rem", letterSpacing: '0.3px' }}>Select Audience</span>
+            <div className="bg-light rounded-circle d-flex align-items-center justify-content-center" style={{ width: '18px', height: '18px' }}>
+              <Info size={12} className="text-primary" />
+            </div>
+          </label>
+          <select
+            className="form-select"
+            value={audienceId}
+            onChange={(e) => setAudienceId(e.target.value)}
+            style={{ 
+              padding: "12px 16px", 
+              borderColor: "#e2e8f0", 
+              borderRadius: '8px',
+              fontSize: '0.95rem'
+            }}
+          >
+            <option value="">-- No Audience Linked --</option>
+            {audiences.map((aud) => (
+              <option key={aud._id || aud.id} value={aud._id || aud.id}>
+                {aud.reportName || aud.advertiserId}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="border-top mb-5" style={{ borderColor: "#f1f5f9" }}></div>

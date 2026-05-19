@@ -9,6 +9,7 @@ const ItemModal = ({
   onSubmit,
   submitLabel,
   removeFile, 
+  audiences = [],
 }) => {
   const getMediaType = (url, desc, explicitType) => {
     let type = explicitType || 'link';
@@ -54,6 +55,23 @@ const ItemModal = ({
                 value={formData.name}
                 onChange={handleInputChange}
               />
+            </div>
+
+            <div className="mb-3">
+              <label>Audience</label>
+              <select
+                className="form-select"
+                name="audienceId"
+                value={formData.audienceId || ""}
+                onChange={handleInputChange}
+              >
+                <option value="">-- No Audience Linked --</option>
+                {audiences.map((aud) => (
+                  <option key={aud._id || aud.id} value={aud._id || aud.id}>
+                    {aud.reportName || aud.advertiserId}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="mb-3">

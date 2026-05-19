@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { Modal, Button, Form } from "react-bootstrap";
-import { FiChevronLeft, FiChevronRight, FiChevronDown, FiPlus } from "react-icons/fi";
+import { FiChevronLeft, FiChevronRight, FiChevronDown, FiPlus, FiEye } from "react-icons/fi";
 import { useSession } from "next-auth/react";
 import { useEffect } from "react";
 import { filterMetadataRows } from "@/utils/filterMetadata";
@@ -55,9 +55,35 @@ const CreativePerformanceTable = ({
   campaignType = "",
   appsflyerCampaignType = "",
   appsflyerDataLength = 0,
-  globalTotals = { TotalConversions: 0, Installs: 0 }
+  globalTotals = { TotalConversions: 0, Installs: 0 },
+  audienceId = ""
 }) => {
   const { data: session } = useSession();
+  const [dbCreatives, setDbCreatives] = useState([]);
+  const [selectedCreativeForModal, setSelectedCreativeForModal] = useState(null);
+
+  useEffect(() => {
+    const fetchDbCreatives = async () => {
+      if (!audienceId || audienceId === "all") {
+        setDbCreatives([]);
+        return;
+      }
+      try {
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+        // Fetch up to 100 creatives associated with the selected audienceId
+        const response = await fetch(`${API_BASE_URL}/creatives?limit=100&audienceId=${audienceId}`);
+        if (response.ok) {
+          const result = await response.json();
+          if (result.data) {
+            setDbCreatives(result.data);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch database creatives for audience:", err);
+      }
+    };
+    fetchDbCreatives();
+  }, [audienceId]);
 
   const filteredColumnsByType = React.useMemo(() => {
     const isVideoType = ["Video", "CTV", "Youtube"].includes(campaignType);
@@ -379,6 +405,29 @@ const CreativePerformanceTable = ({
                     else if (col === "eCPC") val = row.eCPC || 0;
                     else val = row[col] || 0;
 
+                    const matchedCreative = col === "Title" 
+                      ? dbCreatives.find(c => c.creativeName && c.creativeName.trim() === String(val).trim())
+                      : null;
+
+                    if (col === "Title" && matchedCreative) {
+                      return (
+                        <td key={col} className="py-3 px-4">
+                          <div className="d-flex align-items-center gap-2">
+                            <span className="text-dark small fw-semibold">{formatValue(col, val)}</span>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-link p-0 text-primary d-flex align-items-center justify-content-center"
+                              onClick={() => setSelectedCreativeForModal(matchedCreative)}
+                              style={{ width: "24px", height: "24px" }}
+                              title="Preview Creative"
+                            >
+                              <FiEye size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      );
+                    }
+
                     return (
                       <td key={col} className="py-3 px-4">
                         <span className="text-dark small">{formatValue(col, val)}</span>
@@ -521,6 +570,80 @@ const CreativePerformanceTable = ({
           </Button>
           <Button variant="primary" onClick={handleApplyColumns} style={{ borderRadius: '8px' }}>
             Apply
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Dynamic Creative Preview Modal */}
+      <Modal 
+        show={!!selectedCreativeForModal} 
+        onHide={() => setSelectedCreativeForModal(null)} 
+        centered 
+        size="lg"
+        contentClassName="border-0 shadow-lg rounded-4 overflow-hidden"
+      >
+        <Modal.Header closeButton className="bg-light border-0 py-3 px-4">
+          <Modal.Title className="fw-bold fs-5 text-dark d-flex flex-column">
+            <span>{selectedCreativeForModal?.creativeName || "Creative Preview"}</span>
+            <span className="text-muted small fw-normal mt-1" style={{ fontSize: '0.8rem' }}>
+              Format: <span className="badge bg-secondary-subtle text-secondary border px-2 py-1 text-uppercase ms-1" style={{ fontSize: '0.75rem' }}>{selectedCreativeForModal?.type || "unknown"}</span>
+            </span>
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="p-4 bg-white d-flex align-items-center justify-content-center" style={{ minHeight: '350px' }}>
+          {selectedCreativeForModal?.fileUrl ? (
+            (() => {
+              const url = selectedCreativeForModal.fileUrl;
+              const type = selectedCreativeForModal.type || "";
+              
+              if (type === "video" || type === "ctv") {
+                return (
+                  <video 
+                    src={url} 
+                    controls 
+                    className="img-fluid rounded shadow-sm" 
+                    style={{ maxHeight: "500px", maxWidth: "100%", outline: 'none' }}
+                  />
+                );
+              } else if (type === "audio") {
+                return (
+                  <div className="w-100 p-4 bg-light rounded text-center shadow-sm">
+                    <audio src={url} controls className="w-100" />
+                  </div>
+                );
+              } else {
+                const isImg = /\.(jpg|jpeg|png|webp|avif|gif|svg)$/i.test(url);
+                if (isImg && type !== "rich-media") {
+                  return (
+                    <img 
+                      src={url} 
+                      alt={selectedCreativeForModal?.creativeName} 
+                      className="img-fluid rounded shadow-sm border" 
+                      style={{ maxHeight: "500px", maxWidth: "100%" }}
+                    />
+                  );
+                } else {
+                  return (
+                    <iframe 
+                      src={url} 
+                      title={selectedCreativeForModal?.creativeName}
+                      style={{ width: "100%", height: "500px", border: "none", borderRadius: "8px" }}
+                    />
+                  );
+                }
+              }
+            })()
+          ) : (
+            <div className="text-muted text-center py-5">No preview file URL available.</div>
+          )}
+        </Modal.Body>
+        <Modal.Footer className="bg-light border-0 py-3 px-4">
+          <Button 
+            variant="outline-secondary" 
+            onClick={() => setSelectedCreativeForModal(null)} 
+            style={{ borderRadius: '8px', fontWeight: '500' }}
+          >
+            Close
           </Button>
         </Modal.Footer>
       </Modal>

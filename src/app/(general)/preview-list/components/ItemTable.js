@@ -76,6 +76,12 @@ const ItemTable = ({
               className="py-3 text-muted fw-semibold"
               style={{ fontSize: "0.85rem" }}
             >
+              Audience
+            </th>
+            <th
+              className="py-3 text-muted fw-semibold"
+              style={{ fontSize: "0.85rem" }}
+            >
               Preview URL
             </th>
             <th
@@ -97,7 +103,7 @@ const ItemTable = ({
         <tbody className="border-0">
           {items.length === 0 ? (
             <tr>
-              <td colSpan={isEditable ? "5" : "4"} className="text-center py-5">
+              <td colSpan={isEditable ? "6" : "5"} className="text-center py-5">
                 <div className="py-4">
                   <AlertCircle
                     size={40}
@@ -136,6 +142,9 @@ const ItemTable = ({
                 </td>
                 <td className="py-3 text-muted" style={{ fontSize: "0.85rem" }}>
                   {item.description || "-"}
+                </td>
+                <td className="py-3 text-muted" style={{ fontSize: "0.85rem" }}>
+                  <span className="fw-semibold text-dark">{item.audienceName || "-"}</span>
                 </td>
                 <td className="py-3">
                   {item.previewUrl ? (

@@ -10,12 +10,15 @@ import { getAudience } from "@/services/createaudience";
 const ItemManager = () => {
   const { data: session } = useSession();
   const [items, setItems] = useState([]);
+  const [audiences, setAudiences] = useState([]);
+  const [selectedAudienceId, setSelectedAudienceId] = useState("all");
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     file: null,
     previewUrl: "",
     logo: null,
+    audienceId: "",
   });
   const [showCreate, setShowCreate] = useState(false);
   const [showEdit, setShowEdit] = useState(null);
@@ -27,11 +30,27 @@ const ItemManager = () => {
   const [query, setQuery] = useState("");
   const limit = 10;
 
+  // Fetch Audiences list for dropdown
+  useEffect(() => {
+    const fetchAudiences = async () => {
+      try {
+        const res = await getAudience();
+        if (res && res.data) {
+          setAudiences(res.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch audiences:", err);
+      }
+    };
+    fetchAudiences();
+  }, []);
+
   useEffect(() => {
     const fetchItems = async () => {
       try {
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL 
-        const response = await fetch(`${API_BASE_URL}/creatives?page=${page}&limit=${limit}&search=${encodeURIComponent(query)}`);
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+        const audienceQuery = selectedAudienceId && selectedAudienceId !== "all" ? `&audienceId=${selectedAudienceId}` : "";
+        const response = await fetch(`${API_BASE_URL}/creatives?page=${page}&limit=${limit}&search=${encodeURIComponent(query)}${audienceQuery}`);
         if (response.ok) {
           const result = await response.json();
           setTotalPages(result.totalPages || 1);
@@ -43,7 +62,9 @@ const ItemManager = () => {
               type: creative.type,
               previewUrl: creative.fileUrl,
               source: "Upload API",
-              logo: null
+              logo: null,
+              audienceId: creative.audienceId?._id || creative.audienceId || "",
+              audienceName: creative.audienceId?.reportName || creative.audienceId?.advertiserId || "-"
             })));
           }
         }
@@ -53,7 +74,7 @@ const ItemManager = () => {
     };
 
     fetchItems();
-  }, [page, query, view]);
+  }, [page, query, view, selectedAudienceId]);
 
   const resetForm = () =>
     setFormData({
@@ -62,6 +83,7 @@ const ItemManager = () => {
       file: null,
       previewUrl: "",
       logo: null,
+      audienceId: "",
     });
 
   const handleInputChange = (e) => {
@@ -95,6 +117,11 @@ const ItemManager = () => {
       } else if (formData.previewUrl) {
         data.append("fileUrl", formData.previewUrl);
       }
+
+      if (formData.audienceId) {
+        data.append("audienceId", formData.audienceId);
+      }
+
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL
       const response = await fetch(`${API_BASE_URL}/creatives/${showEdit.id}`, {
         method: "PUT",
@@ -105,6 +132,10 @@ const ItemManager = () => {
         const result = await response.json();
         const updated = result.data || {};
         
+        // Find selected audience name from list for immediate UI sync
+        const selectedAud = audiences.find(a => (a._id || a.id) === (updated.audienceId || formData.audienceId));
+        const audName = selectedAud?.reportName || selectedAud?.advertiserId || "-";
+
         setItems((prev) =>
           prev.map((item) =>
             item.id === showEdit.id ? { 
@@ -112,7 +143,9 @@ const ItemManager = () => {
               name: updated.creativeName || formData.name,
               previewUrl: updated.fileUrl || formData.previewUrl,
               description: updated.type ? `Type: ${updated.type}` : formData.description,
-              type: updated.type || cType
+              type: updated.type || cType,
+              audienceId: updated.audienceId || formData.audienceId || "",
+              audienceName: audName
             } : item
           )
         );
@@ -185,6 +218,7 @@ const ItemManager = () => {
         <CreativeSetSettings 
           onCancel={() => setView("list")}
           onSave={(data) => {
+            const savedAudName = audiences.find(a => (a._id || a.id) === (data.audienceId || data.responseData?.data?.audienceId))?.reportName || "-";
             const newItem = {
               id: data.responseData?.data?._id || data.responseData?.creative?._id || data.responseData?._id || Date.now(),
               name: data.title || data.responseData?.creativeName,
@@ -192,12 +226,16 @@ const ItemManager = () => {
               type: data.selectedFormat,
               previewUrl: data.responseData?.data?.fileUrl || data.responseData?.creative?.fileUrl || data.responseData?.fileUrl || data.fileUrl || `/preview?name=${encodeURIComponent(data.title)}`,
               source: "Upload API",
-              logo: null
+              logo: null,
+              audienceId: data.audienceId || data.responseData?.data?.audienceId || "",
+              audienceName: savedAudName
             };
             setItems(prev => [newItem, ...prev]);
             setView("list");
             alert("Creative set saved successfully!");
           }}
+          audiences={audiences}
+          defaultAudienceId={selectedAudienceId !== "all" ? selectedAudienceId : ""}
         />
       </div>
     );
@@ -211,6 +249,27 @@ const ItemManager = () => {
           <p className="text-muted small mb-0">Manage and preview your creative sets</p>
         </div>
         <div className="d-flex align-items-center gap-3">
+          {/* Audience Filter Dropdown */}
+          <div className="d-flex align-items-center gap-2">
+            <span className="text-muted small fw-semibold text-nowrap">Audience:</span>
+            <select
+              className="form-select form-select-sm"
+              value={selectedAudienceId}
+              onChange={(e) => {
+                setPage(1);
+                setSelectedAudienceId(e.target.value);
+              }}
+              style={{ minWidth: '200px', borderRadius: '8px', borderColor: '#dee2e6' }}
+            >
+              <option value="all">All Audiences</option>
+              {audiences.map((aud) => (
+                <option key={aud._id || aud.id} value={aud._id || aud.id}>
+                  {aud.reportName || aud.advertiserId}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <form 
             onSubmit={(e) => {
               e.preventDefault();
@@ -287,6 +346,7 @@ const ItemManager = () => {
           onSubmit={handleEdit}
           submitLabel="Update"
           removeFile={removeFile} 
+          audiences={audiences}
         />
       )}
     </div>
