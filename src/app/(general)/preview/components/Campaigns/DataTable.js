@@ -168,7 +168,7 @@ const PerformanceTable = ({
       setVisibleColumns(defaults);
     }
   }, [campaignType, filteredColumnsByPermission.length, appsflyerDataLength]);
-   const [show, setShow] = useState(false);
+  const [show, setShow] = useState(false);
   const [tempVisibleColumns, setTempVisibleColumns] = useState([]);
 
   useEffect(() => {
@@ -210,8 +210,9 @@ const PerformanceTable = ({
     appsflyerData.forEach((item) => {
       const d = normalizeDate(item.date);
       if (!afMap[d])
-        afMap[d] = { installs: 0, af_login_unique: 0, af_payment_unique: 0 };
+        afMap[d] = { installs: 0, afclicks: 0, af_login_unique: 0, af_payment_unique: 0 };
       afMap[d].installs += item.installs || 0;
+      afMap[d].afclicks += item.clicks || 0;
 
       let af_login_unique = 0;
       let af_payment_unique = 0;
@@ -289,6 +290,7 @@ const PerformanceTable = ({
       return {
         ...row,
         Installs: finalInstalls,
+        "afclicks": af.afclicks,
         "af_login (Unique users)": af.af_login_unique,
         "Total Conversions": finalConversions,
         TotalConversions: finalConversions,
@@ -315,12 +317,16 @@ const PerformanceTable = ({
       (acc, row) => {
         const imp = Number(row.Impressions || row.impressions || 0);
         const clicks = Number(row.Clicks || row.clicks || 0);
+        const afClicks = Number(row.afclicks || 0);
+
+      const finalClicks =
+        appsflyerDataLength > 0 ? clicks + afClicks : clicks;
         const reach = Number(
           row.Reach ||
-            row.reach ||
-            row.total_reach ||
-            row.uniqueReachImpressionReach ||
-            0,
+          row.reach ||
+          row.total_reach ||
+          row.uniqueReachImpressionReach ||
+          0,
         );
         const rowDate = row.Date || row.date || "";
 
@@ -330,10 +336,10 @@ const PerformanceTable = ({
 
         const totalConversions = Number(
           row["Total Conversions"] ||
-            row.TotalConversions ||
-            row.totalConversions ||
-            row.total_conversions ||
-            0,
+          row.TotalConversions ||
+          row.totalConversions ||
+          row.total_conversions ||
+          0,
         );
 
         // Determine effective CPM/CPC
@@ -375,7 +381,7 @@ const PerformanceTable = ({
 
         return {
           Impressions: acc.Impressions + imp,
-          Clicks: acc.Clicks + clicks,
+          Clicks: acc.Clicks + finalClicks,
           Spent: acc.Spent + spent,
           Reach: acc.Reach + reach,
           Views: (acc["Views"] || 0) + videoViews,
@@ -505,16 +511,16 @@ const PerformanceTable = ({
                     const cks = Number(row.Clicks || row.clicks || 0);
                     const rch = Number(
                       row.Reach ||
-                        row.reach ||
-                        row.total_reach ||
-                        row.uniqueReachImpressionReach ||
-                        0,
+                      row.reach ||
+                      row.total_reach ||
+                      row.uniqueReachImpressionReach ||
+                      0,
                     );
                     const cnv = Number(
                       row.TotalConversions ||
-                        row.totalConversions ||
-                        row.total_conversions ||
-                        0,
+                      row.totalConversions ||
+                      row.total_conversions ||
+                      0,
                     );
 
                     const rawCPM = row.eCPM || row.CPM || row.cpm;
@@ -527,27 +533,27 @@ const PerformanceTable = ({
 
                     const videoComplete = Number(
                       row.completeViewsVideo ||
-                        row.CompleteViewsVideo ||
-                        row["Complete view"] ||
-                        0,
+                      row.CompleteViewsVideo ||
+                      row["Complete view"] ||
+                      0,
                     );
                     const videoFirstQ = Number(
                       row.firstQuartileViewsVideo ||
-                        row.FirstQuartileViewsVideo ||
-                        row["First Quartile Views"] ||
-                        0,
+                      row.FirstQuartileViewsVideo ||
+                      row["First Quartile Views"] ||
+                      0,
                     );
                     const videoMidpoint = Number(
                       row.midpointViewsVideo ||
-                        row.MidpointViewsVideo ||
-                        row["Midpoint Views"] ||
-                        0,
+                      row.MidpointViewsVideo ||
+                      row["Midpoint Views"] ||
+                      0,
                     );
                     const videoThirdQ = Number(
                       row.thirdQuartileViewsVideo ||
-                        row.ThirdQuartileViewsVideo ||
-                        row["Third Quartile Views"] ||
-                        0,
+                      row.ThirdQuartileViewsVideo ||
+                      row["Third Quartile Views"] ||
+                      0,
                     );
                     const videoViews = Number(
                       row.Views || row.views || row.VideoViews || 0,
@@ -557,7 +563,10 @@ const PerformanceTable = ({
 
                     // Priority mappings
                     if (col === "Impressions") val = imp;
-                    else if (col === "Clicks") val = cks;
+                    else if (col === "Clicks") {
+                      const afClicks = Number(row.afclicks || 0); 
+                      val = appsflyerDataLength > 0 ? cks + afClicks : cks;
+                    }
                     else if (col === "Reach") val = rch;
                     else if (col === "First Quartile Views") val = videoFirstQ;
                     else if (col === "Midpoint Views") val = videoMidpoint;
@@ -668,46 +677,46 @@ const PerformanceTable = ({
                             : col === "CTR"
                               ? totals.Impressions
                                 ? (
-                                    (totals.Clicks / totals.Impressions) *
-                                    100
-                                  ).toFixed(2) + "%"
+                                  (totals.Clicks / totals.Impressions) *
+                                  100
+                                ).toFixed(2) + "%"
                                 : "0.00%"
                               : col === "CPM"
                                 ? (() => {
-                                    const cpmRate = getPriceForDate(
-                                      campaignPricing?.cpm,
-                                      null,
-                                    );
-                                    const isCpmCampaign =
-                                      cpmRate !== undefined &&
-                                      Number(cpmRate) > 0;
-                                    return isCpmCampaign && totals.Impressions
-                                      ? currencySymbol +
-                                          (
-                                            (totals.Spent /
-                                              totals.Impressions) *
-                                            1000
-                                          ).toFixed(2)
-                                      : currencySymbol + "0.00";
-                                  })()
+                                  const cpmRate = getPriceForDate(
+                                    campaignPricing?.cpm,
+                                    null,
+                                  );
+                                  const isCpmCampaign =
+                                    cpmRate !== undefined &&
+                                    Number(cpmRate) > 0;
+                                  return isCpmCampaign && totals.Impressions
+                                    ? currencySymbol +
+                                    (
+                                      (totals.Spent /
+                                        totals.Impressions) *
+                                      1000
+                                    ).toFixed(2)
+                                    : currencySymbol + "0.00";
+                                })()
                                 : col === "CPC"
                                   ? totals.Clicks
                                     ? currencySymbol +
-                                      (totals.Spent / totals.Clicks).toFixed(2)
+                                    (totals.Spent / totals.Clicks).toFixed(2)
                                     : currencySymbol + "0.00"
                                   : col === "CPCV"
                                     ? totals["Complete view"]
                                       ? currencySymbol +
-                                        (
-                                          totals.Spent / totals["Complete view"]
-                                        ).toFixed(2)
+                                      (
+                                        totals.Spent / totals["Complete view"]
+                                      ).toFixed(2)
                                       : currencySymbol + "0.00"
                                     : col === "CPV"
                                       ? totals["Views"]
                                         ? currencySymbol +
-                                          (
-                                            totals.Spent / totals["Views"]
-                                          ).toFixed(2)
+                                        (
+                                          totals.Spent / totals["Views"]
+                                        ).toFixed(2)
                                         : currencySymbol + "0.00"
                                       : formatValue(col, totals[col], totals)}
                       </span>

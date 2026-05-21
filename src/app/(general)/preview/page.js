@@ -930,6 +930,16 @@ const CampaignDashboard = () => {
       return { TotalConversions: 0, Installs: 0 };
     }
 
+    if (!appsflyerData || appsflyerData.length === 0) {
+      let totalConversions = 0;
+      let totalInstalls = 0;
+      tableData.tableData.forEach(row => {
+        totalConversions += Number(row.TotalConversions || row.totalConversions || row.total_conversions || 0);
+        totalInstalls += Number(row.Installs || row.installs || 0);
+      });
+      return { TotalConversions: totalConversions, Installs: totalInstalls };
+    }
+
     const normalizeDate = (d) => {
       if (!d) return "";
       const str = String(d).split('T')[0];
@@ -1034,6 +1044,8 @@ const CampaignDashboard = () => {
               <PerformanceDashboard
                 tableData={tableData.graphData}
                 appsflyerData={appsflyerData}
+                appsflyerDataLength={filters.appsflyerDataLength}
+                conversionEvent={filters.conversionEvent}
                 currencySymbol={getCurrencySymbol(filters.currency)}
                 campaignPermissions={campaignPermissions}
                 campaignPricing={campaignPricing}
@@ -1083,6 +1095,7 @@ const CampaignDashboard = () => {
                 campaignType={filters.campaignType}
                 appsflyerCampaignType={filters.appsflyerCampaignType}
                 appsflyerDataLength={filters.appsflyerDataLength}
+                appsflyerData={appsflyerData}
                 globalTotals={globalTotals}
                 audienceId={filters.audienceId}
               />
@@ -1145,6 +1158,7 @@ const CampaignDashboard = () => {
                 campaignType={filters.campaignType}
                 appsflyerCampaignType={filters.appsflyerCampaignType}
                 appsflyerDataLength={filters.appsflyerDataLength}
+                appsflyerData={appsflyerData}
                 globalTotals={globalTotals}
               />
             </div>
@@ -1166,6 +1180,7 @@ const CampaignDashboard = () => {
                 campaignType={filters.campaignType}
                 appsflyerCampaignType={filters.appsflyerCampaignType}
                 appsflyerDataLength={filters.appsflyerDataLength}
+                appsflyerData={appsflyerData}
                 globalTotals={globalTotals}
               />
             </div>
@@ -1192,6 +1207,7 @@ const CampaignDashboard = () => {
                 campaignType={filters.campaignType}
                 appsflyerCampaignType={filters.appsflyerCampaignType}
                 appsflyerDataLength={filters.appsflyerDataLength}
+                appsflyerData={appsflyerData}
                 globalTotals={globalTotals}
               />
             </div>
@@ -1241,6 +1257,7 @@ const CampaignDashboard = () => {
                 campaignType={filters.campaignType}
                 appsflyerCampaignType={filters.appsflyerCampaignType}
                 appsflyerDataLength={filters.appsflyerDataLength}
+                appsflyerData={appsflyerData}
                 globalTotals={globalTotals}
               />
             </div>

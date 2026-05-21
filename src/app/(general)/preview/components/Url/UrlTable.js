@@ -47,6 +47,7 @@ const UrlTable = ({
   campaignType = "",
   appsflyerCampaignType = "",
   appsflyerDataLength = 0,
+  appsflyerData = [],
   globalTotals = { TotalConversions: 0, Installs: 0 }
 }) => {
   const { data: session } = useSession();
@@ -212,6 +213,31 @@ const UrlTable = ({
     }
   }
 
+  // Distribute AppsFlyer clicks if appsflyerDataLength > 0
+  if (appsflyerDataLength > 0 && appsflyerData && appsflyerData.length > 0) {
+    const totalBaseClicks = result.reduce((sum, g) => sum + g.Clicks, 0);
+    const totalAfClicks = appsflyerData.reduce((sum, item) => sum + Number(item.clicks || 0), 0);
+    
+    if (totalBaseClicks > 0 && totalAfClicks > 0) {
+      let summedClicks = 0;
+      result.forEach(g => {
+        const clickPct = g.Clicks / totalBaseClicks;
+        const clicksToAdd = totalAfClicks * clickPct;
+        g.Clicks = Math.round(g.Clicks + clicksToAdd);
+        summedClicks += g.Clicks;
+      });
+
+      if (result.length > 0) {
+        const targetClicks = totalBaseClicks + totalAfClicks;
+        const diffClicks = targetClicks - summedClicks;
+        if (diffClicks !== 0) {
+          const largest = result.reduce((prev, current) => (prev.Clicks > current.Clicks) ? prev : current);
+          largest.Clicks += diffClicks;
+        }
+      }
+    }
+  }
+
   // Determine if this is a CPM or CPC campaign from raw pricing
   const anyCpmRate = getPriceForDate(campaignPricing?.cpm, null);
   const isCpmCampaign = anyCpmRate !== undefined && Number(anyCpmRate) > 0;
@@ -225,7 +251,7 @@ const UrlTable = ({
     eCPC: g.Clicks > 0 ? (g.Spent / g.Clicks) : 0,
   })).sort((a, b) => b.Impressions - a.Impressions);
 
-}, [urlData, campaignPricing, globalEffectiveMetrics, campaignType, appsflyerCampaignType, globalTotals, appsflyerDataLength]);
+}, [urlData, campaignPricing, globalEffectiveMetrics, campaignType, appsflyerCampaignType, globalTotals, appsflyerDataLength, appsflyerData]);
 
   const filteredColumns = filteredColumnsByPermission.filter((col) =>
     col.name.toLowerCase().includes(search.toLowerCase())
@@ -389,7 +415,7 @@ const UrlTable = ({
                         <option value={20}>20</option>
                         <option value={50}>50</option>
                     </select>
-                    <FiChevronDown className="position-absolute text-muted" style={{ top: '50%', right: '10px', transform: 'translateY(-50%)', pointerEvents: 'none' }} size={14} />
+                    {/* <FiChevronDown className="position-absolute text-muted" style={{ top: '50%', right: '10px', transform: 'translateY(-50%)', pointerEvents: 'none' }} size={14} /> */}
                   </div>
               </div>
               
