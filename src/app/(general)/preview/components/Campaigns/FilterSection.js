@@ -261,97 +261,79 @@ const ReportsFilter = ({
         const end = item.to ? new Date(item.to) : null;
         
         let dateChanged = false;
-        let updatedFilters;
+        
+        // Construct the updated filters synchronously
+        const updatedFilters = {
+          ...filters,
+          app_id: item.app_id || "",
+          appsflyerCampaignType: item.campaignType || item.campaign_type || "",
+          appsflyerDataLength: res.data.length,
+          conversionEvent: item.conversionEvent || "",
+        };
 
-        setFilters(prev => {
-          updatedFilters = {
-            ...prev,
-            app_id: item.app_id || "",
-            appsflyerCampaignType: item.campaignType || item.campaign_type || "",
-            appsflyerDataLength: res.data.length,
-            conversionEvent: item.conversionEvent || "",
-          };
-
-          if (start && end) {
-            const newStartDate = formatDateToYMD(start);
-            const newEndDate = formatDateToYMD(end);
-            
-            if (newStartDate !== prev.dateRange.startDate || newEndDate !== prev.dateRange.endDate) {
-              dateChanged = true;
-              setRange([{ startDate: start, endDate: end, key: "selection" }]);
-              updatedFilters.dateRange = {
-                startDate: newStartDate,
-                endDate: newEndDate,
-              };
-            }
+        if (start && end) {
+          const newStartDate = formatDateToYMD(start);
+          const newEndDate = formatDateToYMD(end);
+          
+          if (newStartDate !== filters.dateRange.startDate || newEndDate !== filters.dateRange.endDate) {
+            dateChanged = true;
+            setRange([{ startDate: start, endDate: end, key: "selection" }]);
+            updatedFilters.dateRange = {
+              startDate: newStartDate,
+              endDate: newEndDate,
+            };
           }
-          return updatedFilters;
-        });
+        }
 
-        // CRITICAL: Fetch AppsFlyer and reports data with exact updated values
-        setTimeout(() => {
-          if (updatedFilters) {
-            if (typeof fetchAppsflyerData === "function") {
-              fetchAppsflyerData(updatedFilters);
-            }
+        // Synchronously update the React filters state
+        setFilters(updatedFilters);
 
-            if (dateChanged) {
-              fetchCampaignData(updatedFilters);
-              fetchCreativeTableData(updatedFilters);
-              fetchAgeData(updatedFilters);
-              fetchGenderData(updatedFilters);
-              fetchTotalData(updatedFilters);
-              fetchOsData(updatedFilters);
-              fetchBrowserData(updatedFilters);
-              fetchOperatorData(updatedFilters);
-              fetchPlacementPosData(updatedFilters);
-              fetchPlacementTypeData(updatedFilters);
-              fetchDeviceData(updatedFilters);
-              fetchCityData(updatedFilters);
-              if (typeof fetchUrlData === "function") fetchUrlData(updatedFilters);
-            }
-          }
-        }, 0);
+        // Fetch AppsFlyer data and reports data with exact updated values
+        if (typeof fetchAppsflyerData === "function") {
+          fetchAppsflyerData(updatedFilters);
+        }
+
+        if (dateChanged) {
+          fetchCampaignData(updatedFilters);
+          fetchCreativeTableData(updatedFilters);
+          fetchAgeData(updatedFilters);
+          fetchGenderData(updatedFilters);
+          fetchTotalData(updatedFilters);
+          fetchOsData(updatedFilters);
+          fetchBrowserData(updatedFilters);
+          fetchOperatorData(updatedFilters);
+          fetchPlacementPosData(updatedFilters);
+          fetchPlacementTypeData(updatedFilters);
+          fetchDeviceData(updatedFilters);
+          fetchCityData(updatedFilters);
+          if (typeof fetchUrlData === "function") fetchUrlData(updatedFilters);
+        }
       } else {
-        let resetFilters;
-        setFilters(prev => {
-          resetFilters = {
-            ...prev,
-            app_id: "",
-            appsflyerDataLength: 0,
-            appsflyerCampaignType: "",
-            conversionEvent: "",
-          };
-          return resetFilters;
-        });
-        setTimeout(() => {
-          if (resetFilters) {
-            if (typeof fetchAppsflyerData === "function") {
-              fetchAppsflyerData(resetFilters);
-            }
-          }
-        }, 0);
-      }
-    } catch (err) {
-      console.error("Error auto-fetching AppsFlyer data", err);
-      let resetFilters;
-      setFilters(prev => {
-        resetFilters = {
-          ...prev,
+        const resetFilters = {
+          ...filters,
           app_id: "",
           appsflyerDataLength: 0,
           appsflyerCampaignType: "",
           conversionEvent: "",
         };
-        return resetFilters;
-      });
-      setTimeout(() => {
-        if (resetFilters) {
-          if (typeof fetchAppsflyerData === "function") {
-            fetchAppsflyerData(resetFilters);
-          }
+        setFilters(resetFilters);
+        if (typeof fetchAppsflyerData === "function") {
+          fetchAppsflyerData(resetFilters);
         }
-      }, 0);
+      }
+    } catch (err) {
+      console.error("Error auto-fetching AppsFlyer data", err);
+      const resetFilters = {
+        ...filters,
+        app_id: "",
+        appsflyerDataLength: 0,
+        appsflyerCampaignType: "",
+        conversionEvent: "",
+      };
+      setFilters(resetFilters);
+      if (typeof fetchAppsflyerData === "function") {
+        fetchAppsflyerData(resetFilters);
+      }
     } finally {
       setIsAppsFlyerLoading(false);
     }
