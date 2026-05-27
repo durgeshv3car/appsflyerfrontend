@@ -137,7 +137,15 @@ const CampaignDashboard = () => {
     appsflyerDataLength: 0, 
     app_id: "", // Added app_id
   });
-  const [isUpdating, setIsUpdating] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(true);
+
+  // Force show loader for 3 seconds on initial page load / refresh
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsUpdating(false);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleUpdate = () => {
     const filtersToSave = { ...filters };
@@ -162,7 +170,7 @@ const CampaignDashboard = () => {
   const [userRole, setUserRole] = useState("");
   const [campaignPermissions, setCampaignPermissions] = useState([]);
   const [allAudiences, setAllAudiences] = useState([]);
-  const [campaignPricing, setCampaignPricing] = useState({ cpm: {}, cpc: {} });
+  const [campaignPricing, setCampaignPricing] = useState({ cpm: {}, cpc: {}, impression: {} });
 
   useEffect(() => {
     const fetchAudiences = async () => {
@@ -190,7 +198,8 @@ const CampaignDashboard = () => {
       setCampaignPermissions(selectedAud?.permissions || []);
       setCampaignPricing({
         cpm: typeof selectedAud?.cpm === 'object' ? selectedAud.cpm : {},
-        cpc: typeof selectedAud?.cpc === 'object' ? selectedAud.cpc : {}
+        cpc: typeof selectedAud?.cpc === 'object' ? selectedAud.cpc : {},
+        impression: typeof selectedAud?.impression === 'object' ? selectedAud.impression : {}
       });
 
       // Sync reportName and fetch conversionEvent
@@ -208,7 +217,7 @@ const CampaignDashboard = () => {
       }
     } else {
       setCampaignPermissions([]);
-      setCampaignPricing({ cpm: {}, cpc: {} });
+      setCampaignPricing({ cpm: {}, cpc: {}, impression: {} });
     }
   }, [filters.audienceId, allAudiences]);
 

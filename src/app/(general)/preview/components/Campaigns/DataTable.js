@@ -116,7 +116,7 @@ const PerformanceTable = ({
     );
     // HIDE INSTALLS AND CONVERSION EVENT IF NO APPSFLYER DATA
     if (
-      appsflyerDataLength === 0 &&
+      (!appsflyerData || appsflyerData.length === 0) &&
       (col.name === "Installs" || col.name === "af_login (Unique users)")
     ) {
       return false;
@@ -140,7 +140,7 @@ const PerformanceTable = ({
 
           // HIDE INSTALLS AND AF LOGIN IF NO APPSFLYER DATA
           if (
-            appsflyerDataLength === 0 &&
+            (!appsflyerData || appsflyerData.length === 0) &&
             (c.name === "Installs" || c.name === "af_login (Unique users)")
           )
             return false;
@@ -269,7 +269,7 @@ const PerformanceTable = ({
 
       // Fallback to proxy if both are 0 but clicks exist, ONLY if AppsFlyer config exists
       const clicks = Number(row.Clicks || row.clicks || 0);
-      const hasAFConfig = appsflyerDataLength > 0;
+      const hasAFConfig = appsflyerData && appsflyerData.length > 0;
 
       if (hasAFConfig) {
         if (finalInstalls === 0 && clicks > 0) finalInstalls = clicks * 0.0989;
@@ -313,14 +313,14 @@ const PerformanceTable = ({
     sortedTableData?.slice(startIndex, startIndex + rowsPerPage) || [];
 
   const totals = React.useMemo(() => {
-    return mergedData?.reduce(
+    const totalAfClicks = (appsflyerData && appsflyerData.length > 0)
+      ? appsflyerData.reduce((sum, item) => sum + Number(item.clicks || 0), 0)
+      : 0;
+
+    const reduced = mergedData?.reduce(
       (acc, row) => {
         const imp = Number(row.Impressions || row.impressions || 0);
         const clicks = Number(row.Clicks || row.clicks || 0);
-        const afClicks = Number(row.afclicks || 0);
-
-      const finalClicks =
-        appsflyerDataLength > 0 ? clicks + afClicks : clicks;
         const reach = Number(
           row.Reach ||
           row.reach ||
@@ -381,7 +381,7 @@ const PerformanceTable = ({
 
         return {
           Impressions: acc.Impressions + imp,
-          Clicks: acc.Clicks + finalClicks,
+          Clicks: acc.Clicks + clicks,
           Spent: acc.Spent + spent,
           Reach: acc.Reach + reach,
           Views: (acc["Views"] || 0) + videoViews,
@@ -419,7 +419,13 @@ const PerformanceTable = ({
         "af_login (Unique users)": 0,
       },
     );
-  }, [mergedData, campaignPricing]);
+
+    if (!reduced) return { Impressions: 0, Clicks: 0, Reach: 0, Spent: 0 };
+    return {
+      ...reduced,
+      Clicks: reduced.Clicks + totalAfClicks,
+    };
+  }, [mergedData, campaignPricing, appsflyerDataLength, appsflyerData]);
 
   const formatValue = (col, value) => {
     if (value === undefined || value === null)
@@ -565,7 +571,7 @@ const PerformanceTable = ({
                     if (col === "Impressions") val = imp;
                     else if (col === "Clicks") {
                       const afClicks = Number(row.afclicks || 0); 
-                      val = appsflyerDataLength > 0 ? cks + afClicks : cks;
+                      val = (appsflyerData && appsflyerData.length > 0) ? cks + afClicks : cks;
                     }
                     else if (col === "Reach") val = rch;
                     else if (col === "First Quartile Views") val = videoFirstQ;
@@ -579,31 +585,35 @@ const PerformanceTable = ({
 
                     // Force consistent derived metrics
                     const rowDate = row.Date || row.date || "";
-                    if (col === "CTR") val = imp > 0 ? (cks / imp) * 100 : 0;
+                    const dateSpecificCPM = getPriceForDate(
+                      campaignPricing?.cpm,
+                      rowDate,
+                    );
+                    const dateSpecificCPC = getPriceForDate(
+                      campaignPricing?.cpc,
+                      rowDate,
+                    );
+
+                    let rowSpent = 0;
+                    if (dateSpecificCPM > 0) {
+                      rowSpent = (imp / 1000) * dateSpecificCPM;
+                    } else if (dateSpecificCPC > 0) {
+                      rowSpent = cks * dateSpecificCPC;
+                    } else {
+                      const rowCPM = Number(rawCPM || 0);
+                      const rowCPC = Number(rawCPC || 0);
+                      rowSpent = rowCPM > 0 ? (imp / 1000) * rowCPM : cks * rowCPC;
+                    }
+
+                    if (col === "CTR") {
+                      const afClicks = Number(row.afclicks || 0);
+                      const finalClicks = (appsflyerData && appsflyerData.length > 0) ? cks + afClicks : cks;
+                      val = imp > 0 ? (finalClicks / imp) * 100 : 0;
+                    }
                     if (col === "Spent") {
-                      const dateSpecificCPM = getPriceForDate(
-                        campaignPricing?.cpm,
-                        rowDate,
-                      );
-                      const dateSpecificCPC = getPriceForDate(
-                        campaignPricing?.cpc,
-                        rowDate,
-                      );
-                      if (dateSpecificCPM > 0) {
-                        val = (imp / 1000) * dateSpecificCPM;
-                      } else if (dateSpecificCPC > 0) {
-                        val = cks * dateSpecificCPC;
-                      } else {
-                        const rowCPM = Number(rawCPM || 0);
-                        const rowCPC = Number(rawCPC || 0);
-                        val = rowCPM > 0 ? (imp / 1000) * rowCPM : cks * rowCPC;
-                      }
+                      val = rowSpent;
                     }
                     if (col === "CPM") {
-                      const dateSpecificCPM = getPriceForDate(
-                        campaignPricing?.cpm,
-                        rowDate,
-                      );
                       if (dateSpecificCPM > 0) {
                         val = dateSpecificCPM;
                       } else {
@@ -612,15 +622,17 @@ const PerformanceTable = ({
                       }
                     }
                     if (col === "CPC") {
-                      const dateSpecificCPC = getPriceForDate(
-                        campaignPricing?.cpc,
-                        rowDate,
-                      );
-
-                      if (dateSpecificCPC > 0) {
-                        val = dateSpecificCPC;
+                      const hasAF = appsflyerData && appsflyerData.length > 0;
+                      if (hasAF) {
+                        const afClicks = Number(row.afclicks || 0);
+                        const finalClicks = cks + afClicks;
+                        val = finalClicks > 0 ? rowSpent / finalClicks : 0;
                       } else {
-                        val = Number(rawCPC || 0);
+                        if (dateSpecificCPC > 0) {
+                          val = dateSpecificCPC;
+                        } else {
+                          val = Number(rawCPC || 0);
+                        }
                       }
                     }
                     if (col === "Frequency") val = rch > 0 ? imp / rch : 0;

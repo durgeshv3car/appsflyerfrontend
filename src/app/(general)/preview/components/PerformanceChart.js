@@ -173,7 +173,9 @@ const TrendChart = ({
     const ctr = tableData.map((row) => {
       const imp = Number(row.Impressions || row.impressions || 0);
       const cks = Number(row.Clicks || row.clicks || 0);
-      return imp > 0 ? (cks / imp) * 100 : 0;
+      const afClicks = Number(row.afclicks || 0);
+      const finalClicks = appsflyerDataLength > 0 ? cks + afClicks : cks;
+      return imp > 0 ? (finalClicks / imp) * 100 : 0;
     });
     const cost = tableData.map((row) => {
       const rowDate = row.Date || row.date || "";

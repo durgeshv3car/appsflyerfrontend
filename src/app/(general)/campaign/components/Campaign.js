@@ -51,6 +51,7 @@ const emptyCampaign = {
   insertionOrderId: "",
   cpm: {},
   cpc: {},
+  impression: {},
   currency: "",
   campaignType: "CTV", // New field added
   source: "DV360", // Default source
@@ -178,6 +179,8 @@ const Campaign = () => {
   const [newCpmValue, setNewCpmValue] = useState("");
   const [newCpcDate, setNewCpcDate] = useState("");
   const [newCpcValue, setNewCpcValue] = useState("");
+  const [newImpressionDate, setNewImpressionDate] = useState("");
+  const [newImpressionValue, setNewImpressionValue] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   // AppsFlyer State
@@ -224,9 +227,11 @@ const Campaign = () => {
       ...emptyCampaign,
       cpm: { [startDateStr]: 0 },
       cpc: { [startDateStr]: 0 },
+      impression: { [startDateStr]: 0 },
     });
     setNewCpmDate(startDateStr);
     setNewCpcDate(startDateStr);
+    setNewImpressionDate(startDateStr);
     setEditingIndex(null);
     setModalOpen(true);
   };
@@ -237,7 +242,9 @@ const Campaign = () => {
       ...campaign,
       cpm: typeof campaign.cpm === "object" ? campaign.cpm : {},
       cpc: typeof campaign.cpc === "object" ? campaign.cpc : {},
+      impression: typeof campaign.impression === "object" ? campaign.impression : {},
     });
+    setNewImpressionDate(startDateStr);
     setEditingIndex(index);
     setModalOpen(true);
   };
@@ -289,6 +296,24 @@ const Campaign = () => {
     });
   };
 
+  const handleAddImpressionEntry = () => {
+    if (!newImpressionValue) return;
+    const dateToUse = newImpressionDate || startDateStr;
+    setCampaignData((prev) => ({
+      ...prev,
+      impression: { ...prev.impression, [dateToUse]: Number(newImpressionValue) },
+    }));
+    setNewImpressionValue("");
+  };
+
+  const handleRemoveImpressionEntry = (date) => {
+    setCampaignData((prev) => {
+      const newImpression = { ...prev.impression };
+      delete newImpression[date];
+      return { ...prev, impression: newImpression };
+    });
+  };
+
   const handleSearchChange = (e) => {
     setSearch(e.target.value);
   };
@@ -329,11 +354,12 @@ const Campaign = () => {
       campaignData?.advertiserId?.trim() &&
       campaignData?.campaignType?.trim() &&
       (Object.keys(campaignData?.cpm || {}).length > 0 ||
-        Object.keys(campaignData?.cpc || {}).length > 0);
+        Object.keys(campaignData?.cpc || {}).length > 0 ||
+        Object.keys(campaignData?.impression || {}).length > 0);
 
     if (!isValid) {
       toast.warning(
-        "Please fill all required fields and add at least one CPM or CPC entry",
+        "Please fill all required fields and add at least one CPM, CPC, or Impression entry",
       );
       return;
     }
@@ -494,6 +520,7 @@ const Campaign = () => {
       campaignId,
       cpm,
       cpc,
+      impression,
       currency,
       campaignType,
     } = selectedPermissionCampaign;
@@ -504,6 +531,7 @@ const Campaign = () => {
       campaignId,
       cpm,
       cpc,
+      impression,
       currency,
       campaignType,
       ...updatedData,
@@ -741,6 +769,7 @@ const Campaign = () => {
                     <th>Insertion Order ID</th>
                     <th>CPM</th>
                     <th>CPC</th>
+                    <th>Impression</th>
                     <th>Currency</th>
                     <th>Campaign Type</th>
                     <th>Cron Status</th>
@@ -800,6 +829,15 @@ const Campaign = () => {
                             </span>
                           ) : (
                             c.cpc || "-"
+                          )}
+                        </td>
+                        <td className="align-middle">
+                          {typeof c.impression === "object" ? (
+                            <span className="badge bg-light text-dark border">
+                              {Object.keys(c.impression).length} dates
+                            </span>
+                          ) : (
+                            c.impression || "-"
                           )}
                         </td>
                         <td className="align-middle">{c.currency || "-"}</td>
@@ -1250,6 +1288,77 @@ const Campaign = () => {
                         </div>
 
                         <div className="row mb-3">
+                          <div className="col-4">
+                            <label className="fw-semibold mb-0">
+                              Date-wise Impression
+                            </label>
+                          </div>
+                          <div className="col-8">
+                            <div className="d-flex gap-2 mb-2">
+                              <input
+                                type="date"
+                                className="form-control form-control-sm"
+                                value={newImpressionDate}
+                                onChange={(e) => setNewImpressionDate(e.target.value)}
+                              />
+                              <input
+                                type="number"
+                                className="form-control form-control-sm"
+                                placeholder="Value"
+                                value={newImpressionValue}
+                                onChange={(e) => setNewImpressionValue(e.target.value)}
+                                onKeyDown={(e) =>
+                                  e.key === "Enter" &&
+                                  (e.preventDefault(), handleAddImpressionEntry())
+                                }
+                              />
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={handleAddImpressionEntry}
+                              >
+                                Add
+                              </button>
+                            </div>
+                            <div
+                              className="border rounded p-2 bg-light"
+                              style={{ maxHeight: "150px", overflowY: "auto" }}
+                            >
+                              {Object.keys(campaignData?.impression || {}).length ===
+                              0 ? (
+                                <small className="text-muted">
+                                  No Impression entries added.
+                                </small>
+                              ) : (
+                                Object.entries(campaignData.impression)
+                                  .sort()
+                                  .map(([date, val]) => (
+                                    <div
+                                      key={date}
+                                      className="d-flex justify-content-between align-items-center mb-1 pb-1 border-bottom"
+                                    >
+                                      <small className="fw-medium">
+                                        {date === startDateStr
+                                          ? `Base Rate: ${val}`
+                                          : `${date}: ${val}`}
+                                      </small>
+                                      <button
+                                        type="button"
+                                        className="btn btn-link btn-sm p-0 text-danger"
+                                        onClick={() =>
+                                          handleRemoveImpressionEntry(date)
+                                        }
+                                      >
+                                        Remove
+                                      </button>
+                                    </div>
+                                  ))
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="row mb-3">
                           <div className="col-4 d-flex align-items-center">
                             <label className="fw-semibold mb-0">Currency</label>
                           </div>
@@ -1337,7 +1446,8 @@ const Campaign = () => {
                               campaignData?.advertiserId?.trim() &&
                               campaignData?.campaignType?.trim() &&
                               (Object.keys(campaignData?.cpm || {}).length > 0 ||
-                                Object.keys(campaignData?.cpc || {}).length > 0) &&
+                                Object.keys(campaignData?.cpc || {}).length > 0 ||
+                                Object.keys(campaignData?.impression || {}).length > 0) &&
                               (campaignData.source === "Eskimi" ||
                                 (campaignData.campaignId?.trim() &&
                                   campaignData.insertionOrderId?.trim()))
