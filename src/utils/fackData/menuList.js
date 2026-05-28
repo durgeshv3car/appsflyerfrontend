@@ -27,12 +27,6 @@ export const menuList = [
         icon: 'feather-layout',        
     },
     
-       {
-        id: 5,
-        name: "Create Account",
-        path: `/authentication/register/creative`,
-        icon: 'feather-send',        
-    },
      
 
 ]

@@ -128,11 +128,11 @@ const LoginForm = ({ registerPath, resetPath }) => {
           </button>
         </div>
         
-        <div className="mt-4 text-center">
+        {/* <div className="mt-4 text-center">
             <p className="text-muted" style={{ fontSize: '14px' }}>
                 Don't have an account? <Link href={registerPath} className="text-primary fw-bold">Sign up</Link>
             </p>
-        </div>
+        </div> */}
       </form>
 
     </>

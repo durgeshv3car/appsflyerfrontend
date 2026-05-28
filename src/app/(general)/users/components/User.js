@@ -129,7 +129,15 @@ function UserPage() {
   return (
     <div className="container-fluid py-4">
       <ToastContainer />
-      <h2 className="mb-4">Users</h2>
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h2 className="mb-0">Users</h2>
+        <button
+          className="btn btn-primary"
+          onClick={() => router.push("/authentication/register/creative")}
+        >
+          <User size={16} /> Create User
+        </button>
+      </div>
       <div className="table-responsive">
         <table className="table table-hover align-middle shadow-sm rounded">
           <thead className="table-primary">
