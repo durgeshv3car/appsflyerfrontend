@@ -238,6 +238,42 @@ const BrowserTable = ({
         largest.TotalConversions += diffConv;
         largest.Installs += diffInst;
       }
+
+      // If total conversion is less than 1000, show value 0 and adjust to other which have value greater than 1000
+      if (targetConversions >= 1000) {
+        let offset = 0;
+        result.forEach(g => {
+          if (g.TotalConversions < 1000) {
+            offset += g.TotalConversions;
+            g.TotalConversions = 0;
+          }
+        });
+
+        if (offset > 0) {
+          const qualifying = result.filter(g => g.TotalConversions >= 1000);
+          if (qualifying.length > 0) {
+            const qualifyingSum = qualifying.reduce((sum, g) => sum + g.TotalConversions, 0);
+            let adjustedOffset = 0;
+            qualifying.forEach((g, idx) => {
+              let additional = 0;
+              if (idx === qualifying.length - 1) {
+                additional = offset - adjustedOffset;
+              } else {
+                additional = Math.round(offset * (g.TotalConversions / qualifyingSum));
+                adjustedOffset += additional;
+              }
+              g.TotalConversions += additional;
+            });
+          } else {
+            const largest = result.reduce((prev, current) => (prev.Clicks > current.Clicks) ? prev : current);
+            largest.TotalConversions = targetConversions;
+          }
+        }
+      } else {
+        result.forEach(g => {
+          g.TotalConversions = 0;
+        });
+      }
     }
 
     // Distribute AppsFlyer clicks if appsflyerDataLength > 0

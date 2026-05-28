@@ -287,54 +287,49 @@ const ItemTable = ({
                     Your browser does not support the video tag.
                   </video>
                 )}
-                {(previewMedia.type === "ctv" ||
-                  previewMedia.type === "rich-media") && (
-                  <div className="w-100 bg-white d-flex flex-column">
-                    <div
-                      className="d-flex justify-content-between align-items-center p-2 border-bottom"
-                      style={{ backgroundColor: "#f8fafc" }}
-                    >
-                      <span className="small text-muted fw-bold ps-2">
-                        {previewMedia.type === "ctv" ? "CTV" : "Rich Media"}{" "}
-                        Preview
-                      </span>
-                      <a
-                        href={getSafeIframeUrl(previewMedia.url)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn btn-sm btn-primary py-1 px-2 d-flex align-items-center"
-                        style={{
-                          fontSize: "0.75rem",
-                          backgroundColor: "#6b46c1",
-                          border: "none",
-                        }}
-                      >
-                        <ExternalLink size={12} className="me-1" /> Open in New
-                        Tab
-                      </a>
-                    </div>
-                    {previewMedia.url?.includes("<iframe") ? (
-                      // Case 1: Full HTML embed string
-                      <div
-                        className="video-container"
-                        style={{ width: "100%", height: "400px" }}
-                        dangerouslySetInnerHTML={{ __html: previewMedia.url }}
-                      />
-                    ) : (
-                      // Case 2: Plain URL
-                      <iframe
-                        src={getSafeIframeUrl(previewMedia.url)}
-                        title="Preview Content"
-                        width="100%"
-                        height="400px"
-                        style={{ border: "none" }}
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                        sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-presentation allow-forms"
-                        allowFullScreen
-                      />
-                    )}
-                  </div>
-                )}
+  {(previewMedia.type === "ctv" ||
+  previewMedia.type === "rich-media") && (
+  <div
+    className="w-100 bg-white border rounded-3 p-4 d-flex flex-column align-items-center justify-content-center"
+    style={{
+      minHeight: "260px",
+      boxShadow: "0 2px 10px rgba(0,0,0,0.05)",
+    }}
+  >
+    <div
+      className="d-flex align-items-center justify-content-center rounded-circle mb-3"
+      style={{
+        width: "70px",
+        height: "70px",
+        background: "#f3f0ff",
+      }}
+    >
+      <ExternalLink size={30} color="#6b46c1" />
+    </div>
+
+    <h5 className="fw-bold mb-2 text-center">
+      {previewMedia.type === "ctv" ? "CTV" : "Rich Media"} Preview
+    </h5>
+
+
+    <a
+      href={getSafeIframeUrl(previewMedia.url)}
+      target="_blank"
+      rel="noreferrer"
+      className="btn px-4 py-2 d-flex align-items-center"
+      style={{
+        backgroundColor: "#6b46c1",
+        color: "#fff",
+        borderRadius: "10px",
+        fontWeight: 600,
+        textDecoration: "none",
+      }}
+    >
+      <ExternalLink size={16} className="me-2" />
+      Open Preview
+    </a>
+  </div>
+)}
                 {previewMedia.type === "audio" && (
                   <div
                     className="w-100 p-5 d-flex flex-column align-items-center justify-content-center"

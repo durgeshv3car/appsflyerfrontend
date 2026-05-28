@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { Modal, Button, Form } from "react-bootstrap";
-import { FiChevronLeft, FiChevronRight, FiChevronDown, FiPlus, FiEye } from "react-icons/fi";
+import { FiChevronLeft, FiChevronRight, FiChevronDown, FiPlus, FiEye, FiExternalLink } from "react-icons/fi";
 import { useSession } from "next-auth/react";
 import { useEffect } from "react";
 import { filterMetadataRows } from "@/utils/filterMetadata";
@@ -46,6 +46,15 @@ const getPriceForDate = (pricingObj, targetDate) => {
   return latestValue;
 };
 
+const getSafeIframeUrl = (url) => {
+  if (!url) return "";
+  if (url.includes("<iframe") && url.includes("src=")) {
+    const match = url.match(/src=["'](.*?)["']/);
+    return match ? match[1] : url;
+  }
+  return url;
+};
+
 const CreativePerformanceTable = ({ 
   CreativeTableData = [], 
   currencySymbol = "$", 
@@ -65,14 +74,11 @@ const CreativePerformanceTable = ({
 
   useEffect(() => {
     const fetchDbCreatives = async () => {
-      if (!audienceId || audienceId === "all") {
-        setDbCreatives([]);
-        return;
-      }
       try {
         const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-        // Fetch up to 100 creatives associated with the selected audienceId
-        const response = await fetch(`${API_BASE_URL}/creatives?limit=100&audienceId=${audienceId}`);
+        const audienceQuery = audienceId && audienceId !== "all" ? `&audienceId=${audienceId}` : "";
+        // Fetch creatives
+        const response = await fetch(`${API_BASE_URL}/creatives?limit=500${audienceQuery}`);
         if (response.ok) {
           const result = await response.json();
           if (result.data) {
@@ -80,7 +86,7 @@ const CreativePerformanceTable = ({
           }
         }
       } catch (err) {
-        console.error("Failed to fetch database creatives for audience:", err);
+        console.error("Failed to fetch database creatives:", err);
       }
     };
     fetchDbCreatives();
@@ -267,6 +273,42 @@ const CreativePerformanceTable = ({
         largest.TotalConversions += diffConv;
         largest.Installs += diffInst;
       }
+
+      // If total conversion is less than 1000, show value 0 and adjust to other which have value greater than 1000
+      if (targetConversions >= 1000) {
+        let offset = 0;
+        result.forEach(g => {
+          if (g.TotalConversions < 1000) {
+            offset += g.TotalConversions;
+            g.TotalConversions = 0;
+          }
+        });
+
+        if (offset > 0) {
+          const qualifying = result.filter(g => g.TotalConversions >= 1000);
+          if (qualifying.length > 0) {
+            const qualifyingSum = qualifying.reduce((sum, g) => sum + g.TotalConversions, 0);
+            let adjustedOffset = 0;
+            qualifying.forEach((g, idx) => {
+              let additional = 0;
+              if (idx === qualifying.length - 1) {
+                additional = offset - adjustedOffset;
+              } else {
+                additional = Math.round(offset * (g.TotalConversions / qualifyingSum));
+                adjustedOffset += additional;
+              }
+              g.TotalConversions += additional;
+            });
+          } else {
+            const largest = result.reduce((prev, current) => (prev.Clicks > current.Clicks) ? prev : current);
+            largest.TotalConversions = targetConversions;
+          }
+        }
+      } else {
+        result.forEach(g => {
+          g.TotalConversions = 0;
+        });
+      }
     }
 
     // Distribute AppsFlyer clicks if appsflyerDataLength > 0
@@ -432,7 +474,12 @@ const CreativePerformanceTable = ({
                     else val = row[col] || 0;
 
                     const matchedCreative = col === "Title" 
-                      ? dbCreatives.find(c => c.creativeName && c.creativeName.trim() === String(val).trim())
+                      ? dbCreatives.find(c => {
+                          if (!c.creativeName) return false;
+                          const normC = c.creativeName.toLowerCase().replace(/[^a-z0-9]/g, "");
+                          const normVal = String(val).toLowerCase().replace(/[^a-z0-9]/g, "");
+                          return normC === normVal || normC.includes(normVal) || normVal.includes(normC);
+                        })
                       : null;
 
                     if (col === "Title" && matchedCreative) {
@@ -622,7 +669,7 @@ const CreativePerformanceTable = ({
               const url = selectedCreativeForModal.fileUrl;
               const type = selectedCreativeForModal.type || "";
               
-              if (type === "video" || type === "ctv") {
+              if (type === "video") {
                 return (
                   <video 
                     src={url} 
@@ -637,9 +684,51 @@ const CreativePerformanceTable = ({
                     <audio src={url} controls className="w-100" />
                   </div>
                 );
+              } else if (type === "ctv" || type === "rich-media") {
+                return (
+                  <div
+                    className="w-100 bg-white border rounded-3 p-4 d-flex flex-column align-items-center justify-content-center"
+                    style={{
+                      minHeight: "260px",
+                      boxShadow: "0 2px 10px rgba(0,0,0,0.05)",
+                    }}
+                  >
+                    <div
+                      className="d-flex align-items-center justify-content-center rounded-circle mb-3"
+                      style={{
+                        width: "70px",
+                        height: "70px",
+                        background: "#f3f0ff",
+                      }}
+                    >
+                      <FiExternalLink size={30} color="#6b46c1" />
+                    </div>
+
+                    <h5 className="fw-bold mb-2 text-center">
+                      {type === "ctv" ? "CTV" : "Rich Media"} Preview
+                    </h5>
+
+                    <a
+                      href={getSafeIframeUrl(url)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn px-4 py-2 d-flex align-items-center"
+                      style={{
+                        backgroundColor: "#6b46c1",
+                        color: "#fff",
+                        borderRadius: "10px",
+                        fontWeight: 600,
+                        textDecoration: "none",
+                      }}
+                    >
+                      <FiExternalLink size={16} className="me-2" />
+                      Open Preview
+                    </a>
+                  </div>
+                );
               } else {
                 const isImg = /\.(jpg|jpeg|png|webp|avif|gif|svg)$/i.test(url);
-                if (isImg && type !== "rich-media") {
+                if (isImg) {
                   return (
                     <img 
                       src={url} 
@@ -650,11 +739,45 @@ const CreativePerformanceTable = ({
                   );
                 } else {
                   return (
-                    <iframe 
-                      src={url} 
-                      title={selectedCreativeForModal?.creativeName}
-                      style={{ width: "100%", height: "500px", border: "none", borderRadius: "8px" }}
-                    />
+                    <div
+                      className="w-100 bg-white border rounded-3 p-4 d-flex flex-column align-items-center justify-content-center"
+                      style={{
+                        minHeight: "260px",
+                        boxShadow: "0 2px 10px rgba(0,0,0,0.05)",
+                      }}
+                    >
+                      <div
+                        className="d-flex align-items-center justify-content-center rounded-circle mb-3"
+                        style={{
+                          width: "70px",
+                          height: "70px",
+                          background: "#f3f0ff",
+                        }}
+                      >
+                        <FiExternalLink size={30} color="#6b46c1" />
+                      </div>
+
+                      <h5 className="fw-bold mb-2 text-center">
+                        Creative Preview
+                      </h5>
+
+                      <a
+                        href={getSafeIframeUrl(url)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn px-4 py-2 d-flex align-items-center"
+                        style={{
+                          backgroundColor: "#6b46c1",
+                          color: "#fff",
+                          borderRadius: "10px",
+                          fontWeight: 600,
+                          textDecoration: "none",
+                        }}
+                      >
+                        <FiExternalLink size={16} className="me-2" />
+                        Open Preview
+                      </a>
+                    </div>
                   );
                 }
               }
