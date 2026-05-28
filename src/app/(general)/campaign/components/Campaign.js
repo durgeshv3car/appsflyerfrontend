@@ -762,8 +762,8 @@ const Campaign = () => {
               <table className="table table-hover table-striped table-sm">
                 <thead>
                   <tr>
-                    <th>Report Name</th>
-                    <th>Source</th>
+                    <th className="sticky-col-1">Report Name</th>
+                    <th className="sticky-col-2">Source</th>
                     <th>Advertiser ID</th>
                     <th>Campaign ID</th>
                     <th>Insertion Order ID</th>
@@ -773,7 +773,7 @@ const Campaign = () => {
                     <th>Currency</th>
                     <th>Campaign Type</th>
                     <th>Cron Status</th>
-                    <th className="text-end">Actions</th>
+                    <th className="text-end sticky-col-actions">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -800,8 +800,8 @@ const Campaign = () => {
                   {!loading &&
                     campaigns.map((c, idx) => (
                       <tr key={c._id || idx}>
-                        <td className="align-middle">{c.reportName}</td>
-                        <td className="align-middle">
+                        <td className="align-middle sticky-col-1">{c.reportName}</td>
+                        <td className="align-middle sticky-col-2">
                           <span
                             className={`badge ${c.source === "Eskimi" ? "bg-info" : "bg-primary"}`}
                           >
@@ -866,7 +866,7 @@ const Campaign = () => {
                             </span>
                           </div>
                         </td>
-                        <td className="text-end align-middle">
+                        <td className="text-end align-middle sticky-col-actions">
                           {/* action buttons as a single row with gap and inline SVG icons */}
 
                           <div
@@ -1863,6 +1863,74 @@ const Campaign = () => {
           </div>
         </div>
       )}
+      <style>{`
+        /* Sticky columns styles */
+        .sticky-col-1 {
+          position: sticky !important;
+          left: 0 !important;
+          z-index: 2 !important;
+          background-color: #fff !important;
+          box-shadow: 2px 0 5px -2px rgba(0,0,0,0.15) !important;
+          min-width: 180px !important;
+          max-width: 180px !important;
+          width: 180px !important;
+        }
+
+        .sticky-col-2 {
+          position: sticky !important;
+          left: 180px !important;
+          z-index: 2 !important;
+          background-color: #fff !important;
+          box-shadow: 2px 0 5px -2px rgba(0,0,0,0.15) !important;
+          min-width: 100px !important;
+          max-width: 100px !important;
+          width: 100px !important;
+        }
+
+        .sticky-col-actions {
+          position: sticky !important;
+          right: 0 !important;
+          z-index: 2 !important;
+          background-color: #fff !important;
+          box-shadow: -2px 0 5px -2px rgba(0,0,0,0.15) !important;
+          min-width: 380px !important;
+          max-width: 380px !important;
+          width: 380px !important;
+        }
+
+        /* Header sticky cells should have higher z-index */
+        th.sticky-col-1 {
+          z-index: 3 !important;
+          background-color: #f8f9fa !important;
+        }
+        th.sticky-col-2 {
+          z-index: 3 !important;
+          background-color: #f8f9fa !important;
+        }
+        th.sticky-col-actions {
+          z-index: 3 !important;
+          background-color: #f8f9fa !important;
+        }
+
+        /* Striping and Hover for sticky columns */
+        .table-striped tbody tr:nth-of-type(odd) .sticky-col-1,
+        .table-striped tbody tr:nth-of-type(odd) .sticky-col-2,
+        .table-striped tbody tr:nth-of-type(odd) .sticky-col-actions {
+          background-color: #f8f9fa !important;
+        }
+
+        .table-striped tbody tr:nth-of-type(even) .sticky-col-1,
+        .table-striped tbody tr:nth-of-type(even) .sticky-col-2,
+        .table-striped tbody tr:nth-of-type(even) .sticky-col-actions {
+          background-color: #fff !important;
+        }
+
+        .table-hover tbody tr:hover .sticky-col-1,
+        .table-hover tbody tr:hover .sticky-col-2,
+        .table-hover tbody tr:hover .sticky-col-actions {
+          background-color: #ececec !important;
+        }
+      `}</style>
     </>
   );
 };
