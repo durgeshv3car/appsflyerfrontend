@@ -257,12 +257,8 @@ const ReportsFilter = ({
       
       if (res.success && res.data && res.data.length > 0) {
         const item = res.data[0];
-        const start = item.from ? new Date(item.from) : null;
-        const end = item.to ? new Date(item.to) : null;
         
-        let dateChanged = false;
-        
-        // Construct the updated filters synchronously
+        // Construct the updated filters synchronously (preserving the currently selected/persisted dateRange)
         const updatedFilters = {
           ...filters,
           app_id: item.app_id || "",
@@ -271,42 +267,12 @@ const ReportsFilter = ({
           conversionEvent: item.conversionEvent || "",
         };
 
-        if (start && end) {
-          const newStartDate = formatDateToYMD(start);
-          const newEndDate = formatDateToYMD(end);
-          
-          if (newStartDate !== filters.dateRange.startDate || newEndDate !== filters.dateRange.endDate) {
-            dateChanged = true;
-            setRange([{ startDate: start, endDate: end, key: "selection" }]);
-            updatedFilters.dateRange = {
-              startDate: newStartDate,
-              endDate: newEndDate,
-            };
-          }
-        }
-
         // Synchronously update the React filters state
         setFilters(updatedFilters);
 
-        // Fetch AppsFlyer data and reports data with exact updated values
+        // Fetch AppsFlyer data with exact updated values
         if (typeof fetchAppsflyerData === "function") {
           fetchAppsflyerData(updatedFilters);
-        }
-
-        if (dateChanged) {
-          fetchCampaignData(updatedFilters);
-          fetchCreativeTableData(updatedFilters);
-          fetchAgeData(updatedFilters);
-          fetchGenderData(updatedFilters);
-          fetchTotalData(updatedFilters);
-          fetchOsData(updatedFilters);
-          fetchBrowserData(updatedFilters);
-          fetchOperatorData(updatedFilters);
-          fetchPlacementPosData(updatedFilters);
-          fetchPlacementTypeData(updatedFilters);
-          fetchDeviceData(updatedFilters);
-          fetchCityData(updatedFilters);
-          if (typeof fetchUrlData === "function") fetchUrlData(updatedFilters);
         }
       } else {
         const resetFilters = {
