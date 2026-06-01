@@ -772,7 +772,7 @@ const ReportsFilter = ({
                 {isPdfLoading ? <span className="spinner-border spinner-border-sm"></span> : <FiFileText size={14} />}
                 <span>EXPORT PDF</span>
               </button>
-              {/* <button 
+              <button 
                 className="btn btn-outline-primary d-flex align-items-center gap-2 px-3" 
                 onClick={() => handleExportData('excel')} 
                 disabled={isExcelLoading}
@@ -780,7 +780,7 @@ const ReportsFilter = ({
               >
                 {isExcelLoading ? <span className="spinner-border spinner-border-sm"></span> : <FiDownload size={14} />}
                 <span>EXPORT EXCEL</span>
-              </button> */}
+              </button>
             </div>
           </div>
 

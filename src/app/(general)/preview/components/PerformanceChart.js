@@ -456,9 +456,9 @@ export const PerformanceDashboard = ({
         tableData?.map((row) => {
           const conv = Number(
             row.TotalConversions ||
-              row.totalConversions ||
-              row.total_conversions ||
-              0,
+            row.totalConversions ||
+            row.total_conversions ||
+            0,
           );
           return {
             ...row,
@@ -613,10 +613,10 @@ export const PerformanceDashboard = ({
       total.Clicks += rowClicks;
       total.Reach += Number(
         row.Reach ||
-          row.reach ||
-          row.total_reach ||
-          row.uniqueReachImpressionReach ||
-          0,
+        row.reach ||
+        row.total_reach ||
+        row.uniqueReachImpressionReach ||
+        0,
       );
       total.Spent += rowSpent;
       total.SumCPM += rowCPM * rowImp;
@@ -624,9 +624,9 @@ export const PerformanceDashboard = ({
       total.Views += Number(row.Views || row.views || row.VideoViews || 0);
       total.CompleteViews += Number(
         row.completeViewsVideo ||
-          row.CompleteViewsVideo ||
-          row["Complete Views"] ||
-          0,
+        row.CompleteViewsVideo ||
+        row["Complete Views"] ||
+        0,
       );
       total.Installs += Number(row.Installs || 0);
       total.Conversions += Number(row.TotalConversions || 0);
@@ -649,7 +649,17 @@ export const PerformanceDashboard = ({
     const isCpcCampaign =
       (anyCpcRate !== undefined && Number(anyCpcRate) > 0) || hasBackendCPC;
 
-    const safeDiv = (a, b) => (b ? ((a / b) * 100).toFixed(2) : "0.00");
+    const safeDiv = (a, b) => {
+      if (!b) return "0.00";
+
+      const value = (a / b) * 100;
+
+      if (value >= 0.01) {
+        return value.toFixed(2);
+      }
+
+      return value.toFixed(6).replace(/\.?0+$/, "");
+    };
     return {
       total,
       CTR: safeDiv(total.Clicks, total.Imp),
