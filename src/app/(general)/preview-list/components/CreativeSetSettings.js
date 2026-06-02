@@ -12,44 +12,116 @@ const creativeFormats = [
 
 
 
+const getCreativeNameFromFile = (fileName) => {
+  const baseName = fileName.substring(0, fileName.lastIndexOf('.')) || fileName;
+  const cleanName = baseName.replace(/[_-]+/g, " ");
+  return cleanName
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+};
+
 const CreativeSetSettings = ({ onCancel, onSave, audiences = [], defaultAudienceId = "" }) => {
   const [title, setTitle] = useState("");
   const [selectedFormat, setSelectedFormat] = useState("banner");
   const [audienceId, setAudienceId] = useState(defaultAudienceId || "");
   const [file, setFile] = useState(null);
+  const [files, setFiles] = useState([]);
+  const [isMultiple, setIsMultiple] = useState(false);
   const [fileUrl, setFileUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSave = async () => {
     setIsLoading(true);
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL 
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
     try {
-      const formData = new FormData();
-      formData.append("creativeName", title);
-      formData.append("type", selectedFormat);
-      
-      if (selectedFormat === "rich-media") {
-        if (fileUrl) formData.append("fileUrl", fileUrl);
+      if (selectedFormat === "banner" && isMultiple) {
+        const successes = [];
+        const failures = [];
+        
+        for (const f of files) {
+          const derivedTitle = getCreativeNameFromFile(f.name);
+          const formData = new FormData();
+          formData.append("creativeName", derivedTitle);
+          formData.append("type", "banner");
+          formData.append("file", f);
+          if (audienceId) {
+            formData.append("audienceId", audienceId);
+          }
+          
+          try {
+            const response = await fetch(`${apiBaseUrl}/upload`, {
+              method: "POST",
+              body: formData,
+            });
+            
+            if (response.ok) {
+              const data = await response.json().catch(() => ({}));
+              successes.push({ title: derivedTitle, selectedFormat: "banner", file: f, audienceId, responseData: data });
+            } else {
+              let errText = "Unknown error";
+              try {
+                const errJSON = await response.json();
+                errText = errJSON.error || errJSON.message || JSON.stringify(errJSON);
+              } catch {
+                errText = await response.text();
+              }
+              failures.push({ name: f.name, reason: errText });
+            }
+          } catch (err) {
+            failures.push({ name: f.name, reason: err.message || "Network error" });
+          }
+        }
+        
+        if (failures.length > 0) {
+          const successMsg = successes.length > 0 ? `Successfully uploaded ${successes.length} banners.\n` : "";
+          const failureMsg = `Failed to upload ${failures.length} banners:\n` + 
+            failures.map(fail => `- ${fail.name}: ${fail.reason}`).join("\n");
+          alert(`${successMsg}${failureMsg}`);
+        }
+        
+        if (successes.length > 0) {
+          onSave(successes);
+        }
       } else {
-        if (file) formData.append("file", file);
-      }
+        const formData = new FormData();
+        formData.append("creativeName", title);
+        formData.append("type", selectedFormat);
+        
+        if (selectedFormat === "rich-media") {
+          if (fileUrl) formData.append("fileUrl", fileUrl);
+        } else {
+          if (file) formData.append("file", file);
+        }
 
-      if (audienceId) {
-        formData.append("audienceId", audienceId);
-      }
+        if (audienceId) {
+          formData.append("audienceId", audienceId);
+        }
 
-      const response = await fetch(`${apiBaseUrl}/upload`, {
-        method: "POST",
-        body: formData,
-      });
+        const response = await fetch(`${apiBaseUrl}/upload`, {
+          method: "POST",
+          body: formData,
+        });
 
-      if (response.ok) {
-        const data = await response.json().catch(() => ({}));
-        onSave({ title, selectedFormat, file, fileUrl, audienceId, responseData: data });
-      } else {
-        const errText = await response.text().catch(() => "Unknown error");
-        console.error("Upload failed:", errText);
-        alert("Upload failed. Please try again.");
+        if (response.ok) {
+          const data = await response.json().catch(() => ({}));
+          onSave({ title, selectedFormat, file, fileUrl, audienceId, responseData: data });
+        } else {
+          let errText = "Unknown error";
+          try {
+            const errJSON = await response.json();
+            errText = errJSON.error || errJSON.message || JSON.stringify(errJSON);
+          } catch {
+            errText = await response.text();
+          }
+          console.error("Upload failed:", errText);
+          
+          if (errText.includes("duplicate") || errText.includes("E11000")) {
+            alert("A conflicting creative format or title already exists in the backend. Please try a different name.");
+          } else {
+            alert(`Upload failed: ${errText}`);
+          }
+        }
       }
     } catch (error) {
       console.error("Error uploading file:", error);
@@ -63,12 +135,25 @@ const CreativeSetSettings = ({ onCancel, onSave, audiences = [], defaultAudience
     setSelectedFormat(formatId);
     setFile(null);
     setFileUrl("");
+    setIsMultiple(false);
+    setFiles([]);
   };
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
     }
+  };
+
+  const handleMultipleFilesChange = (e) => {
+    if (e.target.files) {
+      const selectedFiles = Array.from(e.target.files);
+      setFiles((prev) => [...prev, ...selectedFiles]);
+    }
+  };
+
+  const removeMultipleFile = (indexToRemove) => {
+    setFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
   };
 
   const removeFile = () => {
@@ -93,14 +178,16 @@ const CreativeSetSettings = ({ onCancel, onSave, audiences = [], defaultAudience
           <input
             type="text"
             className="form-control"
-            placeholder="Enter a creative set title"
-            value={title}
+            placeholder={isMultiple && selectedFormat === "banner" ? "Automatically derived from image names" : "Enter a creative set title"}
+            value={isMultiple && selectedFormat === "banner" ? "" : title}
+            disabled={isMultiple && selectedFormat === "banner"}
             onChange={(e) => setTitle(e.target.value)}
             style={{ 
               padding: "12px 16px", 
               borderColor: "#e2e8f0", 
               borderRadius: '8px',
-              fontSize: '0.95rem'
+              fontSize: '0.95rem',
+              backgroundColor: (isMultiple && selectedFormat === "banner") ? "#f8fafc" : "white"
             }}
           />
         </div>
@@ -184,70 +271,178 @@ const CreativeSetSettings = ({ onCancel, onSave, audiences = [], defaultAudience
                 {currentFormat?.label} Format
               </h6>
               
+              {selectedFormat === "banner" && (
+                <div className="mb-4">
+                  <label className="fw-semibold mb-2 text-dark" style={{ fontSize: "0.9rem" }}>Upload Mode</label>
+                  <div className="d-flex gap-3">
+                    <button
+                      type="button"
+                      className={`btn btn-sm px-4 py-2 fw-semibold rounded-3 transition-all ${
+                        !isMultiple
+                          ? "bg-primary text-white"
+                          : "btn-outline-secondary border-light-custom text-muted"
+                      }`}
+                      onClick={() => {
+                        setIsMultiple(false);
+                        setFiles([]);
+                        setFile(null);
+                      }}
+                      style={{
+                        fontSize: "0.85rem",
+                        border: !isMultiple ? "none" : "1px solid",
+                        backgroundColor: !isMultiple ? "#6b46c1" : "white",
+                        borderColor: !isMultiple ? "transparent" : "#e2e8f0"
+                      }}
+                    >
+                      Single Banner
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn btn-sm px-4 py-2 fw-semibold rounded-3 transition-all ${
+                        isMultiple
+                          ? "bg-primary text-white"
+                          : "btn-outline-secondary border-light-custom text-muted"
+                      }`}
+                      onClick={() => {
+                        setIsMultiple(true);
+                        setFiles([]);
+                        setFile(null);
+                      }}
+                      style={{
+                        fontSize: "0.85rem",
+                        border: isMultiple ? "none" : "1px solid",
+                        backgroundColor: isMultiple ? "#6b46c1" : "white",
+                        borderColor: isMultiple ? "transparent" : "#e2e8f0"
+                      }}
+                    >
+                      Multiple Banners (Select Many)
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {["banner", "video", "audio"].includes(selectedFormat) && (
                 <div className="mt-4">
-                  <label className="fw-semibold mb-2 text-dark" style={{ fontSize: "0.9rem" }}>Upload {currentFormat?.label} File</label>
-                  {!file ? (
-                    <input
-                      type="file"
-                      className="form-control"
-                      onChange={handleFileChange}
-                      accept={
-                        selectedFormat === "banner" ? "image/*" : 
-                        selectedFormat === "video" ? "video/*" : "audio/*"
-                      }
-                      style={{
-                        padding: "10px 14px",
-                        borderColor: "#e2e8f0",
-                        borderRadius: "8px",
-                      }}
-                    />
-                  ) : (
-                    <div className="d-flex flex-column gap-3 p-3 mt-2 rounded-3" style={{ border: "1px solid #e2e8f0", backgroundColor: "#f8fafc" }}>
-                      {/* Local File Preview */}
-                      <div className="d-flex justify-content-center bg-dark rounded-3 overflow-hidden" style={{ minHeight: '100px' }}>
-                        {selectedFormat === "banner" && (
-                          <img
-                            src={URL.createObjectURL(file)}
-                            alt="Uploaded Preview"
-                            className="img-fluid"
-                            style={{ maxHeight: '200px', objectFit: "contain" }}
-                          />
-                        )}
-                        {selectedFormat === "video" && (
-                          <video 
-                            src={URL.createObjectURL(file)} 
-                            controls 
-                            className="w-100" 
-                            style={{ maxHeight: '200px' }}
-                          />
-                        )}
-                        {selectedFormat === "audio" && (
-                          <div className="w-100 p-4 d-flex align-items-center justify-content-center">
-                            <audio 
-                              src={URL.createObjectURL(file)} 
-                              controls 
-                              className="w-100"
-                            />
-                          </div>
-                        )}
-                      </div>
+                  <label className="fw-semibold mb-2 text-dark" style={{ fontSize: "0.9rem" }}>
+                    Upload {currentFormat?.label} File{selectedFormat === "banner" && isMultiple ? "s" : ""}
+                  </label>
+                  
+                  {selectedFormat === "banner" && isMultiple ? (
+                    <div>
+                      <input
+                        type="file"
+                        className="form-control mb-3"
+                        onChange={handleMultipleFilesChange}
+                        accept="image/*"
+                        multiple
+                        style={{
+                          padding: "10px 14px",
+                          borderColor: "#e2e8f0",
+                          borderRadius: "8px",
+                        }}
+                      />
                       
-                      {/* File Details */}
-                      <div className="d-flex align-items-center justify-content-between">
-                        <div className="flex-grow-1 text-truncate">
-                          <span className="fw-medium d-block text-truncate" style={{ fontSize: "0.9rem" }}>{file.name}</span>
-                          <span className="text-muted small">{(file.size / 1024).toFixed(1)} KB</span>
+                      {files.length > 0 && (
+                        <div className="d-flex flex-column gap-2" style={{ maxHeight: "300px", overflowY: "auto", paddingRight: "5px" }}>
+                          {files.map((f, idx) => {
+                            const derivedName = getCreativeNameFromFile(f.name);
+                            return (
+                              <div key={idx} className="d-flex align-items-center justify-content-between p-2 rounded-3 border bg-light-custom" style={{ borderColor: "#e2e8f0", backgroundColor: "#f8fafc" }}>
+                                <div className="d-flex align-items-center gap-3 text-truncate">
+                                  <img
+                                    src={URL.createObjectURL(f)}
+                                    alt="Preview"
+                                    className="rounded-2"
+                                    style={{ width: "40px", height: "40px", objectFit: "cover", border: "1px solid #dee2e6" }}
+                                  />
+                                  <div className="text-truncate">
+                                    <span className="fw-semibold d-block text-truncate text-dark" style={{ fontSize: "0.85rem" }}>
+                                      {derivedName}
+                                    </span>
+                                    <span className="text-muted small" style={{ fontSize: "0.75rem" }}>
+                                      {f.name} ({ (f.size / 1024).toFixed(1) } KB)
+                                    </span>
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-outline-danger d-flex align-items-center justify-content-center border-0 rounded-circle"
+                                  onClick={() => removeMultipleFile(idx)}
+                                  style={{ width: "28px", height: "28px", padding: 0, backgroundColor: "#fee2e2", color: "#ef4444" }}
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            );
+                          })}
                         </div>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline-danger d-flex align-items-center gap-1 border-0"
-                          onClick={removeFile}
-                          style={{ padding: "6px 12px", backgroundColor: "#fee2e2", color: "#ef4444" }}
-                        >
-                          <X size={14} /> Remove
-                        </button>
-                      </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      {!file ? (
+                        <input
+                          type="file"
+                          className="form-control"
+                          onChange={handleFileChange}
+                          accept={
+                            selectedFormat === "banner" ? "image/*" : 
+                            selectedFormat === "video" ? "video/*" : "audio/*"
+                          }
+                          style={{
+                            padding: "10px 14px",
+                            borderColor: "#e2e8f0",
+                            borderRadius: "8px",
+                          }}
+                        />
+                      ) : (
+                        <div className="d-flex flex-column gap-3 p-3 mt-2 rounded-3" style={{ border: "1px solid #e2e8f0", backgroundColor: "#f8fafc" }}>
+                          {/* Local File Preview */}
+                          <div className="d-flex justify-content-center bg-dark rounded-3 overflow-hidden" style={{ minHeight: '100px' }}>
+                            {selectedFormat === "banner" && (
+                              <img
+                                src={URL.createObjectURL(file)}
+                                alt="Uploaded Preview"
+                                className="img-fluid"
+                                style={{ maxHeight: '200px', objectFit: "contain" }}
+                              />
+                            )}
+                            {selectedFormat === "video" && (
+                              <video 
+                                src={URL.createObjectURL(file)} 
+                                controls 
+                                className="w-100" 
+                                style={{ maxHeight: '200px' }}
+                              />
+                            )}
+                            {selectedFormat === "audio" && (
+                              <div className="w-100 p-4 d-flex align-items-center justify-content-center">
+                                <audio 
+                                  src={URL.createObjectURL(file)} 
+                                  controls 
+                                  className="w-100"
+                                />
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* File Details */}
+                          <div className="d-flex align-items-center justify-content-between">
+                            <div className="flex-grow-1 text-truncate">
+                              <span className="fw-medium d-block text-truncate" style={{ fontSize: "0.9rem" }}>{file.name}</span>
+                              <span className="text-muted small">{(file.size / 1024).toFixed(1)} KB</span>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-danger d-flex align-items-center gap-1 border-0"
+                              onClick={removeFile}
+                              style={{ padding: "6px 12px", backgroundColor: "#fee2e2", color: "#ef4444" }}
+                            >
+                              <X size={14} /> Remove
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -298,10 +493,22 @@ const CreativeSetSettings = ({ onCancel, onSave, audiences = [], defaultAudience
         <button 
           className="btn px-5 py-2 fw-bold transition-all text-white shadow-sm" 
           onClick={handleSave}
-          disabled={!title || isLoading}
+          disabled={
+            isMultiple && selectedFormat === "banner"
+              ? files.length === 0 || isLoading
+              : !title || isLoading || (selectedFormat !== "rich-media" && !file) || (selectedFormat === "rich-media" && !fileUrl)
+          }
           style={{ 
-            backgroundColor: (!title || isLoading) ? "#f1f5f9" : "#6b46c1", 
-            color: (!title || isLoading) ? "#94a3b8" : "white",
+            backgroundColor: (
+              isMultiple && selectedFormat === "banner"
+                ? files.length === 0 || isLoading
+                : !title || isLoading || (selectedFormat !== "rich-media" && !file) || (selectedFormat === "rich-media" && !fileUrl)
+            ) ? "#f1f5f9" : "#6b46c1", 
+            color: (
+              isMultiple && selectedFormat === "banner"
+                ? files.length === 0 || isLoading
+                : !title || isLoading || (selectedFormat !== "rich-media" && !file) || (selectedFormat === "rich-media" && !fileUrl)
+            ) ? "#94a3b8" : "white",
             borderColor: "transparent",
             borderRadius: '8px',
             fontSize: '0.9rem'

@@ -247,6 +247,42 @@ const PreviewListClient = () => {
         <CreativeSetSettings
           onCancel={() => setView("list")}
           onSave={(data) => {
+            if (Array.isArray(data)) {
+              const newItems = data.map((item) => {
+                const savedAudName =
+                  audiences.find(
+                    (a) =>
+                      (a._id || a.id) ===
+                      (item.audienceId || item.responseData?.data?.audienceId)
+                  )?.reportName || "-";
+                return {
+                  id:
+                    item.responseData?.data?._id ||
+                    item.responseData?.creative?._id ||
+                    item.responseData?._id ||
+                    Date.now(),
+                  name: item.title || item.responseData?.creativeName,
+                  description: `Type: banner`,
+                  type: "banner",
+                  previewUrl:
+                    item.responseData?.data?.fileUrl ||
+                    item.responseData?.creative?.fileUrl ||
+                    item.responseData?.fileUrl ||
+                    item.fileUrl ||
+                    `/preview?name=${encodeURIComponent(item.title)}`,
+                  source: "Upload API",
+                  logo: null,
+                  audienceId:
+                    item.audienceId || item.responseData?.data?.audienceId || "",
+                  audienceName: savedAudName,
+                };
+              });
+              setItems((prev) => [...newItems, ...prev]);
+              setView("list");
+              alert("All creative sets saved successfully!");
+              return;
+            }
+
             const savedAudName =
               audiences.find(
                 (a) =>
