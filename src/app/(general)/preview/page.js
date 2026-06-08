@@ -400,7 +400,7 @@ const CampaignDashboard = () => {
             currentFilters.dateRange.startDate,
             currentFilters.dateRange.endDate,
             1,
-            500,
+            100000,
           );
           ({ tData, gData } = extractData(res));
         } else {
@@ -548,7 +548,7 @@ const CampaignDashboard = () => {
             currentFilters.dateRange.startDate,
             currentFilters.dateRange.endDate,
             1,
-            500,
+            100000,
           );
           ({ tData, gData } = extractData(res));
         } else {
@@ -586,7 +586,7 @@ const CampaignDashboard = () => {
             currentFilters.dateRange.startDate,
             currentFilters.dateRange.endDate,
             1,
-            500,
+            100000,
           );
           ({ tData, gData } = extractData(res));
         } else {
@@ -632,7 +632,7 @@ const CampaignDashboard = () => {
             currentFilters.dateRange.startDate,
             currentFilters.dateRange.endDate,
             1,
-            500,
+            100000,
           );
           ({ tData, gData } = extractData(res));
         } else {
@@ -678,7 +678,7 @@ const CampaignDashboard = () => {
             currentFilters.dateRange.startDate,
             currentFilters.dateRange.endDate,
             1,
-            500,
+            100000,
           );
           ({ tData, gData } = extractData(res));
         } else {
@@ -719,7 +719,7 @@ const CampaignDashboard = () => {
             currentFilters.dateRange.startDate,
             currentFilters.dateRange.endDate,
             1,
-            500,
+            100000,
           );
           ({ tData, gData } = extractData(res));
         } else {
@@ -759,7 +759,7 @@ const CampaignDashboard = () => {
             currentFilters.dateRange.startDate,
             currentFilters.dateRange.endDate,
             1,
-            500,
+            100000,
           );
           ({ tData, gData } = extractData(res));
         } else {
@@ -797,7 +797,7 @@ const CampaignDashboard = () => {
             currentFilters.dateRange.startDate,
             currentFilters.dateRange.endDate,
             1,
-            500,
+            100000,
           );
           ({ tData, gData } = extractData(res));
         } else {
@@ -835,7 +835,7 @@ const CampaignDashboard = () => {
             currentFilters.dateRange.startDate,
             currentFilters.dateRange.endDate,
             1,
-            500,
+            100000,
           );
           ({ tData, gData } = extractData(res));
         } else {
