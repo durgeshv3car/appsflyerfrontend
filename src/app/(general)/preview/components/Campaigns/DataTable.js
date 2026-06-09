@@ -66,6 +66,8 @@ const PerformanceTable = ({
   appsflyerCampaignType = "",
   appsflyerDataLength = 0,
   conversionEvent = "",
+  globalTotals = { TotalConversions: 0, Installs: 0 },
+  audienceEndDate = "",
 }) => {
   const { data: session } = useSession();
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
@@ -250,7 +252,7 @@ const PerformanceTable = ({
       afMap[d].af_payment_unique += af_payment_unique;
     });
 
-    return tableData?.map((row) => {
+    const rows = tableData?.map((row) => {
       const d = normalizeDate(row.Date || row.date);
       const af = afMap[d] || {
         installs: 0,
@@ -295,8 +297,87 @@ const PerformanceTable = ({
         "Total Conversions": finalConversions,
         TotalConversions: finalConversions,
       };
-    });
-  }, [tableData, appsflyerData, conversionEvent, appsflyerDataLength]);
+    }) || [];
+
+    const normalizedEndDate = audienceEndDate ? normalizeDate(audienceEndDate) : "";
+    if (normalizedEndDate) {
+      const existingDates = new Set(rows.map(r => normalizeDate(r.Date || r.date)));
+      Object.keys(afMap).forEach((d) => {
+        if (d > normalizedEndDate && !existingDates.has(d)) {
+          const af = afMap[d];
+          let finalConversions = af.af_payment_unique;
+          if (finalConversions === 0 && af.afclicks > 0) {
+            finalConversions = af.afclicks * 0.011194;
+          }
+          rows.push({
+            Date: d,
+            Impressions: 0,
+            Clicks: 0,
+            Reach: 0,
+            Installs: af.installs || (af.afclicks ? af.afclicks * 0.0989 : 0),
+            "afclicks": af.afclicks,
+            "af_login (Unique users)": af.af_login_unique,
+            "Total Conversions": finalConversions,
+            TotalConversions: finalConversions,
+          });
+        }
+      });
+    }
+
+    const targetConversions = globalTotals?.TotalConversions || 0;
+
+    if (rows && rows.length > 0) {
+      if (targetConversions >= 1000) {
+        let offset = 0;
+        rows.forEach((g) => {
+          if (g.TotalConversions < 1000) {
+            offset += g.TotalConversions;
+            g.TotalConversions = 0;
+            g["Total Conversions"] = 0;
+          }
+        });
+
+        if (offset > 0) {
+          const qualifying = rows.filter((g) => g.TotalConversions >= 1000);
+          if (qualifying.length > 0) {
+            const qualifyingSum = qualifying.reduce(
+              (sum, g) => sum + g.TotalConversions,
+              0
+            );
+            let adjustedOffset = 0;
+            qualifying.forEach((g, idx) => {
+              let additional = 0;
+              if (idx === qualifying.length - 1) {
+                additional = offset - adjustedOffset;
+              } else {
+                additional = Math.round(
+                  offset * (g.TotalConversions / qualifyingSum)
+                );
+                adjustedOffset += additional;
+              }
+              g.TotalConversions += additional;
+              g["Total Conversions"] = g.TotalConversions;
+            });
+          } else {
+            const largest = rows.reduce((prev, current) =>
+              Number(prev.Clicks || 0) > Number(current.Clicks || 0)
+                ? prev
+                : current
+            );
+            largest.TotalConversions = targetConversions;
+            largest["Total Conversions"] = targetConversions;
+          }
+        }
+      } else {
+        rows.forEach((g) => {
+          g.TotalConversions = 0;
+          g["Total Conversions"] = 0;
+        });
+      }
+    }
+
+    return rows;
+  }, [tableData, appsflyerData, conversionEvent, appsflyerDataLength, globalTotals, audienceEndDate]);
 
   const sortedTableData = React.useMemo(() => {
     if (!mergedData) return [];

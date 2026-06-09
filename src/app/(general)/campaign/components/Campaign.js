@@ -56,6 +56,7 @@ const emptyCampaign = {
   campaignType: "CTV", // New field added
   source: "DV360", // Default source
   active: true, // New field
+  endDate: "",
 };
 
 const CampaignLoader = ({ progress, status }) => {
@@ -772,6 +773,7 @@ const Campaign = () => {
                     <th>Impression</th>
                     <th>Currency</th>
                     <th>Campaign Type</th>
+                    <th>End Date</th>
                     <th>Cron Status</th>
                     <th className="text-end sticky-col-actions">Actions</th>
                   </tr>
@@ -845,6 +847,9 @@ const Campaign = () => {
                           <span className="badge bg-light text-dark border">
                             {c.campaignType || "-"}
                           </span>
+                        </td>
+                        <td className="align-middle">
+                          {c.endDate ? c.endDate.split("T")[0] : "-"}
                         </td>
                         <td className="align-middle">
                           <div className="form-check form-switch">
@@ -1100,6 +1105,23 @@ const Campaign = () => {
                               placeholder="Advertiser ID"
                               disabled={editingIndex !== null}
                               required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="row mb-3">
+                          <div className="col-4 d-flex align-items-center">
+                            <label className="fw-semibold mb-0">
+                              End Date Campaign
+                            </label>
+                          </div>
+                          <div className="col-8">
+                            <input
+                              type="date"
+                              name="endDate"
+                              value={campaignData?.endDate ? campaignData.endDate.split("T")[0] : ""}
+                              onChange={handleInputChange}
+                              className="form-control"
                             />
                           </div>
                         </div>

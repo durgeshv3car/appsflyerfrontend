@@ -55,7 +55,8 @@ const BrowserTable = ({
   appsflyerCampaignType = "",
   appsflyerDataLength = 0,
   appsflyerData = [],
-  globalTotals = { TotalConversions: 0, Installs: 0 }
+  globalTotals = { TotalConversions: 0, Installs: 0 },
+  audienceEndDate = "",
 }) => {
   const { data: session } = useSession();
 
@@ -210,8 +211,27 @@ const BrowserTable = ({
     });
 
     const result = Object.values(groups);
+    const totalAfClicks = (appsflyerDataLength > 0 && appsflyerData) ? appsflyerData.reduce((sum, item) => sum + Number(item.clicks || 0), 0) : 0;
     const targetConversions = globalTotals?.TotalConversions || 0;
     const targetInstalls = globalTotals?.Installs || 0;
+
+    if (result.length === 0 && (totalAfClicks > 0 || targetConversions > 0 || targetInstalls > 0)) {
+      result.push({
+        Title: "Other",
+        Impressions: 0,
+        Clicks: totalAfClicks,
+        Spent: 0,
+        TotalConversions: targetConversions,
+        Installs: targetInstalls,
+        "Complete Views": 0,
+        "First Quartile Views": 0,
+        "Midpoint Views": 0,
+        "Third Quartile Views": 0,
+        "Views": 0,
+        CPCV: 0,
+        CPV: 0
+      });
+    }
 
     const currentTotalConv = result.reduce((sum, g) => sum + g.TotalConversions, 0);
     const currentTotalInst = result.reduce((sum, g) => sum + g.Installs, 0);
@@ -223,13 +243,42 @@ const BrowserTable = ({
     let summedInst = 0;
 
     result.forEach(g => {
-      g.TotalConversions = Math.round(g.TotalConversions * convScale);
-      g.Installs = Math.round(g.Installs * instScale);
+      g.TotalConversions = convScale > 0 ? Math.round(g.TotalConversions * convScale) : 0;
+      g.Installs = instScale > 0 ? Math.round(g.Installs * instScale) : 0;
       summedConv += g.TotalConversions;
       summedInst += g.Installs;
     });
 
     if (result.length > 0) {
+      if (convScale === 0 && targetConversions > 0) {
+        let tempConv = 0;
+        result.forEach((g, idx) => {
+          let cToAdd = 0;
+          if (idx === result.length - 1) {
+            cToAdd = targetConversions - tempConv;
+          } else {
+            cToAdd = Math.round(targetConversions / result.length);
+            tempConv += cToAdd;
+          }
+          g.TotalConversions = cToAdd;
+        });
+        summedConv = targetConversions;
+      }
+      if (instScale === 0 && targetInstalls > 0) {
+        let tempInst = 0;
+        result.forEach((g, idx) => {
+          let iToAdd = 0;
+          if (idx === result.length - 1) {
+            iToAdd = targetInstalls - tempInst;
+          } else {
+            iToAdd = Math.round(targetInstalls / result.length);
+            tempInst += iToAdd;
+          }
+          g.Installs = iToAdd;
+        });
+        summedInst = targetInstalls;
+      }
+
       const diffConv = targetConversions - summedConv;
       const diffInst = targetInstalls - summedInst;
       
@@ -279,7 +328,6 @@ const BrowserTable = ({
     // Distribute AppsFlyer clicks if appsflyerDataLength > 0
     if (appsflyerDataLength > 0 && appsflyerData && appsflyerData.length > 0) {
       const totalBaseClicks = result.reduce((sum, g) => sum + g.Clicks, 0);
-      const totalAfClicks = appsflyerData.reduce((sum, item) => sum + Number(item.clicks || 0), 0);
       
       if (totalBaseClicks > 0 && totalAfClicks > 0) {
         let summedClicks = 0;
@@ -297,6 +345,20 @@ const BrowserTable = ({
             const largest = result.reduce((prev, current) => (prev.Clicks > current.Clicks) ? prev : current);
             largest.Clicks += diffClicks;
           }
+        }
+      } else if (totalBaseClicks === 0 && totalAfClicks > 0) {
+        if (result.length > 0) {
+          let summedClicks = 0;
+          result.forEach((g, idx) => {
+            let clicksToAdd = 0;
+            if (idx === result.length - 1) {
+              clicksToAdd = totalAfClicks - summedClicks;
+            } else {
+              clicksToAdd = Math.round(totalAfClicks / result.length);
+              summedClicks += clicksToAdd;
+            }
+            g.Clicks = clicksToAdd;
+          });
         }
       }
     }

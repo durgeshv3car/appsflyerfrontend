@@ -211,13 +211,23 @@ const CampaignDashboard = () => {
             updated.reportName = selectedAud.reportName;
             changed = true;
           }
+          if (prev.audienceEndDate !== selectedAud.endDate) {
+            updated.audienceEndDate = selectedAud.endDate;
+            changed = true;
+          }
           return changed ? updated : prev;
         });
-
       }
     } else {
       setCampaignPermissions([]);
       setCampaignPricing({ cpm: {}, cpc: {}, impression: {} });
+      setFilters(prev => {
+        if (prev.audienceEndDate) {
+          const { audienceEndDate, ...rest } = prev;
+          return rest;
+        }
+        return prev;
+      });
     }
   }, [filters.audienceId, allAudiences]);
 
@@ -1059,6 +1069,7 @@ const CampaignDashboard = () => {
                 campaignPermissions={campaignPermissions}
                 campaignPricing={campaignPricing}
                 campaignType={filters.campaignType}
+                audienceEndDate={filters.audienceEndDate}
               />
             </div>
           )}
@@ -1076,6 +1087,7 @@ const CampaignDashboard = () => {
                 appsflyerDataLength={filters.appsflyerDataLength}
                 conversionEvent={filters.conversionEvent}
                 globalTotals={globalTotals}
+                audienceEndDate={filters.audienceEndDate}
               />
             </div>
           )}
@@ -1107,6 +1119,7 @@ const CampaignDashboard = () => {
                 appsflyerData={appsflyerData}
                 globalTotals={globalTotals}
                 audienceId={filters.audienceId}
+                audienceEndDate={filters.audienceEndDate}
               />
             </div>
           )}
@@ -1169,6 +1182,7 @@ const CampaignDashboard = () => {
                 appsflyerDataLength={filters.appsflyerDataLength}
                 appsflyerData={appsflyerData}
                 globalTotals={globalTotals}
+                audienceEndDate={filters.audienceEndDate}
               />
             </div>
           )}
@@ -1191,6 +1205,7 @@ const CampaignDashboard = () => {
                 appsflyerDataLength={filters.appsflyerDataLength}
                 appsflyerData={appsflyerData}
                 globalTotals={globalTotals}
+                audienceEndDate={filters.audienceEndDate}
               />
             </div>
           )}
@@ -1218,6 +1233,7 @@ const CampaignDashboard = () => {
                 appsflyerDataLength={filters.appsflyerDataLength}
                 appsflyerData={appsflyerData}
                 globalTotals={globalTotals}
+                audienceEndDate={filters.audienceEndDate}
               />
             </div>
           )}
@@ -1268,6 +1284,7 @@ const CampaignDashboard = () => {
                 appsflyerDataLength={filters.appsflyerDataLength}
                 appsflyerData={appsflyerData}
                 globalTotals={globalTotals}
+                audienceEndDate={filters.audienceEndDate}
               />
             </div>
           )}
