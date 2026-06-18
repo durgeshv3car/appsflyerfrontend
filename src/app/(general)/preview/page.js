@@ -868,19 +868,103 @@ const CampaignDashboard = () => {
         return;
       }
       try {
-        const res = await getAppsFlyerSyncData(
-          currentFilters.app_id,
-          currentFilters.dateRange.startDate,
-          currentFilters.dateRange.endDate
-        );
-        if (res.success) {
-          setAppsflyerData(res.data || []);
+        const queryStart = currentFilters.dateRange.startDate;
+        const queryEnd = currentFilters.dateRange.endDate;
+        let audEndDateStr = currentFilters.audienceEndDate;
+
+        if (!audEndDateStr && currentFilters.audienceId && allAudiences.length > 0) {
+          const targetId = getNormalizedId(currentFilters.audienceId);
+          const selectedAud = allAudiences.find(a => getNormalizedId(a._id) === targetId);
+          if (selectedAud) {
+            audEndDateStr = selectedAud.endDate;
+          }
+        }
+
+        if (audEndDateStr) {
+          const parseYMD = (dateStr) => {
+            if (!dateStr) return null;
+            const cleanStr = String(dateStr).split("T")[0].replace(/\//g, "-");
+            const parts = cleanStr.split("-");
+            if (parts.length === 3) {
+              return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+            }
+            return new Date(dateStr);
+          };
+
+          const audEnd = parseYMD(audEndDateStr);
+          if (audEnd && !isNaN(audEnd.getTime())) {
+            const nextDay = new Date(audEnd);
+            nextDay.setDate(nextDay.getDate() + 1);
+
+            const formatDate = (d) => {
+              const year = d.getFullYear();
+              const month = String(d.getMonth() + 1).padStart(2, "0");
+              const day = String(d.getDate()).padStart(2, "0");
+              return `${year}-${month}-${day}`;
+            };
+
+            const audEndStr = formatDate(audEnd);
+            const nextDayStr = formatDate(nextDay);
+
+            if (queryEnd < nextDayStr) {
+              // Whole query range is on or before audience end date -> call audience endpoint
+              const res = await getAppsFlyerSyncData(
+                currentFilters.app_id,
+                queryStart,
+                queryEnd,
+                false
+              );
+              if (res.success) {
+                setAppsflyerData(res.data || []);
+              }
+            } else if (queryStart >= nextDayStr) {
+              // Whole query range is from the next day after end date -> call conversion endpoint
+              const res = await getAppsFlyerSyncData(
+                currentFilters.app_id,
+                queryStart,
+                queryEnd,
+                true
+              );
+              if (res.success) {
+                setAppsflyerData(res.data || []);
+              }
+            } else {
+              // Query range spans across the boundary -> split and query both, then merge
+              const [resAudience, resConversion] = await Promise.all([
+                getAppsFlyerSyncData(currentFilters.app_id, queryStart, audEndStr, false).catch(() => ({ success: false, data: [] })),
+                getAppsFlyerSyncData(currentFilters.app_id, nextDayStr, queryEnd, true).catch(() => ({ success: false, data: [] }))
+              ]);
+
+              const combinedData = [
+                ...(resAudience.success ? resAudience.data || [] : []),
+                ...(resConversion.success ? resConversion.data || [] : [])
+              ];
+              setAppsflyerData(combinedData);
+            }
+          } else {
+            // Fallback if audEnd parsing failed
+            const res = await getAppsFlyerSyncData(currentFilters.app_id, queryStart, queryEnd, false);
+            if (res.success) {
+              setAppsflyerData(res.data || []);
+            }
+          }
+        } else {
+          // No end date defined -> call audience endpoint
+          const res = await getAppsFlyerSyncData(
+            currentFilters.app_id,
+            queryStart,
+            queryEnd,
+            false
+          );
+          if (res.success) {
+            setAppsflyerData(res.data || []);
+          }
         }
       } catch (error) {
         console.error("Error fetching AppsFlyer data:", error);
       }
     },
-    [filters],
+    [filters, allAudiences],
   );
 
 
@@ -971,15 +1055,19 @@ const CampaignDashboard = () => {
       if (!afMap[d]) afMap[d] = { installs: 0, af_payment_unique: 0 };
       afMap[d].installs += (item.installs || 0);
       
-      const safeTarget = String(filters.conversionEvent || "").replace(/\s+/g, "").toLowerCase();
-      if (item.events && Array.isArray(item.events)) {
-        item.events.forEach(evt => {
-          const safeEName = String(evt.event_name || "").replace(/\s+/g, "").toLowerCase();
-          const cleanVal = String(evt.event_value || "").replace(/,/g, "").trim();
-          if (safeTarget && (safeEName === safeTarget || safeEName.includes(safeTarget) || safeTarget.includes(safeEName))) {
-            afMap[d].af_payment_unique += Number(cleanVal) || 0;
-          }
-        });
+      if (item.total_revenue > 0) {
+        afMap[d].af_payment_unique += item.total_revenue;
+      } else {
+        const safeTarget = String(filters.conversionEvent || "").replace(/\s+/g, "").toLowerCase();
+        if (item.events && Array.isArray(item.events)) {
+          item.events.forEach(evt => {
+            const safeEName = String(evt.event_name || "").replace(/\s+/g, "").toLowerCase();
+            const cleanVal = String(evt.event_value || "").replace(/,/g, "").trim();
+            if (safeTarget && (safeEName === safeTarget || safeEName.includes(safeTarget) || safeTarget.includes(safeEName))) {
+              afMap[d].af_payment_unique += Number(cleanVal) || 0;
+            }
+          });
+        }
       }
     });
 

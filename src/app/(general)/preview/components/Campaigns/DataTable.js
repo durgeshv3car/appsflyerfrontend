@@ -218,17 +218,39 @@ const PerformanceTable = ({
 
       let af_login_unique = 0;
       let af_payment_unique = 0;
-      const safeTarget = String(conversionEvent || "")
-        .replace(/\s+/g, "")
-        .toLowerCase();
+
+      if (item.total_revenue > 0) {
+        af_payment_unique = item.total_revenue;
+      } else {
+        const safeTarget = String(conversionEvent || "")
+          .replace(/\s+/g, "")
+          .toLowerCase();
+
+        if (item.events && Array.isArray(item.events)) {
+          item.events.forEach((evt) => {
+            const safeEName = String(evt.event_name || "")
+              .replace(/\s+/g, "")
+              .toLowerCase();
+            const cleanVal = String(evt.event_value || "")
+              .replace(/,/g, "")
+              .trim();
+
+            if (
+              safeTarget &&
+              (safeEName === safeTarget ||
+                safeEName.includes(safeTarget) ||
+                safeTarget.includes(safeEName))
+            ) {
+              af_payment_unique += Number(cleanVal) || 0;
+            }
+          });
+        }
+      }
 
       if (item.events && Array.isArray(item.events)) {
         item.events.forEach((evt) => {
           const eName = String(evt.event_name || "")
             .trim()
-            .toLowerCase();
-          const safeEName = String(evt.event_name || "")
-            .replace(/\s+/g, "")
             .toLowerCase();
           const cleanVal = String(evt.event_value || "")
             .replace(/,/g, "")
@@ -237,17 +259,9 @@ const PerformanceTable = ({
           if (eName.includes("af_login") && eName.includes("unique")) {
             af_login_unique += Number(cleanVal) || 0;
           }
-
-          if (
-            safeTarget &&
-            (safeEName === safeTarget ||
-              safeEName.includes(safeTarget) ||
-              safeTarget.includes(safeEName))
-          ) {
-            af_payment_unique += Number(cleanVal) || 0;
-          }
         });
       }
+
       afMap[d].af_login_unique += af_login_unique;
       afMap[d].af_payment_unique += af_payment_unique;
     });

@@ -76,27 +76,50 @@ export const updateAppsFlyerData = async (id, data) => {
   return { success: false, message: "Update not implemented in backend" };
 };
 
-export const getAppsFlyerByAudienceId = async (audienceId) => {
+export const getAppsFlyerByAudienceId = async (audienceId, hasEndDate) => {
+  const endpoint = hasEndDate ? "appsflyer-conversion" : "appsflyer-audience";
+  const fallbackEndpoint = hasEndDate ? "appsflyer-audience" : "appsflyer-conversion";
   try {
     const token = await getToken();
-    const res = await axios.get(`${API_URL}/appsflyer-audience/by-audience/${audienceId}`, {
+    const res = await axios.get(`${API_URL}/${endpoint}/by-audience/${audienceId}`, {
       headers: {
         Authorization: token,
       },
     });
-    return res.data;
+    if (res.data && res.data.success && res.data.data && res.data.data.length > 0) {
+      return res.data;
+    }
+    // If successful but no data, try fallback
+    const fallbackRes = await axios.get(`${API_URL}/${fallbackEndpoint}/by-audience/${audienceId}`, {
+      headers: {
+        Authorization: token,
+      },
+    });
+    return fallbackRes.data;
   } catch (error) {
-    console.error("Error fetching AppsFlyer by audience ID:", error.response?.data || error.message);
-    throw error;
+    // If primary failed, try fallback
+    try {
+      const token = await getToken();
+      const fallbackRes = await axios.get(`${API_URL}/${fallbackEndpoint}/by-audience/${audienceId}`, {
+        headers: {
+          Authorization: token,
+        },
+      });
+      return fallbackRes.data;
+    } catch (fallbackError) {
+      console.error(`Error fetching AppsFlyer by audience ID from both endpoints:`, fallbackError.response?.data || fallbackError.message);
+      throw error;
+    }
   }
 };
 
-export const getAppsFlyerSyncData = async (app_id, startDate, endDate) => {
+export const getAppsFlyerSyncData = async (app_id, startDate, endDate, hasEndDate) => {
+  const endpoint = hasEndDate ? "appsflyer-conversion" : "appsflyer-audience";
   try {
     const token = await getToken();
 
     const res = await axios.post(
-      `${API_URL}/appsflyer-audience/sync-data`,
+      `${API_URL}/${endpoint}/sync-data`,
       {
         app_id,
         startDate,
@@ -112,7 +135,7 @@ export const getAppsFlyerSyncData = async (app_id, startDate, endDate) => {
     return res.data;
   } catch (error) {
     console.error(
-      "Error fetching AppsFlyer sync data:",
+      `Error fetching AppsFlyer sync data from ${endpoint}:`,
       error.response?.data || error.message
     );
     throw error;

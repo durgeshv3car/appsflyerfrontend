@@ -253,7 +253,32 @@ const ReportsFilter = ({
   const autoFetchAppsFlyer = async (audienceId) => {
     try {
       setIsAppsFlyerLoading(true);
-      const res = await getAppsFlyerByAudienceId(audienceId);
+      const targetId = String(audienceId);
+      const selectedAud = advertisers?.find(a => getAudId(a) === targetId || String(a.advertiserId) === targetId);
+      
+      let hasEndDate = false;
+      if (selectedAud && selectedAud.endDate) {
+        const parseYMD = (dateStr) => {
+          if (!dateStr) return null;
+          const cleanStr = String(dateStr).split("T")[0].replace(/\//g, "-");
+          const parts = cleanStr.split("-");
+          if (parts.length === 3) {
+            return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+          }
+          return new Date(dateStr);
+        };
+        const audEnd = parseYMD(selectedAud.endDate);
+        if (audEnd) {
+          const nextDay = new Date(audEnd);
+          nextDay.setDate(nextDay.getDate() + 1);
+          
+          const today = new Date();
+          const todayLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+          hasEndDate = todayLocal >= nextDay;
+        }
+      }
+
+      const res = await getAppsFlyerByAudienceId(audienceId, hasEndDate);
       
       if (res.success && res.data && res.data.length > 0) {
         const item = res.data[0];
@@ -265,6 +290,7 @@ const ReportsFilter = ({
           appsflyerCampaignType: item.campaignType || item.campaign_type || "",
           appsflyerDataLength: res.data.length,
           conversionEvent: item.conversionEvent || "",
+          audienceEndDate: selectedAud?.endDate || "",
         };
 
         // Synchronously update the React filters state
@@ -281,6 +307,7 @@ const ReportsFilter = ({
           appsflyerDataLength: 0,
           appsflyerCampaignType: "",
           conversionEvent: "",
+          audienceEndDate: selectedAud?.endDate || "",
         };
         setFilters(resetFilters);
         if (typeof fetchAppsflyerData === "function") {
@@ -289,12 +316,15 @@ const ReportsFilter = ({
       }
     } catch (err) {
       console.error("Error auto-fetching AppsFlyer data", err);
+      const targetId = String(audienceId);
+      const selectedAud = advertisers?.find(a => getAudId(a) === targetId || String(a.advertiserId) === targetId);
       const resetFilters = {
         ...filters,
         app_id: "",
         appsflyerDataLength: 0,
         appsflyerCampaignType: "",
         conversionEvent: "",
+        audienceEndDate: selectedAud?.endDate || "",
       };
       setFilters(resetFilters);
       if (typeof fetchAppsflyerData === "function") {
@@ -797,6 +827,7 @@ const ReportsFilter = ({
                     app_id: "",
                     appsflyerCampaignType: "",
                     conversionEvent: "",
+                    audienceEndDate: advertiserObj.endDate || "",
                   }));
                 }}
               />

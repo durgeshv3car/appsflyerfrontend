@@ -156,30 +156,45 @@ const TrendChart = ({
 
   const isVideoType = ["Video", "CTV", "Youtube"].includes(campaignType);
 
+  const sortedTableData = useMemo(() => {
+    if (!tableData || tableData.length === 0) return [];
+
+    return [...tableData].sort((a, b) => {
+      const dateA = new Date(a.Date || a.date || 0).getTime();
+      const dateB = new Date(b.Date || b.date || 0).getTime();
+
+      if (Number.isNaN(dateA) && Number.isNaN(dateB)) return 0;
+      if (Number.isNaN(dateA)) return 1;
+      if (Number.isNaN(dateB)) return -1;
+
+      return dateA - dateB;
+    });
+  }, [tableData]);
+
   useEffect(() => {
     if (!chartRef.current) return;
     if (chartInstance.current) chartInstance.current.destroy();
-    if (!tableData || tableData.length === 0) return;
+    if (!sortedTableData || sortedTableData.length === 0) return;
 
     const ctx = chartRef.current.getContext("2d");
 
-    const labels = tableData.map((row) => row.Date || row.date || "");
-    const impressions = tableData.map(
+    const labels = sortedTableData.map((row) => row.Date || row.date || "");
+    const impressions = sortedTableData.map(
       (row) => Number(row.Impressions || row.impressions) || 0,
     );
-    const clicks = tableData.map((row) => {
+    const clicks = sortedTableData.map((row) => {
       const cks = Number(row.Clicks || row.clicks) || 0;
       const afClicks = Number(row.afclicks || 0);
       return appsflyerDataLength > 0 ? cks + afClicks : cks;
     });
-    const ctr = tableData.map((row) => {
+    const ctr = sortedTableData.map((row) => {
       const imp = Number(row.Impressions || row.impressions || 0);
       const cks = Number(row.Clicks || row.clicks || 0);
       const afClicks = Number(row.afclicks || 0);
       const finalClicks = appsflyerDataLength > 0 ? cks + afClicks : cks;
       return imp > 0 ? (finalClicks / imp) * 100 : 0;
     });
-    const cost = tableData.map((row) => {
+    const cost = sortedTableData.map((row) => {
       const rowDate = row.Date || row.date || "";
       const rowImp = Number(row.Impressions || row.impressions || 0);
       const rowClicks = Number(row.Clicks || row.clicks || 0);
@@ -263,8 +278,8 @@ const TrendChart = ({
     }
 
     if (appsflyerDataLength > 0) {
-      const installs = tableData.map((row) => Number(row.Installs || 0));
-      const conversions = tableData.map((row) =>
+      const installs = sortedTableData.map((row) => Number(row.Installs || 0));
+      const conversions = sortedTableData.map((row) =>
         Number(row.TotalConversions || 0),
       );
 
@@ -353,7 +368,7 @@ const TrendChart = ({
     return () => {
       if (chartInstance.current) chartInstance.current.destroy();
     };
-  }, [tableData, hasSpent, campaignPricing, isVideoType, appsflyerDataLength]);
+  }, [sortedTableData, hasSpent, campaignPricing, isVideoType, appsflyerDataLength]);
 
   const legendItems = [{ color: "#2ECC71", label: "Impressions" }];
   if (!isVideoType) legendItems.push({ color: "#9B59B6", label: "CTR" });
@@ -495,17 +510,39 @@ export const PerformanceDashboard = ({
 
         let af_login_unique = 0;
         let af_payment_unique = 0;
-        const safeTarget = String(conversionEvent || "")
-          .replace(/\s+/g, "")
-          .toLowerCase();
+
+        if (item.total_revenue > 0) {
+          af_payment_unique = item.total_revenue;
+        } else {
+          const safeTarget = String(conversionEvent || "")
+            .replace(/\s+/g, "")
+            .toLowerCase();
+
+          if (item.events && Array.isArray(item.events)) {
+            item.events.forEach((evt) => {
+              const safeEName = String(evt.event_name || "")
+                .replace(/\s+/g, "")
+                .toLowerCase();
+              const cleanVal = String(evt.event_value || "")
+                .replace(/,/g, "")
+                .trim();
+
+              if (
+                safeTarget &&
+                (safeEName === safeTarget ||
+                  safeEName.includes(safeTarget) ||
+                  safeTarget.includes(safeEName))
+              ) {
+                af_payment_unique += Number(cleanVal) || 0;
+              }
+            });
+          }
+        }
 
         if (item.events && Array.isArray(item.events)) {
           item.events.forEach((evt) => {
             const eName = String(evt.event_name || "")
               .trim()
-              .toLowerCase();
-            const safeEName = String(evt.event_name || "")
-              .replace(/\s+/g, "")
               .toLowerCase();
             const cleanVal = String(evt.event_value || "")
               .replace(/,/g, "")
@@ -514,17 +551,9 @@ export const PerformanceDashboard = ({
             if (eName.includes("af_login") && eName.includes("unique")) {
               af_login_unique += Number(cleanVal) || 0;
             }
-
-            if (
-              safeTarget &&
-              (safeEName === safeTarget ||
-                safeEName.includes(safeTarget) ||
-                safeTarget.includes(safeEName))
-            ) {
-              af_payment_unique += Number(cleanVal) || 0;
-            }
           });
         }
+
         afMap[d].af_login_unique += af_login_unique;
         afMap[d].af_payment_unique += af_payment_unique;
       });
@@ -1007,7 +1036,7 @@ export const PerformanceDashboard = ({
                       style={{ fontSize: "14px" }}
                     >
                       {currencySymbol}
-                      {stats.Spent}
+                      {Math.round(stats.Spent)}
                     </span>
                   </div>
                 )}
@@ -1020,11 +1049,10 @@ export const PerformanceDashboard = ({
                       >
                         Installs
                       </span>
-                      <span
-                        className="text-dark fw-bold"
-                        style={{ fontSize: "14px" }}
-                      >
-                        {stats.Installs}
+                      <span className="text-dark fw-bold" style={{ fontSize: "14px" }}>
+                        {isNaN(Number(String(stats.Installs).replace(/,/g, "")))
+                          ? 0
+                          : Math.round(Number(String(stats.Installs).replace(/,/g, ""))).toLocaleString()}
                       </span>
                     </div>
                     <div className="d-flex justify-content-between align-items-center">
