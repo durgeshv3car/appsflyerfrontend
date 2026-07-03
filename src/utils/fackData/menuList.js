@@ -26,6 +26,12 @@ export const menuList = [
         path: `/preview`,
         icon: 'feather-layout',        
     },
+     {
+        id: 5,
+        name: "Appsflyer Report",
+        path: `/appflyer-report`,
+        icon: 'feather-cast',        
+    },
     
      
 

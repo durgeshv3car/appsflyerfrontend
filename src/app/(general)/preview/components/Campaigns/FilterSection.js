@@ -124,6 +124,7 @@ const ReportsFilter = ({
       initialFilters.appsflyerDataLength = 0;
       initialFilters.app_id = "";
       initialFilters.conversionEvent = "";
+      initialFilters.conversionValue = "";
       initialFilters.appsflyerCampaignType = "";
     }
 
@@ -290,6 +291,7 @@ const ReportsFilter = ({
           appsflyerCampaignType: item.campaignType || item.campaign_type || "",
           appsflyerDataLength: res.data.length,
           conversionEvent: item.conversionEvent || "",
+          conversionValue: item.conversionValue || "",
           audienceEndDate: selectedAud?.endDate || "",
         };
 
@@ -307,6 +309,7 @@ const ReportsFilter = ({
           appsflyerDataLength: 0,
           appsflyerCampaignType: "",
           conversionEvent: "",
+          conversionValue: "",
           audienceEndDate: selectedAud?.endDate || "",
         };
         setFilters(resetFilters);
@@ -324,6 +327,7 @@ const ReportsFilter = ({
         appsflyerDataLength: 0,
         appsflyerCampaignType: "",
         conversionEvent: "",
+        conversionValue: "",
         audienceEndDate: selectedAud?.endDate || "",
       };
       setFilters(resetFilters);
@@ -467,6 +471,7 @@ const ReportsFilter = ({
        delete filtersToSave.appsflyerDataLength;
        delete filtersToSave.app_id;
        delete filtersToSave.conversionEvent;
+       delete filtersToSave.conversionValue;
        delete filtersToSave.appsflyerCampaignType;
        
        localStorage.setItem("campaignFilteredData", JSON.stringify(filtersToSave));
@@ -827,6 +832,7 @@ const ReportsFilter = ({
                     app_id: "",
                     appsflyerCampaignType: "",
                     conversionEvent: "",
+                    conversionValue: "",
                     audienceEndDate: advertiserObj.endDate || "",
                   }));
                 }}

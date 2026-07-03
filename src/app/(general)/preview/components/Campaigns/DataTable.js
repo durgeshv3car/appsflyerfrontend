@@ -66,6 +66,7 @@ const PerformanceTable = ({
   appsflyerCampaignType = "",
   appsflyerDataLength = 0,
   conversionEvent = "",
+  conversionValue = "",
   globalTotals = { TotalConversions: 0, Installs: 0 },
   audienceEndDate = "",
 }) => {
@@ -218,33 +219,23 @@ const PerformanceTable = ({
 
       let af_login_unique = 0;
       let af_payment_unique = 0;
+      const isOldData = !item.media_source;
 
-      if (item.total_revenue > 0) {
-        af_payment_unique = item.total_revenue;
-      } else {
-        const safeTarget = String(conversionEvent || "")
-          .replace(/\s+/g, "")
-          .toLowerCase();
-
-        if (item.events && Array.isArray(item.events)) {
+      if (isOldData) {
+        // No conversionValue defined — sum matching conversionEvent values
+        const safeTarget = String(conversionEvent || "").replace(/\s+/g, "").toLowerCase();
+        if (safeTarget && item.events && Array.isArray(item.events)) {
           item.events.forEach((evt) => {
-            const safeEName = String(evt.event_name || "")
-              .replace(/\s+/g, "")
-              .toLowerCase();
-            const cleanVal = String(evt.event_value || "")
-              .replace(/,/g, "")
-              .trim();
-
-            if (
-              safeTarget &&
-              (safeEName === safeTarget ||
-                safeEName.includes(safeTarget) ||
-                safeTarget.includes(safeEName))
-            ) {
+            const safeEName = String(evt.event_name || "").replace(/\s+/g, "").toLowerCase();
+            if (safeEName === safeTarget || safeEName.includes(safeTarget) || safeTarget.includes(safeEName)) {
+              const cleanVal = String(evt.event_value || "").replace(/,/g, "").trim();
               af_payment_unique += Number(cleanVal) || 0;
             }
           });
         }
+      } else {
+        // conversionValue is defined — total_revenue is correct
+        af_payment_unique = item.total_revenue || 0;
       }
 
       if (item.events && Array.isArray(item.events)) {
@@ -391,7 +382,7 @@ const PerformanceTable = ({
     }
 
     return rows;
-  }, [tableData, appsflyerData, conversionEvent, appsflyerDataLength, globalTotals, audienceEndDate]);
+  }, [tableData, appsflyerData, conversionEvent, conversionValue, appsflyerDataLength, globalTotals, audienceEndDate]);
 
   const sortedTableData = React.useMemo(() => {
     if (!mergedData) return [];

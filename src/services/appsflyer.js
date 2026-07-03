@@ -113,7 +113,7 @@ export const getAppsFlyerByAudienceId = async (audienceId, hasEndDate) => {
   }
 };
 
-export const getAppsFlyerSyncData = async (app_id, startDate, endDate, hasEndDate) => {
+export const getAppsFlyerSyncData = async (app_id, startDate, endDate, hasEndDate, audienceId) => {
   const endpoint = hasEndDate ? "appsflyer-conversion" : "appsflyer-audience";
   try {
     const token = await getToken();
@@ -124,6 +124,7 @@ export const getAppsFlyerSyncData = async (app_id, startDate, endDate, hasEndDat
         app_id,
         startDate,
         endDate,
+        audienceId,
       },
       {
         headers: {
@@ -141,3 +142,82 @@ export const getAppsFlyerSyncData = async (app_id, startDate, endDate, hasEndDat
     throw error;
   }
 };
+
+export const createAppsFlyerReport = async (data) => {
+  try {
+    const token = await getToken();
+    const res = await axios.post(`${API_URL}/appsflyer-reports/create`, data, {
+      headers: {
+        Authorization: token,
+      },
+    });
+    return res.data;
+  } catch (error) {
+    console.error("Error creating AppsFlyer report:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const getAllAppsFlyerReports = async (search = "") => {
+  try {
+    const token = await getToken();
+    const res = await axios.get(`${API_URL}/appsflyer-reports/`, {
+      params: { search },
+      headers: {
+        Authorization: token,
+      },
+    });
+    return res.data;
+  } catch (error) {
+    console.error("Error fetching AppsFlyer reports:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const deleteAppsFlyerReport = async (id) => {
+  try {
+    const token = await getToken();
+    const res = await axios.delete(`${API_URL}/appsflyer-reports/${id}`, {
+      headers: {
+        Authorization: token,
+      },
+    });
+    return res.data;
+  } catch (error) {
+    console.error("Error deleting AppsFlyer report:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const getAppsFlyerReportData = async (id, eventName = "", date = "") => {
+  try {
+    const token = await getToken();
+    const res = await axios.get(`${API_URL}/appsflyer-reports/${id}/data`, {
+      params: { eventName, date },
+      headers: {
+        Authorization: token,
+      },
+    });
+    return res.data;
+  } catch (error) {
+    console.error("Error fetching report data:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const syncAppsFlyerReport = async (id) => {
+  try {
+    const token = await getToken();
+    const res = await axios.post(`${API_URL}/appsflyer-reports/${id}/sync`, {}, {
+      headers: {
+        Authorization: token,
+      },
+    });
+    return res.data;
+  } catch (error) {
+    console.error("Error syncing report:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+

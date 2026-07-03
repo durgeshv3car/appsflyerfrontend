@@ -27,6 +27,7 @@ import {
   getSingleAppsFlyerData,
   deleteAppsFlyerData,
 } from "@/services/appsflyer";
+import { getAllUsers } from "@/services/users";
 import PermissionModal from "./PermissionModal";
 import Image from "next/image";
 import {
@@ -173,6 +174,8 @@ const Campaign = () => {
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [audienceId, setAudienceId] = useState(null);
+  const [usersList, setUsersList] = useState([]);
+  const [userSearch, setUserSearch] = useState("");
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [selectedPermissionCampaign, setSelectedPermissionCampaign] =
     useState(null);
@@ -197,6 +200,7 @@ const Campaign = () => {
     media_source: "",
     campaign_type: "",
     conversion_event: "",
+    conversion_value: "",
     Appflyer_api_token: "",
   });
   const [editingAppsFlyerId, setEditingAppsFlyerId] = useState(null);
@@ -656,6 +660,7 @@ const Campaign = () => {
         media_source: "",
         campaign_type: "",
         conversion_event: "",
+        conversion_value: "",
         Appflyer_api_token: "",
       });
       setEditingAppsFlyerId(null);
@@ -676,6 +681,7 @@ const Campaign = () => {
       media_source: item.media_source,
       campaign_type: item.campaignType || "",
       conversion_event: item.conversionEvent || "",
+      conversion_value: item.conversionValue || "",
       Appflyer_api_token: item.Appflyer_api_token || "",
     });
     setEditingAppsFlyerId(item._id);
@@ -720,26 +726,38 @@ const Campaign = () => {
       media_source: "",
       campaign_type: "",
       conversion_event: "",
+      conversion_value: "",
       Appflyer_api_token: "",
     });
     setEditingAppsFlyerId(null);
   };
 
-  const openEmailModal = (id) => {
+  const openEmailModal = async (id) => {
     setShowEmailModal(true);
     setError("");
     setAudienceId(id);
+    setUsersList([]);
+    setUserSearch("");
+    try {
+      const res = await getAllUsers();
+      const usersData = res?.userData || [];
+      setUsersList(usersData);
+    } catch (err) {
+      console.error("Error loading users:", err);
+      toast.error("Failed to load users list");
+    }
   };
 
-  const handleAddUser = async () => {
-    if (!email) return;
+  const handleAddUser = async (emailOverride = null) => {
+    const targetEmail = emailOverride || email;
+    if (!targetEmail) return;
 
     try {
       setLoading(true);
       setError("");
-      const res = await addAudienceToUser(email, audienceId);
+      const res = await addAudienceToUser(targetEmail, audienceId);
       if (res.message) {
-        toast.success("User added successfully");
+        toast.success(`User added successfully`);
         setShowEmailModal(false);
         setEmail("");
       }
@@ -750,6 +768,13 @@ const Campaign = () => {
       setLoading(false);
     }
   };
+
+  const filteredUsers = usersList.filter((u) => {
+    const nameStr = String(u.name || "").toLowerCase();
+    const emailStr = String(u.email || "").toLowerCase();
+    const query = userSearch.toLowerCase();
+    return nameStr.includes(query) || emailStr.includes(query);
+  });
 
   return (
     <>
@@ -777,7 +802,7 @@ const Campaign = () => {
                 <thead>
                   <tr>
                     <th className="sticky-col-1">Report Name</th>
-                    <th className="sticky-col-2">Source</th>
+                    <th>Source</th>
                     <th>Advertiser ID</th>
                     <th>Campaign ID</th>
                     <th>Insertion Order ID</th>
@@ -787,14 +812,14 @@ const Campaign = () => {
                     <th>Currency</th>
                     <th>Campaign Type</th>
                     <th>End Date</th>
-                    <th>Cron Status</th>
+                    <th className="sticky-col-cron">Cron Status</th>
                     <th className="text-end sticky-col-actions">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading && (
                     <tr>
-                      <td colSpan={5} className="text-center py-4">
+                      <td colSpan={13} className="text-center py-4">
                         <div
                           className="spinner-border spinner-border-sm me-2"
                           role="status"
@@ -806,7 +831,7 @@ const Campaign = () => {
 
                   {!loading && campaigns.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="text-center py-4 text-muted">
+                      <td colSpan={13} className="text-center py-4 text-muted">
                         No campaigns yet. Click "Add" to create one.
                       </td>
                     </tr>
@@ -815,8 +840,10 @@ const Campaign = () => {
                   {!loading &&
                     campaigns.map((c, idx) => (
                       <tr key={c._id || idx}>
-                        <td className="align-middle sticky-col-1">{c.reportName}</td>
-                        <td className="align-middle sticky-col-2">
+                        <td className="align-middle sticky-col-1 text-truncate" title={c.reportName}>
+                          {c.reportName}
+                        </td>
+                        <td className="align-middle">
                           <span
                             className={`badge ${c.source === "Eskimi" ? "bg-info" : "bg-primary"}`}
                           >
@@ -864,8 +891,8 @@ const Campaign = () => {
                         <td className="align-middle">
                           {c.endDate ? c.endDate.split("T")[0] : "-"}
                         </td>
-                        <td className="align-middle">
-                          <div className="form-check form-switch">
+                        <td className="align-middle sticky-col-cron">
+                          <div className="form-check form-switch m-0">
                             <input
                               className="form-check-input"
                               type="checkbox"
@@ -997,20 +1024,20 @@ const Campaign = () => {
                                 </svg>
                               </button>
                             )}
-                             <button
+                            <button
                               className="btn btn-sm btn-outline-primary"
                               onClick={() => openAppsFlyerModal(c)}
                               title="AppsFlyer Data"
                             >
                               <Database size={16} /> AppsFlyer
                             </button>
-                             <button
+                            <button
                               className="btn btn-sm btn-outline-success"
                               onClick={() => handleShowPermissions(c)}
                             >
                               <Shield size={16} /> Permissions
                             </button>
-                           
+
                           </div>
                         </td>
                       </tr>
@@ -1218,7 +1245,7 @@ const Campaign = () => {
                               style={{ maxHeight: "150px", overflowY: "auto" }}
                             >
                               {Object.keys(campaignData?.cpm || {}).length ===
-                              0 ? (
+                                0 ? (
                                 <small className="text-muted">
                                   No CPM entries added.
                                 </small>
@@ -1289,7 +1316,7 @@ const Campaign = () => {
                               style={{ maxHeight: "150px", overflowY: "auto" }}
                             >
                               {Object.keys(campaignData?.cpc || {}).length ===
-                              0 ? (
+                                0 ? (
                                 <small className="text-muted">
                                   No CPC entries added.
                                 </small>
@@ -1360,7 +1387,7 @@ const Campaign = () => {
                               style={{ maxHeight: "150px", overflowY: "auto" }}
                             >
                               {Object.keys(campaignData?.impression || {}).length ===
-                              0 ? (
+                                0 ? (
                                 <small className="text-muted">
                                   No Impression entries added.
                                 </small>
@@ -1508,11 +1535,11 @@ const Campaign = () => {
 
           {showEmailModal && (
             <div className="modal fade show d-block" tabIndex="-1">
-              <div className="modal-dialog modal-sm modal-dialog-centered">
-                <div className="modal-content">
+              <div className="modal-dialog modal-dialog-centered">
+                <div className="modal-content shadow-lg border-0 rounded-3">
                   {/* Header */}
-                  <div className="modal-header">
-                    <h5 className="modal-title">Add User</h5>
+                  <div className="modal-header py-3">
+                    <h5 className="modal-title fw-bold text-dark">Add User to Campaign</h5>
                     <button
                       type="button"
                       className="btn-close"
@@ -1521,31 +1548,58 @@ const Campaign = () => {
                   </div>
 
                   {/* Body */}
-                  <div className="modal-body">
-                    <label className="form-label">Email</label>
-                    <input
-                      type="email"
-                      className="form-control"
-                      placeholder="Enter user email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                    />
+                  <div className="modal-body p-3">
+                    {/* Search Field */}
+                    <div className="mb-3">
+                      <input
+                        type="text"
+                        className="form-control form-control-sm border-2 rounded-3 shadow-sm"
+                        placeholder="Search user name or email..."
+                        value={userSearch}
+                        onChange={(e) => setUserSearch(e.target.value)}
+                      />
+                    </div>
+
+                    {/* Scrollable User List */}
+                    <div className="list-group border rounded-3 overflow-auto" style={{ maxHeight: "300px" }}>
+                      {filteredUsers.length === 0 ? (
+                        <div className="text-center py-4 text-muted small">
+                          No users found matching your search.
+                        </div>
+                      ) : (
+                        filteredUsers.map((u) => (
+                          <div
+                            key={u._id}
+                            className="list-group-item d-flex align-items-center justify-content-between py-2 px-3"
+                          >
+                            <div className="text-truncate me-2">
+                              <div className="fw-semibold text-dark small text-truncate" title={u.name}>
+                                {u.name || "Unnamed"}
+                              </div>
+                              <div className="text-muted text-truncate" style={{ fontSize: "11px" }} title={u.email}>
+                                {u.email}
+                              </div>
+                            </div>
+                            <button
+                              className="btn btn-primary btn-sm px-3 rounded-pill fw-semibold shadow-sm flex-shrink-0"
+                              style={{ fontSize: "11px", padding: "4px 12px" }}
+                              onClick={() => handleAddUser(u.email)}
+                            >
+                              Add
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
 
                   {/* Footer */}
-                  <div className="modal-footer">
+                  <div className="modal-footer py-2">
                     <button
-                      className="btn btn-secondary btn-sm"
+                      className="btn btn-secondary btn-sm rounded-3 px-3"
                       onClick={() => setShowEmailModal(false)}
                     >
-                      Cancel
-                    </button>
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={() => handleAddUser()}
-                      disabled={!email}
-                    >
-                      Add
+                      Close
                     </button>
                   </div>
                 </div>
@@ -1689,6 +1743,18 @@ const Campaign = () => {
                             </div>
                             <div className="mb-4">
                               <label className="form-label small fw-semibold">
+                                Conversion Value
+                              </label>
+                              <input
+                                name="conversion_value"
+                                value={appsFlyerFormData.conversion_value}
+                                onChange={handleAppsFlyerInputChange}
+                                className="form-control form-control-sm border-2"
+                                placeholder="e.g. sales, revenue, inr"
+                              />
+                            </div>
+                            <div className="mb-4">
+                              <label className="form-label small fw-semibold">
                                 AppsFlyer API Token
                               </label>
                               <input
@@ -1786,7 +1852,7 @@ const Campaign = () => {
                               </thead>
                               <tbody>
                                 {appsFlyerLoading &&
-                                appsFlyerList.length === 0 ? (
+                                  appsFlyerList.length === 0 ? (
                                   <tr>
                                     <td
                                       colSpan="6"
@@ -1929,20 +1995,23 @@ const Campaign = () => {
           z-index: 2 !important;
           background-color: #fff !important;
           box-shadow: 2px 0 5px -2px rgba(0,0,0,0.15) !important;
-          min-width: 180px !important;
-          max-width: 180px !important;
-          width: 180px !important;
+          min-width: 320px !important;
+          max-width: 320px !important;
+          width: 320px !important;
+          white-space: nowrap !important;
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
         }
 
-        .sticky-col-2 {
+        .sticky-col-cron {
           position: sticky !important;
-          left: 180px !important;
+          right: 380px !important;
           z-index: 2 !important;
           background-color: #fff !important;
-          box-shadow: 2px 0 5px -2px rgba(0,0,0,0.15) !important;
-          min-width: 100px !important;
-          max-width: 100px !important;
-          width: 100px !important;
+          box-shadow: -2px 0 5px -2px rgba(0,0,0,0.15) !important;
+          min-width: 160px !important;
+          max-width: 160px !important;
+          width: 160px !important;
         }
 
         .sticky-col-actions {
@@ -1961,7 +2030,7 @@ const Campaign = () => {
           z-index: 3 !important;
           background-color: #f8f9fa !important;
         }
-        th.sticky-col-2 {
+        th.sticky-col-cron {
           z-index: 3 !important;
           background-color: #f8f9fa !important;
         }
@@ -1972,19 +2041,19 @@ const Campaign = () => {
 
         /* Striping and Hover for sticky columns */
         .table-striped tbody tr:nth-of-type(odd) .sticky-col-1,
-        .table-striped tbody tr:nth-of-type(odd) .sticky-col-2,
+        .table-striped tbody tr:nth-of-type(odd) .sticky-col-cron,
         .table-striped tbody tr:nth-of-type(odd) .sticky-col-actions {
           background-color: #f8f9fa !important;
         }
 
         .table-striped tbody tr:nth-of-type(even) .sticky-col-1,
-        .table-striped tbody tr:nth-of-type(even) .sticky-col-2,
+        .table-striped tbody tr:nth-of-type(even) .sticky-col-cron,
         .table-striped tbody tr:nth-of-type(even) .sticky-col-actions {
           background-color: #fff !important;
         }
 
         .table-hover tbody tr:hover .sticky-col-1,
-        .table-hover tbody tr:hover .sticky-col-2,
+        .table-hover tbody tr:hover .sticky-col-cron,
         .table-hover tbody tr:hover .sticky-col-actions {
           background-color: #ececec !important;
         }

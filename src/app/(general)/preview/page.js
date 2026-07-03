@@ -136,6 +136,7 @@ const CampaignDashboard = () => {
     appsflyerCampaignType: "", // Added appsflyerCampaignType
     appsflyerDataLength: 0, 
     app_id: "", // Added app_id
+    conversionValue: "",
   });
   const [isUpdating, setIsUpdating] = useState(true);
 
@@ -152,6 +153,7 @@ const CampaignDashboard = () => {
     delete filtersToSave.appsflyerDataLength;
     delete filtersToSave.app_id;
     delete filtersToSave.conversionEvent;
+    delete filtersToSave.conversionValue;
     delete filtersToSave.appsflyerCampaignType;
     localStorage.setItem("campaignFilteredData", JSON.stringify(filtersToSave));
     setIsUpdating(true);
@@ -912,7 +914,8 @@ const CampaignDashboard = () => {
                 currentFilters.app_id,
                 queryStart,
                 queryEnd,
-                false
+                false,
+                currentFilters.audienceId
               );
               if (res.success) {
                 setAppsflyerData(res.data || []);
@@ -923,7 +926,8 @@ const CampaignDashboard = () => {
                 currentFilters.app_id,
                 queryStart,
                 queryEnd,
-                true
+                true,
+                currentFilters.audienceId
               );
               if (res.success) {
                 setAppsflyerData(res.data || []);
@@ -931,8 +935,8 @@ const CampaignDashboard = () => {
             } else {
               // Query range spans across the boundary -> split and query both, then merge
               const [resAudience, resConversion] = await Promise.all([
-                getAppsFlyerSyncData(currentFilters.app_id, queryStart, audEndStr, false).catch(() => ({ success: false, data: [] })),
-                getAppsFlyerSyncData(currentFilters.app_id, nextDayStr, queryEnd, true).catch(() => ({ success: false, data: [] }))
+                getAppsFlyerSyncData(currentFilters.app_id, queryStart, audEndStr, false, currentFilters.audienceId).catch(() => ({ success: false, data: [] })),
+                getAppsFlyerSyncData(currentFilters.app_id, nextDayStr, queryEnd, true, currentFilters.audienceId).catch(() => ({ success: false, data: [] }))
               ]);
 
               const combinedData = [
@@ -943,7 +947,7 @@ const CampaignDashboard = () => {
             }
           } else {
             // Fallback if audEnd parsing failed
-            const res = await getAppsFlyerSyncData(currentFilters.app_id, queryStart, queryEnd, false);
+            const res = await getAppsFlyerSyncData(currentFilters.app_id, queryStart, queryEnd, false, currentFilters.audienceId);
             if (res.success) {
               setAppsflyerData(res.data || []);
             }
@@ -954,7 +958,8 @@ const CampaignDashboard = () => {
             currentFilters.app_id,
             queryStart,
             queryEnd,
-            false
+            false,
+            currentFilters.audienceId
           );
           if (res.success) {
             setAppsflyerData(res.data || []);
@@ -1049,26 +1054,30 @@ const CampaignDashboard = () => {
       return str.replace(/\//g, "-");
     };
 
+    const isOldData = !filters.conversionValue;
     const afMap = {};
     appsflyerData.forEach(item => {
       const d = normalizeDate(item.date);
       if (!afMap[d]) afMap[d] = { installs: 0, af_payment_unique: 0 };
       afMap[d].installs += (item.installs || 0);
-      
-      if (item.total_revenue > 0) {
-        afMap[d].af_payment_unique += item.total_revenue;
-      } else {
+
+      const isOldDataLocal = !item.media_source;
+      let finalVal = 0;
+      if (isOldDataLocal) {
         const safeTarget = String(filters.conversionEvent || "").replace(/\s+/g, "").toLowerCase();
-        if (item.events && Array.isArray(item.events)) {
+        if (safeTarget && item.events && Array.isArray(item.events)) {
           item.events.forEach(evt => {
             const safeEName = String(evt.event_name || "").replace(/\s+/g, "").toLowerCase();
-            const cleanVal = String(evt.event_value || "").replace(/,/g, "").trim();
-            if (safeTarget && (safeEName === safeTarget || safeEName.includes(safeTarget) || safeTarget.includes(safeEName))) {
-              afMap[d].af_payment_unique += Number(cleanVal) || 0;
+            if (safeEName === safeTarget || safeEName.includes(safeTarget) || safeTarget.includes(safeEName)) {
+              const cleanVal = String(evt.event_value || "").replace(/,/g, "").trim();
+              finalVal += Number(cleanVal) || 0;
             }
           });
         }
+      } else {
+        finalVal = (item.total_revenue || 0);
       }
+      afMap[d].af_payment_unique += finalVal;
     });
 
     let totalConversions = 0;
@@ -1097,7 +1106,7 @@ const CampaignDashboard = () => {
     });
 
     return { TotalConversions: Math.round(totalConversions), Installs: Math.round(totalInstalls) };
-  }, [tableData.tableData, appsflyerData, filters.conversionEvent, filters.appsflyerDataLength]);
+  }, [tableData.tableData, appsflyerData, filters.conversionEvent, filters.conversionValue, filters.appsflyerDataLength]);
 
   return (
     <div className="bg-light min-vh-100 ">
@@ -1153,6 +1162,7 @@ const CampaignDashboard = () => {
                 appsflyerData={appsflyerData}
                 appsflyerDataLength={filters.appsflyerDataLength}
                 conversionEvent={filters.conversionEvent}
+                conversionValue={filters.conversionValue}
                 currencySymbol={getCurrencySymbol(filters.currency)}
                 campaignPermissions={campaignPermissions}
                 campaignPricing={campaignPricing}
@@ -1174,6 +1184,7 @@ const CampaignDashboard = () => {
                 appsflyerCampaignType={filters.appsflyerCampaignType}
                 appsflyerDataLength={filters.appsflyerDataLength}
                 conversionEvent={filters.conversionEvent}
+                conversionValue={filters.conversionValue}
                 globalTotals={globalTotals}
                 audienceEndDate={filters.audienceEndDate}
               />

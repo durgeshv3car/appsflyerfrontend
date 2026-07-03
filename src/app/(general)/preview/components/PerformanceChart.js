@@ -425,6 +425,7 @@ export const PerformanceDashboard = ({
   appsflyerData = [],
   appsflyerDataLength = 0,
   conversionEvent = "",
+  conversionValue = "",
   currencySymbol = "$",
   campaignPermissions = [],
   campaignPricing = { cpm: {}, cpc: {} },
@@ -510,33 +511,23 @@ export const PerformanceDashboard = ({
 
         let af_login_unique = 0;
         let af_payment_unique = 0;
+        const isOldData = !item.media_source;
 
-        if (item.total_revenue > 0) {
-          af_payment_unique = item.total_revenue;
-        } else {
-          const safeTarget = String(conversionEvent || "")
-            .replace(/\s+/g, "")
-            .toLowerCase();
-
-          if (item.events && Array.isArray(item.events)) {
+        if (isOldData) {
+          // No conversionValue defined — sum matching conversionEvent values
+          const safeTarget = String(conversionEvent || "").replace(/\s+/g, "").toLowerCase();
+          if (safeTarget && item.events && Array.isArray(item.events)) {
             item.events.forEach((evt) => {
-              const safeEName = String(evt.event_name || "")
-                .replace(/\s+/g, "")
-                .toLowerCase();
-              const cleanVal = String(evt.event_value || "")
-                .replace(/,/g, "")
-                .trim();
-
-              if (
-                safeTarget &&
-                (safeEName === safeTarget ||
-                  safeEName.includes(safeTarget) ||
-                  safeTarget.includes(safeEName))
-              ) {
+              const safeEName = String(evt.event_name || "").replace(/\s+/g, "").toLowerCase();
+              if (safeEName === safeTarget || safeEName.includes(safeTarget) || safeTarget.includes(safeEName)) {
+                const cleanVal = String(evt.event_value || "").replace(/,/g, "").trim();
                 af_payment_unique += Number(cleanVal) || 0;
               }
             });
           }
+        } else {
+          // conversionValue is defined — total_revenue is correct
+          af_payment_unique = item.total_revenue || 0;
         }
 
         if (item.events && Array.isArray(item.events)) {
@@ -587,7 +578,7 @@ export const PerformanceDashboard = ({
           if (finalConversions === 0 && clicks > 0)
             finalConversions = clicks * 0.011194;
         }
-
+        console.log(finalConversions,defaultConversions, "finalConversions")
         return {
           ...row,
           Installs: finalInstalls,
@@ -676,7 +667,7 @@ export const PerformanceDashboard = ({
     }
 
     return rows;
-  }, [tableData, appsflyerData, appsflyerDataLength, conversionEvent, audienceEndDate]);
+  }, [tableData, appsflyerData, appsflyerDataLength, conversionEvent, conversionValue, audienceEndDate]);
 
   const stats = useMemo(() => {
     const total = {
