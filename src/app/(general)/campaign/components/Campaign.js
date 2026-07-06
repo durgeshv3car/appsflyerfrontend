@@ -39,6 +39,8 @@ import {
   BarChart3,
   PieChart,
   MapPin,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -192,6 +194,7 @@ const Campaign = () => {
   const [selectedAudienceForAppsFlyer, setSelectedAudienceForAppsFlyer] =
     useState(null);
   const [appsFlyerList, setAppsFlyerList] = useState([]);
+  const [showAppsFlyerToken, setShowAppsFlyerToken] = useState(false);
   const [appsFlyerFormData, setAppsFlyerFormData] = useState({
     name: "",
     app_id: "",
@@ -571,6 +574,7 @@ const Campaign = () => {
   const openAppsFlyerModal = async (audience) => {
     setSelectedAudienceForAppsFlyer(audience);
     setShowAppsFlyerModal(true);
+    setShowAppsFlyerToken(false);
     setAppsFlyerLoading(true);
     try {
       const res = await getAllAppsFlyerData();
@@ -730,6 +734,7 @@ const Campaign = () => {
       Appflyer_api_token: "",
     });
     setEditingAppsFlyerId(null);
+    setShowAppsFlyerToken(false);
   };
 
   const openEmailModal = async (id) => {
@@ -1753,19 +1758,29 @@ const Campaign = () => {
                                 placeholder="e.g. sales, revenue, inr"
                               />
                             </div>
-                            <div className="mb-4">
+                             <div className="mb-4">
                               <label className="form-label small fw-semibold">
                                 AppsFlyer API Token
                               </label>
-                              <input
-                                type="password"
-                                name="Appflyer_api_token"
-                                value={appsFlyerFormData.Appflyer_api_token || ""}
-                                onChange={handleAppsFlyerInputChange}
-                                className="form-control form-control-sm border-2"
-                                placeholder="Bearer token..."
-                                required={!editingAppsFlyerId}
-                              />
+                              <div className="input-group">
+                                <input
+                                  type={showAppsFlyerToken ? "text" : "password"}
+                                  name="Appflyer_api_token"
+                                  value={appsFlyerFormData.Appflyer_api_token || ""}
+                                  onChange={handleAppsFlyerInputChange}
+                                  className="form-control form-control-sm border-2"
+                                  placeholder="Bearer token..."
+                                  required={!editingAppsFlyerId}
+                                />
+                                <button
+                                  type="button"
+                                  className="btn btn-outline-secondary d-flex align-items-center justify-content-center"
+                                  onClick={() => setShowAppsFlyerToken(!showAppsFlyerToken)}
+                                  style={{ borderLeft: "none" }}
+                                >
+                                  {showAppsFlyerToken ? <EyeOff size={14} /> : <Eye size={14} />}
+                                </button>
+                              </div>
                             </div>
                             <div className="d-grid gap-2">
                               <button

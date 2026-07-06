@@ -317,10 +317,6 @@ const OperatorTable = ({
             largest.TotalConversions = targetConversions;
           }
         }
-      } else {
-        result.forEach(g => {
-          g.TotalConversions = 0;
-        });
       }
     }
 

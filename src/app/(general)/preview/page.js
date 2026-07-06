@@ -1070,12 +1070,14 @@ const CampaignDashboard = () => {
             const safeEName = String(evt.event_name || "").replace(/\s+/g, "").toLowerCase();
             if (safeEName === safeTarget || safeEName.includes(safeTarget) || safeTarget.includes(safeEName)) {
               const cleanVal = String(evt.event_value || "").replace(/,/g, "").trim();
-              finalVal += Number(cleanVal) || 0;
+              const valNum = Number(cleanVal) || 0;
+              finalVal += valNum === 0 ? (evt.event_count || 0) : valNum;
             }
           });
         }
       } else {
-        finalVal = (item.total_revenue || 0);
+        // If 0, fallback to event_count
+        finalVal = (item.total_revenue || 0) === 0 ? (item.event_count || 0) : (item.total_revenue || 0);
       }
       afMap[d].af_payment_unique += finalVal;
     });

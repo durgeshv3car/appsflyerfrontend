@@ -229,13 +229,14 @@ const PerformanceTable = ({
             const safeEName = String(evt.event_name || "").replace(/\s+/g, "").toLowerCase();
             if (safeEName === safeTarget || safeEName.includes(safeTarget) || safeTarget.includes(safeEName)) {
               const cleanVal = String(evt.event_value || "").replace(/,/g, "").trim();
-              af_payment_unique += Number(cleanVal) || 0;
+              const valNum = Number(cleanVal) || 0;
+              af_payment_unique += valNum === 0 ? (evt.event_count || 0) : valNum;
             }
           });
         }
       } else {
-        // conversionValue is defined — total_revenue is correct
-        af_payment_unique = item.total_revenue || 0;
+        // conversionValue is defined — total_revenue is correct. If 0, fallback to event_count
+        af_payment_unique = (item.total_revenue || 0) === 0 ? (item.event_count || 0) : (item.total_revenue || 0);
       }
 
       if (item.events && Array.isArray(item.events)) {
@@ -373,11 +374,6 @@ const PerformanceTable = ({
             largest["Total Conversions"] = targetConversions;
           }
         }
-      } else {
-        rows.forEach((g) => {
-          g.TotalConversions = 0;
-          g["Total Conversions"] = 0;
-        });
       }
     }
 
