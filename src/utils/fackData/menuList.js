@@ -3,36 +3,42 @@ export const menuList = [
         id: 1,
         name: "users",
         path: "/users",
-        icon: 'feather-users',        
+        icon: 'feather-users',
     },
 
 
-     {
+    {
         id: 2,
         name: "campaign",
         path: "/campaign",
-        icon: 'feather-settings',        
+        icon: 'feather-settings',
     },
 
-     {
+    {
         id: 3,
         name: "Creative List",
         path: `/preview-list`,
-        icon: 'feather-eye',        
+        icon: 'feather-eye',
     },
     {
         id: 4,
         name: "reports",
         path: `/preview`,
-        icon: 'feather-layout',        
+        icon: 'feather-layout',
     },
-     {
+    {
         id: 5,
         name: "Appsflyer Report",
         path: `/appflyer-report`,
-        icon: 'feather-cast',        
+        icon: 'feather-cast',
     },
-    
-     
+    {
+        id: 6,
+        name: "Appsflyer Preview",
+        path: `/appflyer-preview`,
+        icon: 'feather-briefcase',
+    },
+
+
 
 ]
