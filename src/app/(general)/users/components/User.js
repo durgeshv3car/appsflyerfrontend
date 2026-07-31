@@ -40,7 +40,21 @@ function UserPage() {
   const [selectedUserEmail, setSelectedUserEmail] = useState("");
 
   const handleShowCampaigns = (user) => {
-    setSelectedUserCampaigns(user.audienceId || []);
+    const assignedPagesMap = {};
+    (user.assignedPages || []).forEach((ap) => {
+      const audId = String(ap.audienceId?._id || ap.audienceId || "");
+      if (audId) assignedPagesMap[audId] = ap.page || "preview";
+    });
+
+    const campaignsWithPage = (user.audienceId || []).map((camp) => {
+      const cId = String(camp._id || camp.id || "");
+      return {
+        ...camp,
+        assignedPage: assignedPagesMap[cId] || "preview",
+      };
+    });
+
+    setSelectedUserCampaigns(campaignsWithPage);
     setSelectedUserEmail(user.email);
     setShowCampaignModal(true);
   };
@@ -270,6 +284,7 @@ function UserPage() {
                     <th>Advertiser ID</th>
                     <th>Campaign ID</th>
                     <th>Insertion Order ID</th>
+                    <th>Assigned UI Page</th>
                     <th>CPM</th>
                     <th>Currency</th>
                     <th>Actions</th>
@@ -296,6 +311,13 @@ function UserPage() {
                         <td>{camp.advertiserId}</td>
                         <td>{camp.campaignId || "-"}</td>
                         <td>{camp.insertionOrderId || "-"}</td>
+                        <td>
+                          <span
+                            className={`badge ${camp.assignedPage === "reports" ? "bg-warning text-dark" : "bg-success"}`}
+                          >
+                            {camp.assignedPage === "reports" ? "Reports UI" : "Preview UI"}
+                          </span>
+                        </td>
                         <td>
                           {camp.cpm &&
                             Object.entries(camp.cpm).map(([date, value]) => (

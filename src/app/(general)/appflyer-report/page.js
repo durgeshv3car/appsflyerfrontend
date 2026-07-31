@@ -19,6 +19,7 @@ const emptyForm = {
   media_source: "",
   campaign_type: "",
   conversion_value: "",
+  timezone: "Asia/Kolkata",
   af_siteid: "",
   af_adset_id: "",
   Appflyer_api_token: "",
@@ -92,10 +93,10 @@ export default function AppsFlyerReportPage() {
   }, [reports, debouncedSearchQuery]);
 
   // Fetch report detailed metrics
-  const fetchReportDetails = async (id, eventFilter = "", dateFilter = "") => {
+  const fetchReportDetails = async (appId, mediaSource, eventFilter = "", dateFilter = "") => {
     setDataLoading(true);
     try {
-      const res = await getAppsFlyerReportData(id, eventFilter, dateFilter);
+      const res = await getAppsFlyerReportData(appId, mediaSource, eventFilter, dateFilter);
       setReportData(res.data || []);
 
       // If fetching all data (no filter), extract and cache the unique event names for the dropdown
@@ -118,7 +119,7 @@ export default function AppsFlyerReportPage() {
       setSelectedEventName("");
       setSelectedDate("");
       setEventNamesList([]);
-      fetchReportDetails(selectedReport._id, "", "");
+      fetchReportDetails(selectedReport.app_id, selectedReport.media_source, "", "");
     } else {
       setReportData([]);
       setEventNamesList([]);
@@ -129,7 +130,7 @@ export default function AppsFlyerReportPage() {
   const handleDateFilterChange = (e) => {
     const val = e.target.value;
     setSelectedDate(val);
-    fetchReportDetails(selectedReport._id, selectedEventName, val);
+    fetchReportDetails(selectedReport.app_id, selectedReport.media_source, selectedEventName, val);
   };
 
   const handleInputChange = (e) => {
@@ -233,7 +234,7 @@ export default function AppsFlyerReportPage() {
                   Report Data: {selectedReport.name}
                 </h5>
                 <p className="small text-muted mb-0">
-                  App ID: <span className="font-monospace">{selectedReport.app_id}</span> | Media Source: <span className="badge bg-soft-info text-info">{selectedReport.media_source}</span>
+                  App ID: <span className="font-monospace">{selectedReport.app_id}</span> | Media Source: <span className="badge bg-soft-info text-info">{selectedReport.media_source}</span> | Timezone: <span className="badge bg-soft-primary text-primary border">{selectedReport.timezone || "Asia/Kolkata"}</span>
                   {selectedReport.eventName && (
                     <>
                       {" "}
@@ -257,7 +258,7 @@ export default function AppsFlyerReportPage() {
                       onChange={(e) => {
                         const val = e.target.value;
                         setSelectedEventName(val);
-                        fetchReportDetails(selectedReport._id, val, selectedDate);
+                        fetchReportDetails(selectedReport.app_id, selectedReport.media_source, val, selectedDate);
                       }}
                     >
                       <option value="">All Events</option>
@@ -286,7 +287,7 @@ export default function AppsFlyerReportPage() {
                         className="btn btn-outline-danger btn-sm px-2 rounded-3 d-flex align-items-center justify-content-center"
                         onClick={() => {
                           setSelectedDate("");
-                          fetchReportDetails(selectedReport._id, selectedEventName, "");
+                          fetchReportDetails(selectedReport.app_id, selectedReport.media_source, selectedEventName, "");
                         }}
                         title="Clear Date Filter"
                         style={{ height: "31px" }}
@@ -592,6 +593,19 @@ export default function AppsFlyerReportPage() {
                         className="form-control"
                         placeholder="e.g. sales, revenue, inr"
                       />
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label small fw-semibold">Timezone</label>
+                      <select
+                        name="timezone"
+                        value={formData.timezone || "Asia/Kolkata"}
+                        onChange={handleInputChange}
+                        className="form-select"
+                        style={{ cursor: "pointer" }}
+                      >
+                        <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+                        <option value="UTC">UTC</option>
+                      </select>
                     </div>
                     <div className="row mb-3">
                       <div className="col">

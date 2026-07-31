@@ -6,7 +6,6 @@ export const menuList = [
         icon: 'feather-users',
     },
 
-
     {
         id: 2,
         name: "campaign",
@@ -22,20 +21,20 @@ export const menuList = [
     },
     {
         id: 4,
-        name: "reports",
+        name: "report",
         path: `/preview`,
         icon: 'feather-layout',
     },
     {
         id: 5,
-        name: "Appsflyer Report",
+        name: "App Report",
         path: `/appflyer-report`,
         icon: 'feather-cast',
     },
     {
         id: 6,
-        name: "Appsflyer Preview",
-        path: `/appflyer-preview`,
+        name: "Report new",
+        path: `/reports`,
         icon: 'feather-briefcase',
     },
 

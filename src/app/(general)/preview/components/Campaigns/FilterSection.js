@@ -21,6 +21,7 @@ import "react-date-range/dist/theme/default.css";
 import { getCampaignIdData, getSiteIdData } from "@/services/creativeData";
 import { getAudience } from "@/services/createaudience";
 import { downloadCSV, downloadExcel } from "@/services/export";
+import topTost from "@/utils/topTost";
 import { 
   getAllAppsFlyerData, 
   getSingleAppsFlyerData, 
@@ -510,7 +511,7 @@ const ReportsFilter = ({
       const { default: html2canvas } = await import("html2canvas");
 
       const input = document.getElementById('dashboard-content');
-      if (!input) { alert("Dashboard content not found"); return; }
+      if (!input) { topTost("Dashboard content not found", "error"); return; }
 
       // ── 1. Find the TRUE widest element (handling scrolling tables) ─────
       let maxScrollWidth = input.scrollWidth;
@@ -726,7 +727,7 @@ const ReportsFilter = ({
 
     } catch (err) {
       console.error("PDF Error:", err);
-      alert("PDF generation failed: " + err.message);
+      topTost("PDF generation failed: " + err.message, "error");
     } finally {
       setIsPdfLoading(false);
     }
@@ -738,7 +739,7 @@ const ReportsFilter = ({
       try {
         await downloadCSV(filters);
       } catch (error) {
-        alert("Failed to download CSV");
+        topTost("Failed to download CSV", "error");
       } finally {
         setIsCsvLoading(false);
       }
@@ -747,7 +748,7 @@ const ReportsFilter = ({
       try {
         await downloadExcel(filters);
       } catch (error) {
-        alert("Failed to download Excel");
+        topTost("Failed to download Excel", "error");
       } finally {
         setIsExcelLoading(false);
       }

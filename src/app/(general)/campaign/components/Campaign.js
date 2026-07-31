@@ -173,6 +173,7 @@ const Campaign = () => {
   const [loadingStatus, setLoadingStatus] = useState("");
   const [search, setSearch] = useState("");
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const [selectedPageUI, setSelectedPageUI] = useState("preview");
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [audienceId, setAudienceId] = useState(null);
@@ -204,6 +205,7 @@ const Campaign = () => {
     campaign_type: "",
     conversion_event: "",
     conversion_value: "",
+    timezone: "Asia/Kolkata",
     Appflyer_api_token: "",
   });
   const [editingAppsFlyerId, setEditingAppsFlyerId] = useState(null);
@@ -665,6 +667,7 @@ const Campaign = () => {
         campaign_type: "",
         conversion_event: "",
         conversion_value: "",
+        timezone: "Asia/Kolkata",
         Appflyer_api_token: "",
       });
       setEditingAppsFlyerId(null);
@@ -686,6 +689,7 @@ const Campaign = () => {
       campaign_type: item.campaignType || "",
       conversion_event: item.conversionEvent || "",
       conversion_value: item.conversionValue || "",
+      timezone: item.timezone || "Asia/Kolkata",
       Appflyer_api_token: item.Appflyer_api_token || "",
     });
     setEditingAppsFlyerId(item._id);
@@ -731,6 +735,7 @@ const Campaign = () => {
       campaign_type: "",
       conversion_event: "",
       conversion_value: "",
+      timezone: "Asia/Kolkata",
       Appflyer_api_token: "",
     });
     setEditingAppsFlyerId(null);
@@ -739,6 +744,7 @@ const Campaign = () => {
 
   const openEmailModal = async (id) => {
     setShowEmailModal(true);
+    setSelectedPageUI("preview");
     setError("");
     setAudienceId(id);
     setUsersList([]);
@@ -753,16 +759,17 @@ const Campaign = () => {
     }
   };
 
-  const handleAddUser = async (emailOverride = null) => {
+  const handleAddUser = async (emailOverride = null, pageOverride = null) => {
     const targetEmail = emailOverride || email;
+    const page = pageOverride || selectedPageUI || "preview";
     if (!targetEmail) return;
 
     try {
       setLoading(true);
       setError("");
-      const res = await addAudienceToUser(targetEmail, audienceId);
+      const res = await addAudienceToUser(targetEmail, audienceId, page);
       if (res.message) {
-        toast.success(`User added successfully`);
+        toast.success(`User added successfully (${page === "reports" ? "Reports UI" : "Preview UI"})`);
         setShowEmailModal(false);
         setEmail("");
       }
@@ -1554,6 +1561,27 @@ const Campaign = () => {
 
                   {/* Body */}
                   <div className="modal-body p-3">
+                    {/* Page UI Selector */}
+                    <div className="mb-3">
+                      <label className="form-label fw-bold text-dark small mb-1">Select Page UI to Show User:</label>
+                      <div className="d-flex gap-2">
+                        <button
+                          type="button"
+                          className={`btn btn-sm flex-fill fw-semibold ${selectedPageUI === "preview" ? "btn-primary" : "btn-outline-secondary"}`}
+                          onClick={() => setSelectedPageUI("preview")}
+                        >
+                          Preview UI
+                        </button>
+                        <button
+                          type="button"
+                          className={`btn btn-sm flex-fill fw-semibold ${selectedPageUI === "reports" ? "btn-primary" : "btn-outline-secondary"}`}
+                          onClick={() => setSelectedPageUI("reports")}
+                        >
+                          Reports UI
+                        </button>
+                      </div>
+                    </div>
+
                     {/* Search Field */}
                     <div className="mb-3">
                       <input
@@ -1758,7 +1786,21 @@ const Campaign = () => {
                                 placeholder="e.g. sales, revenue, inr"
                               />
                             </div>
-                             <div className="mb-4">
+                            <div className="mb-4">
+                              <label className="form-label small fw-semibold">
+                                Timezone
+                              </label>
+                              <select
+                                name="timezone"
+                                value={appsFlyerFormData.timezone || "Asia/Kolkata"}
+                                onChange={handleAppsFlyerInputChange}
+                                className="form-control form-control-sm border-2"
+                              >
+                                <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+                                <option value="UTC">UTC</option>
+                              </select>
+                            </div>
+                            <div className="mb-4">
                               <label className="form-label small fw-semibold">
                                 AppsFlyer API Token
                               </label>

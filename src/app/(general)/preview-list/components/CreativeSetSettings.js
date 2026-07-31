@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { Info, X } from "lucide-react";
+import topTost from "@/utils/topTost";
 
 const creativeFormats = [
   { id: "banner", label: "Banner", description: "Banners are a universal ad format available in various shapes and sizes, such as rectangles, squares, leaderboards, and others." },
@@ -77,7 +78,7 @@ const CreativeSetSettings = ({ onCancel, onSave, audiences = [], defaultAudience
           const successMsg = successes.length > 0 ? `Successfully uploaded ${successes.length} banners.\n` : "";
           const failureMsg = `Failed to upload ${failures.length} banners:\n` + 
             failures.map(fail => `- ${fail.name}: ${fail.reason}`).join("\n");
-          alert(`${successMsg}${failureMsg}`);
+          topTost(`${successMsg}${failureMsg}`, "error");
         }
         
         if (successes.length > 0) {
@@ -117,15 +118,15 @@ const CreativeSetSettings = ({ onCancel, onSave, audiences = [], defaultAudience
           console.error("Upload failed:", errText);
           
           if (errText.includes("duplicate") || errText.includes("E11000")) {
-            alert("A conflicting creative format or title already exists in the backend. Please try a different name.");
+            topTost("A conflicting creative format or title already exists in the backend. Please try a different name.", "warning");
           } else {
-            alert(`Upload failed: ${errText}`);
+            topTost(`Upload failed: ${errText}`, "error");
           }
         }
       }
     } catch (error) {
       console.error("Error uploading file:", error);
-      alert("Error uploading file. Make sure the backend is running.");
+      topTost("Error uploading file. Make sure the backend is running.", "error");
     } finally {
       setIsLoading(false);
     }

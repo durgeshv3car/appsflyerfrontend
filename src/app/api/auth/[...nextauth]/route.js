@@ -66,6 +66,7 @@ export const authOptions = {
           session.user.role = userData?.role || token.role;
           session.user.permissions = (userData?.permissions || []).map(p => p.toLowerCase());
           session.user.audienceId = userData?.audienceId || [];
+          session.user.assignedPages = userData?.assignedPages || [];
         }
 
         return session;

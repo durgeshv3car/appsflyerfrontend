@@ -108,12 +108,12 @@ export const updateAudience = async (audienceId, campaignData) => {
   }
 };
 
-export const addAudienceToUser = async (email, audienceId) => {
+export const addAudienceToUser = async (email, audienceId, page = "preview") => {
   try {
     const token = await getToken();
     const res = await axios.post(
       `${API_URL}/auth/user/add`,
-      { email, audienceId },
+      { email, audienceId, page },
       {
         headers: {
           Authorization: token,

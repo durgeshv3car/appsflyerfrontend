@@ -5,7 +5,8 @@ import ItemTable from "./components/ItemTable";
 import ItemModal from "./components/ItmeModal";
 import CreativeSetSettings from "./components/CreativeSetSettings";
 import { useSession } from "next-auth/react";
-import { getAudience } from "@/services/createaudience";
+import { getAudience, getAudienceByUser } from "@/services/createaudience";
+import topTost from "@/utils/topTost";
 
 const PreviewListClient = () => {
   const { data: session } = useSession();
@@ -34,7 +35,12 @@ const PreviewListClient = () => {
   useEffect(() => {
     const fetchAudiences = async () => {
       try {
-        const res = await getAudience();
+        let res;
+        if (session?.user?.role === "user" && session?.user?.id) {
+          res = await getAudienceByUser(session.user.id, session.user.role);
+        } else {
+          res = await getAudience();
+        }
         if (res && res.data) {
           setAudiences(res.data);
         }
@@ -43,10 +49,14 @@ const PreviewListClient = () => {
       }
     };
     fetchAudiences();
-  }, []);
+  }, [session]);
 
   useEffect(() => {
     const fetchItems = async () => {
+      if (session?.user?.role === "user" && audiences.length === 0) {
+        setItems([]);
+        return;
+      }
       try {
         const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
         const audienceQuery =
@@ -181,16 +191,17 @@ const PreviewListClient = () => {
           errMessage.includes("duplicate") ||
           errMessage.includes("E11000")
         ) {
-          alert(
-            "A conflicting creative format or title already exists in the backend. Please try a different name."
+          topTost(
+            "A conflicting creative format or title already exists in the backend. Please try a different name.",
+            "warning"
           );
         } else {
-          alert("Failed to update: " + errMessage);
+          topTost("Failed to update: " + errMessage, "error");
         }
       }
     } catch (err) {
       console.error(err);
-      alert("Network or system error updating creative");
+      topTost("Network or system error updating creative", "error");
     }
   };
 
@@ -213,11 +224,11 @@ const PreviewListClient = () => {
         } catch {
           errMessage = await response.text();
         }
-        alert("Failed to delete: " + errMessage);
+        topTost("Failed to delete: " + errMessage, "error");
       }
     } catch (err) {
       console.error(err);
-      alert("Error deleting creative");
+      topTost("Error deleting creative", "error");
     }
   };
 
@@ -279,7 +290,7 @@ const PreviewListClient = () => {
               });
               setItems((prev) => [...newItems, ...prev]);
               setView("list");
-              alert("All creative sets saved successfully!");
+              topTost("All creative sets saved successfully!", "success");
               return;
             }
 
@@ -312,7 +323,7 @@ const PreviewListClient = () => {
             };
             setItems((prev) => [newItem, ...prev]);
             setView("list");
-            alert("Creative set saved successfully!");
+            topTost("Creative set saved successfully!", "success");
           }}
           audiences={audiences}
           defaultAudienceId={selectedAudienceId !== "all" ? selectedAudienceId : ""}

@@ -166,21 +166,6 @@ const UrlTable = ({
     groups[title].Impressions += imp;
     groups[title].Clicks += cks;
     groups[title].Spent += rowSpent;
-
-    let convFactor = 0.011194;
-    let instFactor = (appsflyerDataLength > 0) ? 0.0989 : 0;
-
-    const rowBrowser = (row.browser || row.browser_name || "").toLowerCase();
-    if (
-      (campaignType?.toLowerCase() === "android" || appsflyerCampaignType?.toLowerCase() === "android") &&
-      rowBrowser.includes("safari")
-    ) {
-      convFactor = 0;
-      instFactor = 0;
-    }
-
-    groups[title].TotalConversions += (cks * convFactor);
-    groups[title].Installs += (cks * instFactor);
   });
 
   const result = Object.values(groups);
@@ -199,93 +184,25 @@ const UrlTable = ({
     });
   }
 
-  const currentTotalConv = result.reduce((sum, g) => sum + g.TotalConversions, 0);
-  const currentTotalInst = result.reduce((sum, g) => sum + g.Installs, 0);
-
-  const convScale = currentTotalConv > 0 ? targetConversions / currentTotalConv : 0;
-  const instScale = currentTotalInst > 0 ? targetInstalls / currentTotalInst : 0;
+  // Distribute Installs and Conversions by Impression percentage
+  const totalImpressions = result.reduce((sum, g) => sum + g.Impressions, 0);
 
   let summedConv = 0;
   let summedInst = 0;
 
-  result.forEach(g => {
-    g.TotalConversions = convScale > 0 ? Math.round(g.TotalConversions * convScale) : 0;
-    g.Installs = instScale > 0 ? Math.round(g.Installs * instScale) : 0;
-    summedConv += g.TotalConversions;
-    summedInst += g.Installs;
+  result.forEach((g, idx) => {
+    const share = totalImpressions > 0 ? g.Impressions / totalImpressions : (result.length > 0 ? 1 / result.length : 0);
+    if (idx === result.length - 1) {
+      // Last row gets remainder to avoid rounding drift
+      g.TotalConversions = targetConversions - summedConv;
+      g.Installs = targetInstalls - summedInst;
+    } else {
+      g.TotalConversions = Math.round(targetConversions * share);
+      g.Installs = Math.round(targetInstalls * share);
+      summedConv += g.TotalConversions;
+      summedInst += g.Installs;
+    }
   });
-
-  if (result.length > 0) {
-    if (convScale === 0 && targetConversions > 0) {
-      let tempConv = 0;
-      result.forEach((g, idx) => {
-        let cToAdd = 0;
-        if (idx === result.length - 1) {
-          cToAdd = targetConversions - tempConv;
-        } else {
-          cToAdd = Math.round(targetConversions / result.length);
-          tempConv += cToAdd;
-        }
-        g.TotalConversions = cToAdd;
-      });
-      summedConv = targetConversions;
-    }
-    if (instScale === 0 && targetInstalls > 0) {
-      let tempInst = 0;
-      result.forEach((g, idx) => {
-        let iToAdd = 0;
-        if (idx === result.length - 1) {
-          iToAdd = targetInstalls - tempInst;
-        } else {
-          iToAdd = Math.round(targetInstalls / result.length);
-          tempInst += iToAdd;
-        }
-        g.Installs = iToAdd;
-      });
-      summedInst = targetInstalls;
-    }
-
-    const diffConv = targetConversions - summedConv;
-    const diffInst = targetInstalls - summedInst;
-
-    if (diffConv !== 0 || diffInst !== 0) {
-      const largest = result.reduce((prev, current) => (prev.Clicks > current.Clicks) ? prev : current);
-      largest.TotalConversions += diffConv;
-      largest.Installs += diffInst;
-    }
-
-    // If total conversion is less than 1000, show value 0 and adjust to other which have value greater than 1000
-    if (targetConversions >= 1000) {
-      let offset = 0;
-      result.forEach(g => {
-        if (g.TotalConversions < 1000) {
-          offset += g.TotalConversions;
-          g.TotalConversions = 0;
-        }
-      });
-
-      if (offset > 0) {
-        const qualifying = result.filter(g => g.TotalConversions >= 1000);
-        if (qualifying.length > 0) {
-          const qualifyingSum = qualifying.reduce((sum, g) => sum + g.TotalConversions, 0);
-          let adjustedOffset = 0;
-          qualifying.forEach((g, idx) => {
-            let additional = 0;
-            if (idx === qualifying.length - 1) {
-              additional = offset - adjustedOffset;
-            } else {
-              additional = Math.round(offset * (g.TotalConversions / qualifyingSum));
-              adjustedOffset += additional;
-            }
-            g.TotalConversions += additional;
-          });
-        } else {
-          const largest = result.reduce((prev, current) => (prev.Clicks > current.Clicks) ? prev : current);
-          largest.TotalConversions = targetConversions;
-        }
-      }
-    }
-  }
 
   // Distribute AppsFlyer clicks if appsflyerDataLength > 0
   if (appsflyerDataLength > 0 && appsflyerData && appsflyerData.length > 0) {

@@ -1,6 +1,7 @@
-"use client";
+﻿"use client";
 import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { jwtDecode } from "jwt-decode";
 import { getCurrencySymbol } from "@/utils/currencySymbol";
 import PerformanceDashboard from "./components/PerformanceChart";
@@ -71,7 +72,7 @@ import { createReportsDataBrowser as createBrowserSync } from "@/services/browse
 import { createReportsDataOperator as createOperatorSync } from "@/services/operator";
 import { createReportsDataAdPos as createAdPosSync } from "@/services/ad-pos";
 import { createReportsDataAdType as createAdTypeSync } from "@/services/ad-type";
-import { getAudience } from "@/services/createaudience";
+import { getAudience, getAudienceByUser } from "@/services/createaudience";
 import { filterMetadataRows } from "@/utils/filterMetadata";
 import { createReportsDataCreativeSize } from "@/services/creative-size";
 import { getAppsFlyerSyncData, getAppsFlyerByAudienceId } from "@/services/appsflyer";
@@ -168,6 +169,7 @@ const CampaignDashboard = () => {
   };
 
   const { data: session } = useSession();
+  const router = useRouter();
   const [userPermissions, setUserPermissions] = useState([]);
   const [userRole, setUserRole] = useState("");
   const [campaignPermissions, setCampaignPermissions] = useState([]);
@@ -177,7 +179,12 @@ const CampaignDashboard = () => {
   useEffect(() => {
     const fetchAudiences = async () => {
       try {
-        const res = await getAudience();
+        let res;
+        if (session?.user?.role === "user" && session?.user?.id) {
+          res = await getAudienceByUser(session.user.id, session.user.role);
+        } else {
+          res = await getAudience();
+        }
         if (res?.data) {
           setAllAudiences(res.data);
         }
@@ -186,7 +193,7 @@ const CampaignDashboard = () => {
       }
     };
     fetchAudiences();
-  }, []);
+  }, [session]);
 
   const getNormalizedId = (id) => {
     if (!id) return null;
@@ -246,7 +253,28 @@ const CampaignDashboard = () => {
         console.error("Token decode error", e);
       }
     }
-  }, [session]);
+
+    if (session?.user?.role === "user") {
+      const assignedPages = session.user.assignedPages || [];
+      const currentAudId = filters.audienceId;
+      let matchedPage = null;
+
+      if (currentAudId) {
+        const found = assignedPages.find(
+          (ap) => String(ap.audienceId?._id || ap.audienceId) === String(currentAudId)
+        );
+        if (found) matchedPage = found.page;
+      }
+
+      if (!matchedPage && assignedPages.length > 0) {
+        matchedPage = assignedPages[0].page;
+      }
+
+      if (matchedPage === "reports") {
+        router.replace("/reports");
+      }
+    }
+  }, [session, filters.audienceId, router]);
 
   const hasPermission = (key) => {
     if (userRole === "super_admin") return true;
@@ -974,6 +1002,7 @@ const CampaignDashboard = () => {
 
 
 
+
   const clearAllData = React.useCallback(() => {
     const emptyState = { tableData: [], graphData: [] };
     setTableData(emptyState);
@@ -1009,7 +1038,7 @@ const CampaignDashboard = () => {
     fetchOperatorData(targetFilters);
     fetchPlacementPosData(targetFilters);
     fetchPlacementTypeData(targetFilters);
-     fetchDeviceData(targetFilters);
+    fetchDeviceData(targetFilters);
     fetchCityData(targetFilters);
     fetchUrlData(targetFilters);
     fetchAppsflyerData(targetFilters);
@@ -1032,7 +1061,6 @@ const CampaignDashboard = () => {
     fetchAppsflyerData,
   ]);
 
-
   const globalTotals = React.useMemo(() => {
     if (!tableData.tableData || tableData.tableData.length === 0) {
       return { TotalConversions: 0, Installs: 0 };
@@ -1054,7 +1082,6 @@ const CampaignDashboard = () => {
       return str.replace(/\//g, "-");
     };
 
-    const isOldData = !filters.conversionValue;
     const afMap = {};
     appsflyerData.forEach(item => {
       const d = normalizeDate(item.date);
@@ -1076,8 +1103,8 @@ const CampaignDashboard = () => {
           });
         }
       } else {
-        // If 0, fallback to event_count
-        finalVal = (item.total_revenue || 0) === 0 ? (item.event_count || 0) : (item.total_revenue || 0);
+        // Always use event_count as conversions (not total_revenue)
+        finalVal = item.event_count || 0;
       }
       afMap[d].af_payment_unique += finalVal;
     });
@@ -1090,14 +1117,11 @@ const CampaignDashboard = () => {
       const af = afMap[d] || { installs: 0, af_payment_unique: 0 };
       const defaultConversions = Number(row.TotalConversions || row.totalConversions || row.total_conversions || 0);
       const clicks = Number(row.Clicks || row.clicks || 0);
-      
+
       let finalConversions = af.af_payment_unique > 0 ? af.af_payment_unique : defaultConversions;
       let finalInstalls = af.installs;
 
-      // Fallback to proxy if both are 0, BUT ONLY if we have AppsFlyer config (datalength > 0)
-      // If datalength is 0, we use advertiser data (defaultConversions) directly.
       const hasAFConfig = (filters.appsflyerDataLength > 0);
-      
       if (hasAFConfig) {
         if (finalConversions === 0 && clicks > 0) finalConversions = clicks * 0.011194;
         if (finalInstalls === 0 && clicks > 0) finalInstalls = clicks * 0.0989;
@@ -1127,7 +1151,7 @@ const CampaignDashboard = () => {
           fetchOperatorData={fetchOperatorData}
           fetchPlacementPosData={fetchPlacementPosData}
           fetchPlacementTypeData={fetchPlacementTypeData}
-           fetchDeviceData={fetchDeviceData}
+          fetchDeviceData={fetchDeviceData}
           fetchCityData={fetchCityData}
           fetchUrlData={fetchUrlData}
           fetchAppsflyerData={fetchAppsflyerData}
@@ -1137,11 +1161,25 @@ const CampaignDashboard = () => {
       </Suspense>
 
       <div className="container-fluid py-4 position-relative" id="dashboard-content" style={{ minHeight: isUpdating ? '400px' : 'auto' }}>
-        {isUpdating && (
-          <div 
+        {!isUpdating && session?.user?.role === "user" && allAudiences.length === 0 ? (
+          <div className="card shadow-sm border-0 rounded-4 my-5 p-5 text-center">
+            <div className="card-body py-5">
+              <div className="mb-3 text-muted" style={{ fontSize: "48px" }}>📋</div>
+              <h4 className="fw-bold text-dark mb-2">No Campaigns Assigned</h4>
+              <p className="text-muted small mb-0">
+                There are currently no campaigns or audiences assigned to your account.
+                <br />
+                Please contact your administrator to request access.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {isUpdating && (
+          <div
             className="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center"
-            style={{ 
-              backgroundColor: "rgba(255, 255, 255, 0.7)", 
+            style={{
+              backgroundColor: "rgba(255, 255, 255, 0.7)",
               backdropFilter: "blur(4px)",
               zIndex: 1000,
               borderRadius: '12px'
@@ -1206,7 +1244,7 @@ const CampaignDashboard = () => {
               />
             </div>
           )}
-              {hasPermission("creative_performance_graph_table") && (
+          {hasPermission("creative_performance_graph_table") && (
             <div className="col-12">
               <CreativeTable
                 CreativeTableData={CreativeTableData.tableData}
@@ -1265,11 +1303,6 @@ const CampaignDashboard = () => {
             </div>
           </div>
 
-          {/* {hasPermission("browser_graph") && (
-            <div className="col-12 mt-4">
-              <BrowserPerformance browserData={browserData.graphData} />
-            </div>
-          )} */}
           {hasPermission("browser_table") && (
             <div className="col-12">
               <BrowserTable
@@ -1288,11 +1321,6 @@ const CampaignDashboard = () => {
             </div>
           )}
 
-          {/* {hasPermission("operator_graph") && (
-            <div className="col-12 mt-4">
-              <OperatorPerformance operatorData={operatorData.graphData} />
-            </div>
-          )} */}
           {hasPermission("operator_table") && (
             <div className="col-12">
               <OperatorTable
@@ -1311,11 +1339,6 @@ const CampaignDashboard = () => {
             </div>
           )}
 
-          {/* {hasPermission("os_graph") && (
-            <div className="col-12 mt-5">
-              <OsPerformance osData={osData.graphData} />
-            </div>
-          )} */}
           {hasPermission("os_distribution") && (
             <div className="col-12">
               <OsDistribution osData={osData.graphData} />
@@ -1358,19 +1381,11 @@ const CampaignDashboard = () => {
             </div>
           </div>
 
-       
-
           {hasPermission("url_distribution") && (
             <div className="col-12 mt-4">
               <UrlDistribution urlData={urlData.graphData} />
             </div>
           )}
-
-          {/* {hasPermission("url_graph") && (
-            <div className="col-12 mt-4">
-              <UrlPerformance urlData={urlData.graphData} />
-            </div>
-          )} */}
 
           {hasPermission("url_table") && (
             <div className="col-12">
@@ -1390,9 +1405,11 @@ const CampaignDashboard = () => {
             </div>
           )}
         </div>
-      </div>
+      </>
+      )}
     </div>
-  );
+  </div>
+);
 };
 
 export default CampaignDashboard;

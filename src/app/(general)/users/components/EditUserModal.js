@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 
 const EditUserModal = ({ show, onClose, user, onSave }) => {
   const [formData, setFormData] = useState({ email: "", role: "" });
-    const router = useRouter();
+  const router = useRouter();
 
   // Sync when user changes
   useEffect(() => {
@@ -25,7 +25,7 @@ const EditUserModal = ({ show, onClose, user, onSave }) => {
     onSave(user._id, formData);
   };
 
-  const handleClose=()=>{
+  const handleClose = () => {
     router.push("/users")
     onClose()
   }
@@ -71,7 +71,7 @@ const EditUserModal = ({ show, onClose, user, onSave }) => {
                     <option value="">Select Role</option>
                     <option value="super_admin">super_admin</option>
                     <option value="user">user</option>
-              
+
                   </select>
                 </div>
               </div>

@@ -235,8 +235,8 @@ const PerformanceTable = ({
           });
         }
       } else {
-        // conversionValue is defined — total_revenue is correct. If 0, fallback to event_count
-        af_payment_unique = (item.total_revenue || 0) === 0 ? (item.event_count || 0) : (item.total_revenue || 0);
+        // Always use event_count as conversions (not total_revenue)
+        af_payment_unique = item.event_count || 0;
       }
 
       if (item.events && Array.isArray(item.events)) {
