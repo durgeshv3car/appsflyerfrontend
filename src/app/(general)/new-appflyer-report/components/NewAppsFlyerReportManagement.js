@@ -62,6 +62,7 @@ export default function NewAppsFlyerReportManagement() {
   const [reportData, setReportData] = useState([]);
   const [dataLoading, setDataLoading] = useState(false);
   const [showToken, setShowToken] = useState(false);
+  const [copiedId, setCopiedId] = useState(null);
 
   // Debounce search query input
   useEffect(() => {
@@ -401,6 +402,7 @@ export default function NewAppsFlyerReportManagement() {
                   <thead className="table-light border-bottom">
                     <tr>
                       <th className="px-4 py-3 small fw-bold text-secondary">Name</th>
+                      <th className="px-4 py-3 small fw-bold text-secondary">ID</th>
                       <th className="px-4 py-3 small fw-bold text-secondary">App ID</th>
                       <th className="px-4 py-3 small fw-bold text-secondary">Date Range</th>
                       <th className="px-4 py-3 small fw-bold text-secondary">Media Source</th>
@@ -413,7 +415,7 @@ export default function NewAppsFlyerReportManagement() {
                   <tbody>
                     {loading ? (
                       <tr>
-                        <td colSpan="8" className="text-center py-5">
+                        <td colSpan="9" className="text-center py-5">
                           <div className="d-flex justify-content-center align-items-center gap-2 text-muted">
                             <Loader2 className="spinner-border spinner-border-sm border-0" style={{ animation: "spin 1s linear infinite" }} />
                             <span>Loading configurations...</span>
@@ -422,7 +424,7 @@ export default function NewAppsFlyerReportManagement() {
                       </tr>
                     ) : reports.length === 0 ? (
                       <tr>
-                        <td colSpan="8" className="text-center py-5 text-muted italic">
+                        <td colSpan="9" className="text-center py-5 text-muted italic">
                           No configurations matching search criteria found.
                         </td>
                       </tr>
@@ -435,6 +437,47 @@ export default function NewAppsFlyerReportManagement() {
                           title="Click to view report data"
                         >
                           <td className="px-4 py-3 fw-semibold text-primary">{item.name}</td>
+                          <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                            <div className="d-flex align-items-center gap-1">
+                              <span className="font-monospace text-muted" style={{ fontSize: "0.72rem" }}>
+                                {item._id ? `${item._id.slice(0, 8)}...` : "-"}
+                              </span>
+                              <button
+                                title={`Copy full ID: ${item._id}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigator.clipboard.writeText(item._id).then(() => {
+                                    setCopiedId(item._id);
+                                    setTimeout(() => setCopiedId(null), 2000);
+                                  });
+                                }}
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  padding: "2px 4px",
+                                  borderRadius: "4px",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  color: copiedId === item._id ? "#22863a" : "#999",
+                                  transition: "color 0.2s",
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.color = copiedId === item._id ? "#22863a" : "#555"}
+                                onMouseLeave={e => e.currentTarget.style.color = copiedId === item._id ? "#22863a" : "#999"}
+                              >
+                                {copiedId === item._id ? (
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="20 6 9 17 4 12" />
+                                  </svg>
+                                ) : (
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                                  </svg>
+                                )}
+                              </button>
+                            </div>
+                          </td>
                           <td className="px-4 py-3 font-monospace small text-muted">{item.app_id}</td>
                           <td className="px-4 py-3">
                             {item.from ? item.from.split("T")[0] : "-"} to {item.to ? item.to.split("T")[0] : "-"}
