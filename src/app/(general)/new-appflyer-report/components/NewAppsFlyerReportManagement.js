@@ -285,6 +285,10 @@ export default function NewAppsFlyerReportManagement() {
                   <Database size={20} />
                   Report Data: {selectedReport.name}
                 </h5>
+                <p className="small text-muted mb-1">
+                  <span className="fw-semibold text-dark">ID:</span>{" "}
+                  <span className="font-monospace text-secondary" style={{ fontSize: "0.78rem" }}>{selectedReport._id}</span>
+                </p>
                 <p className="small text-muted mb-0">
                   App ID: <span className="font-monospace">{selectedReport.app_id}</span> | Media Source: <span className="badge bg-soft-info text-info">{selectedReport.media_source}</span> | Timezone: <span className="badge bg-soft-primary text-primary border">{selectedReport.timezone || "Asia/Kolkata"}</span>
                   {selectedReport.eventName && (
