@@ -185,13 +185,30 @@ const UrlTable = ({
   }
 
   // Distribute Installs and Conversions by Impression percentage
+  const targetImpressions = Number(globalTotals?.Impressions || globalEffectiveMetrics?.impressions || 0);
   const totalImpressions = result.reduce((sum, g) => sum + g.Impressions, 0);
+
+  if (targetImpressions > 0 && totalImpressions > 0 && targetImpressions !== totalImpressions) {
+    let allocatedImp = 0;
+    result.forEach((g, idx) => {
+      if (idx === result.length - 1) {
+        g.Impressions = Math.max(0, targetImpressions - allocatedImp);
+      } else {
+        const ratio = g.Impressions / totalImpressions;
+        const scaled = Math.round(targetImpressions * ratio);
+        g.Impressions = scaled;
+        allocatedImp += scaled;
+      }
+    });
+  }
 
   let summedConv = 0;
   let summedInst = 0;
 
+  const currentTotalImp = result.reduce((sum, g) => sum + g.Impressions, 0);
+
   result.forEach((g, idx) => {
-    const share = totalImpressions > 0 ? g.Impressions / totalImpressions : (result.length > 0 ? 1 / result.length : 0);
+    const share = currentTotalImp > 0 ? g.Impressions / currentTotalImp : (result.length > 0 ? 1 / result.length : 0);
     if (idx === result.length - 1) {
       // Last row gets remainder to avoid rounding drift
       g.TotalConversions = targetConversions - summedConv;

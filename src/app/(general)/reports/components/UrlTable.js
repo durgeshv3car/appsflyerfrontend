@@ -29,31 +29,83 @@ export function UrlTable({ urlData: propData, campaignPricing, globalEffectiveMe
 
   const list = useMemo(() => {
     if (!Array.isArray(propData) || propData.length === 0) return [];
+    const globalTargetImp = Number(globalEffectiveMetrics?.impressions || 0);
+
     const rawList = propData.map(r => {
       const imp = Number(r.Impressions || r.impressions || 0);
       const clk = Number(r.Clicks || r.clicks || 0);
       const ctrRaw = Number(r.CTR || r.ctr || 0);
-      const ctrVal = ctrRaw > 1 ? ctrRaw : (imp > 0 ? (clk / imp * 100) : 0);
       const cpmVal = effectiveCpm || Number(r.CPM || r.cpm || r.eCPM || 320);
-      const spent = (imp / 1000) * cpmVal;
 
-      const vComplete = hasVideo ? Number(r.completeViewsVideo || r.CompleteViewsVideo || r.complete_views || r.completeViews || Math.round(imp * 0.8846)) : 0;
-      const vFirstQ = hasVideo ? Number(r.firstQuartileViewsVideo || r.FirstQuartileViewsVideo || Math.round(imp * 0.9474)) : 0;
-      const vMidpoint = hasVideo ? Number(r.midpointViewsVideo || r.MidpointViewsVideo || Math.round(imp * 0.9222)) : 0;
-      const vThirdQ = hasVideo ? Number(r.thirdQuartileViewsVideo || r.ThirdQuartileViewsVideo || Math.round(imp * 0.8999)) : 0;
-      const vViews = hasVideo ? Number(r.Views || r.views || r.VideoViews || vComplete || Math.round(imp * 0.98836)) : 0;
-      const cpvVal = vViews > 0 ? spent / vViews : 0;
-      const cpcvVal = vComplete > 0 ? spent / vComplete : 0;
+      const vComplete = hasVideo ? Number(r.completeViewsVideo || r.CompleteViewsVideo || r.complete_views || r.completeViews || 0) : 0;
+      const vFirstQ = hasVideo ? Number(r.firstQuartileViewsVideo || r.FirstQuartileViewsVideo || 0) : 0;
+      const vMidpoint = hasVideo ? Number(r.midpointViewsVideo || r.MidpointViewsVideo || 0) : 0;
+      const vThirdQ = hasVideo ? Number(r.thirdQuartileViewsVideo || r.ThirdQuartileViewsVideo || 0) : 0;
+      const vViews = hasVideo ? Number(r.Views || r.views || r.VideoViews || vComplete || 0) : 0;
 
       return {
         url: r.name || r.Url || r.url || r.Domain || r.domain || "Unknown URL",
         rawImp: imp,
         rawClicks: clk,
-        impressions: imp.toLocaleString('en-IN'),
+        ctrRaw,
+        cpmVal,
+        vComplete,
+        vFirstQ,
+        vMidpoint,
+        vThirdQ,
+        vViews,
+      };
+    });
+
+    const totalClicksSum = rawList.reduce((a, r) => a + r.rawClicks, 0);
+    const totalImpSum = rawList.reduce((a, r) => a + r.rawImp, 0);
+    const targetTotalImp = globalTargetImp > 0 ? globalTargetImp : totalImpSum;
+
+    let allocatedImp = 0;
+    return rawList.map((r, idx) => {
+      let share = 0;
+      if (totalClicksSum > 0) {
+        share = r.rawClicks / totalClicksSum;
+      } else if (totalImpSum > 0) {
+        share = r.rawImp / totalImpSum;
+      } else {
+        share = 1 / rawList.length;
+      }
+
+      let scaledImp = 0;
+      if (idx === rawList.length - 1) {
+        scaledImp = Math.max(0, targetTotalImp - allocatedImp);
+      } else {
+        const impRatio = totalImpSum > 0 ? r.rawImp / totalImpSum : (1 / rawList.length);
+        scaledImp = Math.round(targetTotalImp * impRatio);
+        allocatedImp += scaledImp;
+      }
+
+      const clk = r.rawClicks;
+      const ctrVal = r.ctrRaw > 1 ? r.ctrRaw : (scaledImp > 0 ? (clk / scaledImp * 100) : 0);
+      const spent = (scaledImp / 1000) * r.cpmVal;
+
+      const vViews = hasVideo ? (r.vViews > 0 ? Math.round(r.vViews * (totalImpSum > 0 ? scaledImp / totalImpSum : 1)) : Math.round(scaledImp * 0.98836)) : 0;
+      const vComplete = hasVideo ? (r.vComplete > 0 ? Math.round(r.vComplete * (totalImpSum > 0 ? scaledImp / totalImpSum : 1)) : Math.round(scaledImp * 0.8846)) : 0;
+      const vFirstQ = hasVideo ? (r.vFirstQ > 0 ? Math.round(r.vFirstQ * (totalImpSum > 0 ? scaledImp / totalImpSum : 1)) : Math.round(scaledImp * 0.9474)) : 0;
+      const vMidpoint = hasVideo ? (r.vMidpoint > 0 ? Math.round(r.vMidpoint * (totalImpSum > 0 ? scaledImp / totalImpSum : 1)) : Math.round(scaledImp * 0.9222)) : 0;
+      const vThirdQ = hasVideo ? (r.vThirdQ > 0 ? Math.round(r.vThirdQ * (totalImpSum > 0 ? scaledImp / totalImpSum : 1)) : Math.round(scaledImp * 0.8999)) : 0;
+
+      const cpvVal = vViews > 0 ? spent / vViews : 0;
+      const cpcvVal = vComplete > 0 ? spent / vComplete : 0;
+
+      const inst = Math.round(totalInstalls * share);
+      const conv = Math.round(totalConversions * share);
+
+      return {
+        url: r.url,
+        rawImp: scaledImp,
+        rawClicks: clk,
+        impressions: scaledImp.toLocaleString('en-IN'),
         clicks: clk.toLocaleString('en-IN'),
         ctr: ctrVal.toFixed(2) + "%",
-        cpmVal,
-        cpm: "₹" + cpmVal.toFixed(2),
+        cpmVal: r.cpmVal,
+        cpm: "₹" + r.cpmVal.toFixed(2),
         rawViews: vViews,
         rawComplete: vComplete,
         rawFirstQ: vFirstQ,
@@ -61,31 +113,13 @@ export function UrlTable({ urlData: propData, campaignPricing, globalEffectiveMe
         rawThirdQ: vThirdQ,
         cpvVal,
         cpcvVal,
-      };
-    });
-
-    const totalClicksSum = rawList.reduce((a, r) => a + r.rawClicks, 0);
-    const totalImpSum = rawList.reduce((a, r) => a + r.rawImp, 0);
-
-    return rawList.map((r) => {
-      let share = 0;
-      if (totalClicksSum > 0) {
-        share = r.rawClicks / totalClicksSum;
-      } else if (totalImpSum > 0) {
-        share = r.rawImp / totalImpSum;
-      }
-      const inst = Math.round(totalInstalls * share);
-      const conv = Math.round(totalConversions * share);
-
-      return {
-        ...r,
         installs: inst,
         conversions: conv,
         installsFormatted: inst.toLocaleString('en-IN'),
         conversionsFormatted: conv.toLocaleString('en-IN'),
       };
     });
-  }, [propData, effectiveCpm, hasVideo, totalInstalls, totalConversions]);
+  }, [propData, effectiveCpm, hasVideo, totalInstalls, totalConversions, globalEffectiveMetrics]);
 
   const totals = useMemo(() => {
     const totalImpr = list.reduce((a, r) => a + r.rawImp, 0);

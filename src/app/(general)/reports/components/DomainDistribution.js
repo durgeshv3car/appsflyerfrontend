@@ -120,6 +120,7 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
 
   const list = useMemo(() => {
     const hasRawInstalls = rawInstallsBreakdown?.city && Object.keys(rawInstallsBreakdown.city).length > 0;
+    const globalTargetImp = Number(globalEffectiveMetrics?.impressions || 0);
 
     // CASE 1: AppsFlyer Data Found -> State Data from rawinstall API (matching appflyer-preview)
     if (hasAF) {
@@ -174,7 +175,7 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
       }).sort((a, b) => b.rawInstalls - a.rawInstalls);
 
       const propDataArr = Array.isArray(propData) ? propData : [];
-      const totalImpSum = propDataArr.reduce((a, r) => a + Number(r.Impressions || r.impressions || 0), 0);
+      const totalImpSum = globalTargetImp > 0 ? globalTargetImp : propDataArr.reduce((a, r) => a + Number(r.Impressions || r.impressions || 0), 0);
       const totalClicksSum = propDataArr.reduce((a, r) => a + Number(r.Clicks || r.clicks || 0), 0);
       const totalViewsSum = propDataArr.reduce((a, r) => a + Number(r.Views || r.views || r.VideoViews || 0), 0);
       const totalCompleteSum = propDataArr.reduce((a, r) => a + Number(r.completeViewsVideo || r.CompleteViewsVideo || r.complete_views || r.completeViews || 0), 0);
@@ -182,9 +183,16 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
       const totalMidpointSum = propDataArr.reduce((a, r) => a + Number(r.midpointViewsVideo || r.MidpointViewsVideo || 0), 0);
       const totalThirdQSum = propDataArr.reduce((a, r) => a + Number(r.thirdQuartileViewsVideo || r.ThirdQuartileViewsVideo || 0), 0);
 
-      return stateList.map(g => {
+      let allocatedImp = 0;
+      return stateList.map((g, idx) => {
         const share = targetInst > 0 ? g.rawInstalls / targetInst : (1 / stateList.length);
-        const imp = Math.round(totalImpSum * share);
+        let imp = 0;
+        if (idx === stateList.length - 1) {
+          imp = Math.max(0, totalImpSum - allocatedImp);
+        } else {
+          imp = Math.round(totalImpSum * share);
+          allocatedImp += imp;
+        }
         const clk = Math.round(totalClicksSum * share);
         const ctrVal = imp > 0 ? (clk / imp * 100) : 0;
         const cpmVal = effectiveCpm;
@@ -227,8 +235,20 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
     // CASE 2: No AppsFlyer Data -> Old City Method Data
     if (!Array.isArray(propData) || propData.length === 0) return [];
 
-    return propData.map(r => {
-      const imp = Number(r.Impressions || r.impressions || 0);
+    const rawCityImpSum = propData.reduce((a, r) => a + Number(r.Impressions || r.impressions || 0), 0);
+    const targetTotalImp = globalTargetImp > 0 ? globalTargetImp : rawCityImpSum;
+
+    let allocatedImp = 0;
+    return propData.map((r, idx) => {
+      const rawImp = Number(r.Impressions || r.impressions || 0);
+      const share = rawCityImpSum > 0 ? (rawImp / rawCityImpSum) : (1 / propData.length);
+      let imp = 0;
+      if (idx === propData.length - 1) {
+        imp = Math.max(0, targetTotalImp - allocatedImp);
+      } else {
+        imp = Math.round(targetTotalImp * share);
+        allocatedImp += imp;
+      }
       const clk = Number(r.Clicks || r.clicks || 0);
       const ctrRaw = Number(r.CTR || r.ctr || 0);
       const ctrVal = ctrRaw > 1 ? ctrRaw : (imp > 0 ? (clk / imp * 100) : 0);
@@ -265,7 +285,7 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
         conversionsFormatted: "0",
       };
     });
-  }, [propData, effectiveCpm, hasVideo, hasAF, rawInstallsBreakdown, totalInstalls, totalConversions]);
+  }, [propData, effectiveCpm, hasVideo, hasAF, rawInstallsBreakdown, totalInstalls, totalConversions, globalEffectiveMetrics]);
 
   const totals = useMemo(() => {
     const totalImpr = list.reduce((a, r) => a + r.rawImp, 0);

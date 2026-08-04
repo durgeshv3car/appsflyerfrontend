@@ -37,6 +37,19 @@ export const menuList = [
         path: `/reports`,
         icon: 'feather-briefcase',
     },
+     {
+        id: 7,
+        name: "Token",
+        path: `/token`,
+        icon: 'feather-umbrella',
+    },
+    {
+        id: 8,
+        name: "New Appflyer Report",
+        path: `/new-appflyer-report`,
+        icon: 'feather-airplay',
+    },
+
 
 
 
