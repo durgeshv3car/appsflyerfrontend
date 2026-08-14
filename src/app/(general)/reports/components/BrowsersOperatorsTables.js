@@ -159,12 +159,12 @@ function BrowserTable({ data, titleLabel, subLabel, entityKey, defaultData, hasV
           <thead>
             <tr>
               <th style={{ paddingLeft: "22px" }}>{entityKey.toUpperCase()}</th>
-              <th>IMPRESSIONS</th>
+              {!isCtvWithAF && <th>IMPRESSIONS</th>}
               {!isCtvWithAF && <th>CLICKS</th>}
               {!isCtvWithAF && <th>CTR</th>}
-              {hasVideo && <th>VIEWS</th>}
+              {hasVideo && !isCtvWithAF && <th>VIEWS</th>}
               {hasVideo && !isCtvWithAF && <th>CPV</th>}
-              {hasVideo && <th>COMPLETE VIEW</th>}
+              {hasVideo && !isCtvWithAF && <th>COMPLETE VIEW</th>}
               {hasVideo && !isCtvWithAF && <th>CPCV</th>}
               {hasAF && <th>INSTALLS</th>}
               {hasAF && <th style={{ paddingRight: "22px" }}>TOTAL CONVERSIONS</th>}
@@ -186,12 +186,12 @@ function BrowserTable({ data, titleLabel, subLabel, entityKey, defaultData, hasV
                       <td style={{ fontWeight: 600, color: "#111827", paddingLeft: "22px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {r[entityKey] || r.name || "–"}
                       </td>
-                      <td>{r.impressions}</td>
+                      {!isCtvWithAF && <td>{r.impressions}</td>}
                       {!isCtvWithAF && <td>{r.clicks}</td>}
                       {!isCtvWithAF && <td>{r.ctr}</td>}
-                      {hasVideo && <td>{vViews.toLocaleString('en-IN')}</td>}
+                      {hasVideo && !isCtvWithAF && <td>{vViews.toLocaleString('en-IN')}</td>}
                       {hasVideo && !isCtvWithAF && <td>₹{cpvVal.toFixed(2)}</td>}
-                      {hasVideo && <td>{vComplete.toLocaleString('en-IN')}</td>}
+                      {hasVideo && !isCtvWithAF && <td>{vComplete.toLocaleString('en-IN')}</td>}
                       {hasVideo && !isCtvWithAF && <td>₹{cpcvVal.toFixed(2)}</td>}
                       {hasAF && <td>{r.installsFormatted}</td>}
                       {hasAF && <td style={{ paddingRight: "22px" }}>{r.conversionsFormatted}</td>}
@@ -200,19 +200,19 @@ function BrowserTable({ data, titleLabel, subLabel, entityKey, defaultData, hasV
                 })}
                 <tr className="st-tr-total">
                   <td style={{ paddingLeft: "22px" }}>Total</td>
-                  <td>{totals.totalImpr}</td>
+                  {!isCtvWithAF && <td>{totals.totalImpr}</td>}
                   {!isCtvWithAF && <td>{totals.totalClicks}</td>}
                   {!isCtvWithAF && <td>{totals.avgCtr}</td>}
-                  {hasVideo && <td>{totals.totalViews}</td>}
+                  {hasVideo && !isCtvWithAF && <td>{totals.totalViews}</td>}
                   {hasVideo && !isCtvWithAF && <td>{totals.avgCpv}</td>}
-                  {hasVideo && <td>{totals.totalComplete}</td>}
+                  {hasVideo && !isCtvWithAF && <td>{totals.totalComplete}</td>}
                   {hasVideo && !isCtvWithAF && <td>{totals.avgCpcv}</td>}
                   {hasAF && <td>{totals.totalInstalls}</td>}
                   {hasAF && <td style={{ paddingRight: "22px" }}>{totals.totalConversions}</td>}
                 </tr>
               </>
             ) : (
-              <tr><td colSpan={4 + (hasVideo ? 4 : 0) + (hasAF ? 2 : 0) - (isCtvWithAF ? (hasVideo ? 4 : 2) : 0)} style={{ textAlign: "center", padding: 20, color: "#6B7280" }}>No data available.</td></tr>
+              <tr><td colSpan={1 + (isCtvWithAF ? 0 : 3) + (hasVideo && !isCtvWithAF ? 4 : 0) + (hasAF ? 2 : 0)} style={{ textAlign: "center", padding: 20, color: "#6B7280" }}>No data available.</td></tr>
             )}
           </tbody>
         </table>

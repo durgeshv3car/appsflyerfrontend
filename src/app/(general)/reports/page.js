@@ -173,6 +173,7 @@ export default function DashboardRedesignPage() {
     },
   ]);
   const calRef = useRef(null);
+  const searchRef = useRef(null);
 
   const setPreset = (type) => {
     const today = new Date();
@@ -231,6 +232,9 @@ export default function DashboardRedesignPage() {
       if (calRef.current && !calRef.current.contains(e.target)) {
         setShowCalendar(false);
       }
+      if (searchRef.current && !searchRef.current.contains(e.target)) {
+        setIsFocused(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -271,18 +275,12 @@ export default function DashboardRedesignPage() {
     return filterMetadataRows(tData);
   };
 
-  // Force show loader for 3 seconds on initial page load / refresh
-  useEffect(() => {
-    setIsUpdating(true);
-    const timer = setTimeout(() => {
-      setIsUpdating(false);
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, []);
+  // Track fetch in-flight so loader timers don't race each other
+  const fetchingRef = useRef(false);
 
   const fetchDataForAudience = async (targetAudience, dateRangeToUse) => {
     if (!targetAudience) return;
-
+    fetchingRef.current = true;
     setIsUpdating(true);
     setPerfPage(1);
     setSelectedAudience(targetAudience);
@@ -517,10 +515,8 @@ export default function DashboardRedesignPage() {
     } catch (err) {
       console.error("Error fetching campaign data:", err);
     } finally {
-      // Force show loader for 3 seconds as requested
-      setTimeout(() => {
-        setIsUpdating(false);
-      }, 3000);
+      fetchingRef.current = false;
+      setIsUpdating(false);
     }
   };
 
@@ -1188,58 +1184,86 @@ export default function DashboardRedesignPage() {
       ) : (
         <>
           {/* ── Filter Bar ── */}
-      <div className="st-filter-bar">
-        {!isPdfLoading ? (
-          <>
-            <div className="st-search-wrap" onBlur={() => setTimeout(() => setIsFocused(false), 200)}>
-              <span className="st-search-icon"><SearchIcon /></span>
-              <input className="st-search" placeholder="Search campaigns, creatives, domains..."
-                value={search} onChange={e => setSearch(e.target.value)}
-                onFocus={() => setIsFocused(true)} />
-              {isFocused && (
-                <div className="st-dropdown">
-                  {!search && <div style={{ padding: "8px 12px", fontSize: 11, fontWeight: 700, color: "#9CA3AF" }}>SELECT A CAMPAIGN</div>}
-                  {(search ? filteredCampaigns : campaignsList.slice(0, 20)).map(c => (
-                    <div
-                      key={c}
-                      className="st-dropdown-item"
+          <div className="st-filter-bar">
+            {!isPdfLoading ? (
+              <>
+                <div className="st-search-wrap" ref={searchRef}>
+                  <span className="st-search-icon"><SearchIcon /></span>
+                  <input className="st-search" placeholder="Search campaigns, creatives, domains..."
+                    value={search} onChange={e => setSearch(e.target.value)}
+                    onFocus={() => setIsFocused(true)} />
+                  {search && (
+                    <span
                       onMouseDown={(e) => {
                         e.preventDefault();
-                        setSearch(c);
-                        setIsFocused(false);
-                        const selectedAud = allAudiences.find(a => {
-                          const name = a.reportName || a.campaignName || a.name || "";
-                          return name.trim().toLowerCase() === c.trim().toLowerCase();
-                        });
-                        if (selectedAud) {
-                          fetchDataForAudience(selectedAud, {
-                            startDate: range[0].startDate,
-                            endDate: range[0].endDate
-                          });
-                        }
+                        e.stopPropagation();
+                        setSearch("");
                       }}
-                      style={{ cursor: "pointer" }}
+                      style={{
+                        position: "absolute",
+                        right: "12px",
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        cursor: "pointer",
+                        color: "#9CA3AF",
+                        fontSize: "14px",
+                        fontWeight: "bold",
+                        padding: "2px 6px",
+                        borderRadius: "50%",
+                        zIndex: 5
+                      }}
+                      title="Clear search"
                     >
-                      {c}
+                      ✕
+                    </span>
+                  )}
+                  {isFocused && (
+                    <div className="st-dropdown">
+                      {!search && <div style={{ padding: "8px 12px", fontSize: 11, fontWeight: 700, color: "#9CA3AF" }}>SELECT A CAMPAIGN</div>}
+                      {(search ? filteredCampaigns : campaignsList.slice(0, 20)).map(c => (
+                        <div
+                          key={c}
+                          className="st-dropdown-item"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setSearch(c);
+                            setIsFocused(false);
+                            const selectedAud = allAudiences.find(a => {
+                              const name = a.reportName || a.campaignName || a.name || "";
+                              return name.trim().toLowerCase() === c.trim().toLowerCase();
+                            });
+                            if (selectedAud) {
+                              fetchDataForAudience(selectedAud, {
+                                startDate: range[0].startDate,
+                                endDate: range[0].endDate
+                              });
+                            }
+                          }}
+                          style={{ cursor: "pointer" }}
+                        >
+                          {c}
+                        </div>
+                      ))}
+                      {search && filteredCampaigns.length === 0 && (
+                        <div style={{ padding: "12px 16px", fontSize: 13, color: "#64748B", display: "flex", alignItems: "center", gap: 8 }}>
+                          <span>🔍</span>
+                          <span>No campaigns found matching "<b>{search}</b>"</span>
+                        </div>
+                      )}
                     </div>
-                  ))}
-                  {search && filteredCampaigns.length === 0 && (
-                    <div style={{ padding: "8px 12px", fontSize: 13, color: "#6B7280" }}>No campaigns found</div>
                   )}
                 </div>
-              )}
-            </div>
 
-            <div style={{ position: "relative" }} ref={calRef}>
-              <div className="st-chip" onClick={() => setShowCalendar(!showCalendar)} style={{ cursor: "pointer" }}>
-                <CalIcon />
-                <span>
-                  {format(range[0].startDate, "d MMM yyyy")} – {format(range[0].endDate, "d MMM yyyy")}
-                </span>
-              </div>
-              {showCalendar && (
-                <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 8, zIndex: 100, boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)", borderRadius: 12, overflow: "hidden", border: "1px solid #E5E7EB", backgroundColor: "#fff", display: "flex", flexDirection: "column", minWidth: "820px" }}>
-                  <style>{`
+                <div style={{ position: "relative" }} ref={calRef}>
+                  <div className="st-chip" onClick={() => setShowCalendar(!showCalendar)} style={{ cursor: "pointer" }}>
+                    <CalIcon />
+                    <span>
+                      {format(range[0].startDate, "d MMM yyyy")} – {format(range[0].endDate, "d MMM yyyy")}
+                    </span>
+                  </div>
+                  {showCalendar && (
+                    <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 8, zIndex: 100, boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)", borderRadius: 12, overflow: "hidden", border: "1px solid #E5E7EB", backgroundColor: "#fff", display: "flex", flexDirection: "column", minWidth: "820px" }}>
+                      <style>{`
                     .rdrMonth { width: 330px !important; padding: 0 15px !important; }
                     .rdrCalendarWrapper { font-size: 12px !important; color: #334155 !important; border-radius: 12px !important; width: 100% !important; }
                     .rdrDateDisplayWrapper { display: none !important; }
@@ -1254,392 +1278,431 @@ export default function DashboardRedesignPage() {
                     .rdrDayNumber span { color: #334155 !important; font-weight: 500 !important; }
                     .rdrDayToday .rdrDayNumber span:after { background: #4c84ff !important; bottom: 4px !important; }
                   `}</style>
-                  <div style={{ display: "flex", flexDirection: "row-reverse", backgroundColor: "#fff" }}>
-                    <div style={{ borderLeft: "1px solid #E5E7EB", padding: "16px", backgroundColor: "#F8FAFC", display: "flex", flexDirection: "column", gap: "4px", width: "170px" }}>
-                      <label style={{ fontWeight: 700, color: "#64748B", marginBottom: "12px", padding: "4px 8px", fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.1em" }}>Quick Select</label>
-                      {[
-                        { label: 'Today', key: 'today' },
-                        { label: 'Yesterday', key: 'yesterday' },
-                        { label: 'Last 7 days', key: 'last7days' },
-                        { label: 'This Month', key: 'thisMonth' },
-                        { label: 'Last Month', key: 'lastMonth' },
-                        { label: 'All Time', key: 'all' }
-                      ].map((btn) => (
+                      <div style={{ display: "flex", flexDirection: "row-reverse", backgroundColor: "#fff" }}>
+                        <div style={{ borderLeft: "1px solid #E5E7EB", padding: "16px", backgroundColor: "#F8FAFC", display: "flex", flexDirection: "column", gap: "4px", width: "170px" }}>
+                          <label style={{ fontWeight: 700, color: "#64748B", marginBottom: "12px", padding: "4px 8px", fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.1em" }}>Quick Select</label>
+                          {[
+                            { label: 'Today', key: 'today' },
+                            { label: 'Yesterday', key: 'yesterday' },
+                            { label: 'Last 7 days', key: 'last7days' },
+                            { label: 'This Month', key: 'thisMonth' },
+                            { label: 'Last Month', key: 'lastMonth' },
+                            { label: 'All Time', key: 'all' }
+                          ].map((btn) => (
+                            <button
+                              key={btn.key}
+                              style={{ textAlign: "left", padding: "8px 12px", borderRadius: "8px", border: "none", fontSize: "11px", background: "transparent", fontWeight: "600", color: "#475569", textTransform: "uppercase", cursor: "pointer", transition: "all 0.2s" }}
+                              onClick={() => setPreset(btn.key)}
+                              onMouseOver={(e) => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#0061ff' }}
+                              onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#475569' }}
+                            >
+                              {btn.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div style={{ padding: "8px", overflow: "auto", maxWidth: "100%" }}>
+                          <DateRange
+                            editableDateInputs={false}
+                            onChange={item => {
+                              const newSel = item.selection;
+                              setRange([newSel]);
+                              if (newSel.startDate && newSel.endDate) {
+                                const sDateStr = format(newSel.startDate, "yyyy-MM-dd");
+                                const eDateStr = format(newSel.endDate, "yyyy-MM-dd");
+                                localStorage.setItem("dashboardSelectedRange", JSON.stringify({
+                                  startDate: sDateStr,
+                                  endDate: eDateStr
+                                }));
+                              }
+                            }}
+                            moveRangeOnFirstSelection={false}
+                            ranges={range}
+                            months={2}
+                            direction="horizontal"
+                            showDateDisplay={false}
+                            rangeColors={['#4c84ff']}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", padding: "12px 24px", borderTop: "1px solid #E5E7EB", alignItems: "center", backgroundColor: "#F8FAFC" }}>
                         <button
-                          key={btn.key}
-                          style={{ textAlign: "left", padding: "8px 12px", borderRadius: "8px", border: "none", fontSize: "11px", background: "transparent", fontWeight: "600", color: "#475569", textTransform: "uppercase", cursor: "pointer", transition: "all 0.2s" }}
-                          onClick={() => setPreset(btn.key)}
-                          onMouseOver={(e) => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#0061ff' }}
-                          onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#475569' }}
+                          style={{ background: "none", border: "none", color: "#64748B", fontWeight: "bold", padding: "6px 12px", fontSize: "11px", textTransform: "uppercase", cursor: "pointer" }}
+                          onClick={() => setShowCalendar(false)}
                         >
-                          {btn.label}
+                          Cancel
                         </button>
-                      ))}
+                        <button
+                          style={{ background: "#0061ff", color: "#fff", border: "none", borderRadius: "9999px", fontWeight: "bold", padding: "6px 20px", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", cursor: "pointer" }}
+                          onClick={() => setShowCalendar(false)}
+                        >
+                          Apply Range
+                        </button>
+                      </div>
                     </div>
+                  )}
+                </div>
 
-                    <div style={{ padding: "8px", overflow: "auto", maxWidth: "100%" }}>
-                      <DateRange
-                        editableDateInputs={false}
-                        onChange={item => {
-                          const newSel = item.selection;
-                          setRange([newSel]);
-                          if (newSel.startDate && newSel.endDate) {
-                            const sDateStr = format(newSel.startDate, "yyyy-MM-dd");
-                            const eDateStr = format(newSel.endDate, "yyyy-MM-dd");
-                            localStorage.setItem("dashboardSelectedRange", JSON.stringify({
-                              startDate: sDateStr,
-                              endDate: eDateStr
-                            }));
-                          }
-                        }}
-                        moveRangeOnFirstSelection={false}
-                        ranges={range}
-                        months={2}
-                        direction="horizontal"
-                        showDateDisplay={false}
-                        rangeColors={['#4c84ff']}
-                      />
-                    </div>
-                  </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", marginLeft: "auto", flexShrink: 0 }}>
+                  <button
+                    className="st-apply-btn"
+                    onClick={handleApplyFilters}
+                    disabled={isUpdating}
+                    style={{ opacity: isUpdating ? 0.7 : 1, cursor: isUpdating ? "not-allowed" : "pointer" }}
+                  >
+                    {isUpdating ? 'Applying...' : 'Apply Filters'}
+                  </button>
 
-                  <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", padding: "12px 24px", borderTop: "1px solid #E5E7EB", alignItems: "center", backgroundColor: "#F8FAFC" }}>
+                  {/* Export Buttons */}
+                  <div style={{ display: "flex", gap: "8px" }}>
                     <button
-                      style={{ background: "none", border: "none", color: "#64748B", fontWeight: "bold", padding: "6px 12px", fontSize: "11px", textTransform: "uppercase", cursor: "pointer" }}
-                      onClick={() => setShowCalendar(false)}
+                      style={{ display: "flex", alignItems: "center", gap: "6px", backgroundColor: "#FEE2E2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: "8px", padding: "8px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}
+                      onClick={handleExportPDF}
                     >
-                      Cancel
+                      <FiFileText size={14} />
+                      Export PDF
                     </button>
                     <button
-                      style={{ background: "#0061ff", color: "#fff", border: "none", borderRadius: "9999px", fontWeight: "bold", padding: "6px 20px", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", cursor: "pointer" }}
-                      onClick={() => setShowCalendar(false)}
+                      style={{ display: "flex", alignItems: "center", gap: "6px", backgroundColor: "#DCFCE7", color: "#16A34A", border: "1px solid #BBF7D0", borderRadius: "8px", padding: "8px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}
+                      onClick={handleExportCSV} disabled={isCsvLoading}
                     >
-                      Apply Range
+                      <FiDownload size={14} />
+                      {isCsvLoading ? 'Exporting...' : 'Export EXCEL'}
                     </button>
                   </div>
                 </div>
-              )}
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginLeft: "auto", flexShrink: 0 }}>
-              <button
-                className="st-apply-btn"
-                onClick={handleApplyFilters}
-                disabled={isUpdating}
-                style={{ opacity: isUpdating ? 0.7 : 1, cursor: isUpdating ? "not-allowed" : "pointer" }}
-              >
-                {isUpdating ? 'Applying...' : 'Apply Filters'}
-              </button>
-
-              {/* Export Buttons */}
-              <div style={{ display: "flex", gap: "8px" }}>
-                <button
-                  style={{ display: "flex", alignItems: "center", gap: "6px", backgroundColor: "#FEE2E2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: "8px", padding: "8px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}
-                  onClick={handleExportPDF}
-                >
-                  <FiFileText size={14} />
-                  Export PDF
-                </button>
-                <button
-                  style={{ display: "flex", alignItems: "center", gap: "6px", backgroundColor: "#DCFCE7", color: "#16A34A", border: "1px solid #BBF7D0", borderRadius: "8px", padding: "8px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}
-                  onClick={handleExportCSV} disabled={isCsvLoading}
-                >
-                  <FiDownload size={14} />
-                  {isCsvLoading ? 'Exporting...' : 'Export EXCEL'}
-                </button>
+              </>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", width: "100%" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", backgroundColor: "#F8FAFC", color: "#334155", border: "1px solid #CBD5E1", borderRadius: "8px", padding: "6px 12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" }}>
+                  <span style={{ color: "#2563EB" }}>🕒</span>
+                  <span>Report Generated: <b>{pdfExportTime}</b></span>
+                </div>
               </div>
-            </div>
-          </>
-        ) : (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", width: "100%" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", backgroundColor: "#F8FAFC", color: "#334155", border: "1px solid #CBD5E1", borderRadius: "8px", padding: "6px 12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" }}>
-              <span style={{ color: "#2563EB" }}>🕒</span>
-              <span>Report Generated: <b>{pdfExportTime}</b></span>
-            </div>
-          </div>
-        )}
-      </div>
-      {/* ── Campaign Info Banner ── */}
-      {search && !isPdfLoading && (
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "10px 24px", background: "linear-gradient(90deg, #1E3A8A 0%, #2563EB 100%)",
-          color: "#fff", margin: "-16px 0 0 0", gap: 16, flexWrap: "wrap"
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4ADE80", boxShadow: "0 0 6px #4ADE80" }} />
-            <span style={{ fontSize: 14, fontWeight: 700 }}>{search}</span>
-            <span style={{ fontSize: 11, background: "rgba(255,255,255,0.15)", padding: "2px 10px", borderRadius: 999, fontWeight: 600 }}>
-              {format(range[0].startDate, "d MMM yyyy")} – {format(range[0].endDate, "d MMM yyyy")}
-            </span>
-          </div>
-          <div style={{ display: "flex", gap: 16, fontSize: 12, opacity: 0.85 }}>
-            <span>Impressions: <b style={{ color: "#86EFAC" }}>{(globalEffectiveMetrics.impressions || 0).toLocaleString('en-IN')}</b></span>
-            {!isCtvWithAF && (<><span>Clicks: <b style={{ color: "#93C5FD" }}>{(globalEffectiveMetrics.clicks || 0).toLocaleString('en-IN')}</b></span>
-              <span>CTR: <b style={{ color: "#FCD34D" }}>{(globalEffectiveMetrics.ctr || 0).toFixed(2)}%</b></span></>)}
-
-            {globalEffectiveMetrics.reach > 0 && (
-              <span>Reach: <b style={{ color: "#FCA5A5" }}>{(globalEffectiveMetrics.reach || 0).toLocaleString('en-IN')}</b></span>
             )}
           </div>
-        </div>
-      )}
 
-      {/* ── Quantico-Style KPI Cards Grid ── */}
-      <div className="st-kpi-grid">
-
-        {/* IMPRESSIONS */}
-        <div className="st-kpi-card-q">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <div style={{ width: 32, height: 32, borderRadius: 8, background: "#E0F2FE", color: "#0284C7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>
-              📊
+          {search.trim() !== "" && campaignsList.length > 0 && filteredCampaigns.length === 0 ? (
+            <div style={{
+              backgroundColor: "#ffffff",
+              borderRadius: "16px",
+              padding: "60px 24px",
+              margin: "24px 16px",
+              textAlign: "center",
+              boxShadow: "0 4px 20px rgba(0, 0, 0, 0.05)",
+              border: "1px solid #E2E8F0"
+            }}>
+              <div style={{ fontSize: "56px", marginBottom: "16px" }}>🔍</div>
+              <h3 style={{ fontSize: "20px", fontWeight: 700, color: "#0F172A", marginBottom: "8px" }}>
+                No Results Found
+              </h3>
+              <p style={{ fontSize: "14px", color: "#64748B", maxWidth: "420px", margin: "0 auto 24px auto", lineHeight: 1.5 }}>
+                No campaigns match <b>"{search}"</b>. Please check your spelling or search for another campaign.
+              </p>
+              <button
+                onClick={() => setSearch("")}
+                style={{
+                  backgroundColor: "#2563EB",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "999px",
+                  padding: "10px 28px",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                  boxShadow: "0 2px 8px rgba(37, 99, 235, 0.25)"
+                }}
+              >
+                Clear Search
+              </button>
             </div>
-            <ExpandIcon />
-          </div>
-          <div className="st-kpi-tag">IMPRESSIONS</div>
-          <div className="st-kpi-num">{(globalEffectiveMetrics.impressions || 0).toLocaleString('en-IN')}</div>
-        </div>
+          ) : (
+            <>
+              {/* ── Campaign Info Banner ── */}
+              {search && !isPdfLoading && (
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "10px 24px", background: "linear-gradient(90deg, #1E3A8A 0%, #2563EB 100%)",
+                  color: "#fff", margin: "-16px 0 0 0", gap: 16, flexWrap: "wrap"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4ADE80", boxShadow: "0 0 6px #4ADE80" }} />
+                    <span style={{ fontSize: 14, fontWeight: 700 }}>{search}</span>
+                    <span style={{ fontSize: 11, background: "rgba(255,255,255,0.15)", padding: "2px 10px", borderRadius: 999, fontWeight: 600 }}>
+                      {format(range[0].startDate, "d MMM yyyy")} – {format(range[0].endDate, "d MMM yyyy")}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", gap: 16, fontSize: 12, opacity: 0.85 }}>
+                    <span>Impressions: <b style={{ color: "#86EFAC" }}>{(globalEffectiveMetrics.impressions || 0).toLocaleString('en-IN')}</b></span>
+                    {!isCtvWithAF && (<><span>Clicks: <b style={{ color: "#93C5FD" }}>{(globalEffectiveMetrics.clicks || 0).toLocaleString('en-IN')}</b></span>
+                      <span>CTR: <b style={{ color: "#FCD34D" }}>{(globalEffectiveMetrics.ctr || 0).toFixed(2)}%</b></span></>)}
 
-        {/* CLICKS & CTR */}
-        {!isCtvWithAF && (
-          <div className="st-kpi-card-q">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: "#DCFCE7", color: "#16A34A", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>
-                ⚡
+                    {globalEffectiveMetrics.reach > 0 && (
+                      <span>Reach: <b style={{ color: "#FCA5A5" }}>{(globalEffectiveMetrics.reach || 0).toLocaleString('en-IN')}</b></span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Quantico-Style KPI Cards Grid ── */}
+              <div className="st-kpi-grid">
+
+                {/* IMPRESSIONS */}
+                <div className="st-kpi-card-q">
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: "#E0F2FE", color: "#0284C7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>
+                      📊
+                    </div>
+                    <ExpandIcon />
+                  </div>
+                  <div className="st-kpi-tag">IMPRESSIONS</div>
+                  <div className="st-kpi-num">{(globalEffectiveMetrics.impressions || 0).toLocaleString('en-IN')}</div>
+                </div>
+
+                {/* CLICKS & CTR */}
+                {!isCtvWithAF && (
+                  <div className="st-kpi-card-q">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: "#DCFCE7", color: "#16A34A", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>
+                        ⚡
+                      </div>
+                      <ExpandIcon />
+                    </div>
+                    <div className="st-kpi-tag">CLICKS & CTR</div>
+                    <div className="st-kpi-num">{(globalEffectiveMetrics.clicks || 0).toLocaleString('en-IN')}</div>
+                    <div className="st-kpi-meta" style={{ marginBottom: 4 }}>CTR: <b>{(globalEffectiveMetrics.ctr || 0).toFixed(2)}%</b> · eCPC: <b>₹{(globalEffectiveMetrics.eCPC || 0).toFixed(2)}</b></div>
+                  </div>
+                )}
+
+                {/* REACH & FREQUENCY */}
+                {globalEffectiveMetrics.reach > 0 && (
+                  <div className="st-kpi-card-q">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: "#FCE7F3", color: "#BE185D", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>
+                        🎯
+                      </div>
+                      <ExpandIcon />
+                    </div>
+                    <div className="st-kpi-tag">REACH & FREQUENCY</div>
+                    <div className="st-kpi-num">{(globalEffectiveMetrics.reach || 0).toLocaleString('en-IN')}</div>
+                    <div className="st-kpi-meta" style={{ marginBottom: 4 }}>Freq: <b>{(globalEffectiveMetrics.frequency || 0).toFixed(2)}×</b></div>
+                  </div>
+                )}
+
+                {/* INSTALLS */}
+                {globalEffectiveMetrics.hasAppsflyerData && (
+                  <div className="st-kpi-card-q">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: "#D1FAE5", color: "#059669", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>
+                        📲
+                      </div>
+                      <ExpandIcon />
+                    </div>
+                    <div className="st-kpi-tag">INSTALLS</div>
+                    <div className="st-kpi-num">{(globalEffectiveMetrics.installs || 0).toLocaleString('en-IN')}</div>
+                  </div>
+                )}
+
+                {/* CONVERSIONS */}
+                {globalEffectiveMetrics.hasAppsflyerData && (
+                  <div className="st-kpi-card-q">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: "#FEF3C7", color: "#D97706", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>
+                        🏆
+                      </div>
+                      <ExpandIcon />
+                    </div>
+                    <div className="st-kpi-tag">TOTAL CONVERSIONS</div>
+                    <div className="st-kpi-num">{(globalEffectiveMetrics.conversions || 0).toLocaleString('en-IN')}</div>
+                  </div>
+                )}
+
+                {/* VIDEO COMPLETIONS & VCR */}
+                {!isCtvWithAF && globalEffectiveMetrics.hasVideoData && (
+                  <div className="st-kpi-card-q">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: "#F0FDF4", color: "#16A34A", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>
+                        🎬
+                      </div>
+                      <ExpandIcon />
+                    </div>
+                    <div className="st-kpi-tag">VIDEO COMPLETIONS & VCR</div>
+                    <div className="st-kpi-num">{(globalEffectiveMetrics.totalVideoComplete || 0).toLocaleString('en-IN')}</div>
+                    <div className="st-kpi-meta" style={{ marginBottom: 4 }}>VCR: <b>{(globalEffectiveMetrics.overallVcr || 0).toFixed(2)}%</b></div>
+                  </div>
+                )}
+
+                {/* SPEND & eCPM */}
+                {!isCtvWithAF && (
+                  <div className="st-kpi-card-q">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: "#F3E8FF", color: "#8B5CF6", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>
+                        💎
+                      </div>
+                      <ExpandIcon />
+                    </div>
+                    <div className="st-kpi-tag">TOTAL SPEND & eCPM</div>
+                    <div className="st-kpi-num">₹{(globalEffectiveMetrics.spend || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
+                    <div className="st-kpi-meta" style={{ marginBottom: 4 }}>eCPM: <b>₹{(globalEffectiveMetrics.eCPM || 0).toFixed(2)}</b> · ROAS: <b>{(globalEffectiveMetrics.roas || 0).toFixed(2)}×</b></div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+                      <div className="st-badge-up" style={{ background: "#F3E8FF", color: "#7C3AED" }}>↑ 1.15×</div>
+                      <SparklinePurple />
+                    </div>
+                  </div>
+                )}
+
               </div>
-              <ExpandIcon />
-            </div>
-            <div className="st-kpi-tag">CLICKS & CTR</div>
-            <div className="st-kpi-num">{(globalEffectiveMetrics.clicks || 0).toLocaleString('en-IN')}</div>
-            <div className="st-kpi-meta" style={{ marginBottom: 4 }}>CTR: <b>{(globalEffectiveMetrics.ctr || 0).toFixed(2)}%</b> · eCPC: <b>₹{(globalEffectiveMetrics.eCPC || 0).toFixed(2)}</b></div>
-          </div>
-        )}
 
-        {/* REACH & FREQUENCY */}
-        {globalEffectiveMetrics.reach > 0 && (
-          <div className="st-kpi-card-q">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: "#FCE7F3", color: "#BE185D", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>
-                🎯
-              </div>
-              <ExpandIcon />
-            </div>
-            <div className="st-kpi-tag">REACH & FREQUENCY</div>
-            <div className="st-kpi-num">{(globalEffectiveMetrics.reach || 0).toLocaleString('en-IN')}</div>
-            <div className="st-kpi-meta" style={{ marginBottom: 4 }}>Freq: <b>{(globalEffectiveMetrics.frequency || 0).toFixed(2)}×</b></div>
-          </div>
-        )}
+              {/* ── Trend Analysis ── */}
+              <TrendChart tableData={globalEffectiveMetrics.enrichedTableData} hasAppsflyerData={globalEffectiveMetrics.hasAppsflyerData} selectedAudience={selectedAudience} />
 
-        {/* INSTALLS */}
-        {globalEffectiveMetrics.hasAppsflyerData && (
-          <div className="st-kpi-card-q">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: "#EFF6FF", color: "#2563EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>
-                📲
-              </div>
-              <ExpandIcon />
-            </div>
-            <div className="st-kpi-tag">INSTALLS</div>
-            <div className="st-kpi-num">{(globalEffectiveMetrics.installs || 0).toLocaleString('en-IN')}</div>
-            <div className="st-kpi-meta" style={{ marginBottom: 4 }}>CVR: <b>{(globalEffectiveMetrics.cvr || 0).toFixed(2)}%</b></div>
+              {/* ── Performance Table ── */}
+              {(() => {
+                const PERF_PAGE_SIZE = 10;
+                const perfData = globalEffectiveMetrics.enrichedTableData;
+                const perfTotalPages = Math.ceil(perfData.length / PERF_PAGE_SIZE) || 1;
+                const perfFrom = perfData.length === 0 ? 0 : (perfPage - 1) * PERF_PAGE_SIZE + 1;
+                const perfTo = Math.min(perfPage * PERF_PAGE_SIZE, perfData.length);
+                const perfRows = perfData.slice((perfPage - 1) * PERF_PAGE_SIZE, perfPage * PERF_PAGE_SIZE);
+                const ctype = String(selectedAudience?.campaignType || selectedAudience?.campaign_type || "").toUpperCase();
+                const isCtvWithAF = ctype.includes("CTV") && !!globalEffectiveMetrics?.hasAppsflyerData;
+                const colSpan = (6 + (globalEffectiveMetrics.hasVideoData ? 7 : 0) + (globalEffectiveMetrics.reach > 0 ? 2 : 0) + (globalEffectiveMetrics.hasAppsflyerData ? 2 : 0)) - (isCtvWithAF ? (globalEffectiveMetrics.hasVideoData ? 7 : 5) : 0);
+                return (
+                  <div className="st-panel" style={{ paddingBottom: 0, overflow: "hidden" }}>
+                    <div className="st-panel-header">
+                      <div>
+                        <div className="st-panel-title">Performance</div>
+                        <div className="st-panel-sub">Showing <b>{perfFrom}</b> to <b>{perfTo}</b> of <b>{perfData.length}</b> entries</div>
+                      </div>
+                      <TablePagination
+                        currentPage={perfPage}
+                        totalPages={perfTotalPages}
+                        onPrev={() => setPerfPage(p => Math.max(1, p - 1))}
+                        onNext={() => setPerfPage(p => Math.min(perfTotalPages, p + 1))}
+                      />
+                    </div>
+                    <div style={{ overflowX: "auto", width: "calc(100% + 44px)", margin: "0 -22px" }}>
+                      <table className="st-table" style={{ width: "100%", minWidth: "100%", tableLayout: "auto" }}>
+                        <thead>
+                          <tr>
+                            <th style={{ paddingLeft: "22px" }}>PERIOD</th>
+                            <th>IMPRESSIONS</th>
+                            {globalEffectiveMetrics.reach > 0 && <th>REACH</th>}
+                            {globalEffectiveMetrics.reach > 0 && <th>FREQUENCY</th>}
+                            {!isCtvWithAF && <th>CPM</th>}
+                            {globalEffectiveMetrics.hasVideoData && <th>VIEWS</th>}
+                            {globalEffectiveMetrics.hasVideoData && !isCtvWithAF && <th>CPV</th>}
+                            {!isCtvWithAF && <th>CLICKS</th>}
+                            {!isCtvWithAF && <th>CPC</th>}
+                            {globalEffectiveMetrics.hasVideoData && <th>1ST QUARTILE VIEWS</th>}
+                            {globalEffectiveMetrics.hasVideoData && <th>MIDPOINT VIEWS</th>}
+                            {globalEffectiveMetrics.hasVideoData && <th>3RD QUARTILE VIEWS</th>}
+                            {globalEffectiveMetrics.hasVideoData && <th>COMPLETE VIEW</th>}
+                            {globalEffectiveMetrics.hasVideoData && !isCtvWithAF && <th>CPCV</th>}
+                            {globalEffectiveMetrics.hasAppsflyerData && <th>INSTALLS</th>}
+                            {globalEffectiveMetrics.hasAppsflyerData && <th style={{ paddingRight: isCtvWithAF ? "22px" : "auto" }}>TOTAL CONVERSIONS</th>}
+                            {!isCtvWithAF && <th>CTR</th>}
+                            {!isCtvWithAF && <th style={{ paddingRight: "22px" }}>SPEND</th>}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {perfRows.length > 0 ? (
+                            perfRows.map((r, i) => (
+                              <tr key={i} className="st-tr">
+                                <td style={{ paddingLeft: "22px", whiteSpace: "nowrap" }}>{r.period || "-"}</td>
+                                <td>{Number(r.Impressions || r.impressions || 0).toLocaleString('en-IN')}</td>
+                                {globalEffectiveMetrics.reach > 0 && <td>{Number(r.computedReach || 0).toLocaleString('en-IN')}</td>}
+                                {globalEffectiveMetrics.reach > 0 && <td>{r.computedFreq ? r.computedFreq.toFixed(2) : "0.00"}</td>}
+                                {!isCtvWithAF && <td>₹{r.computedCpm.toFixed(2)}</td>}
+                                {globalEffectiveMetrics.hasVideoData && <td>{Number(r.computedViews || 0).toLocaleString('en-IN')}</td>}
+                                {globalEffectiveMetrics.hasVideoData && !isCtvWithAF && <td>₹{r.computedCpv ? r.computedCpv.toFixed(2) : "0.00"}</td>}
+                                {!isCtvWithAF && <td>{Number(r.Clicks || r.clicks || 0).toLocaleString('en-IN')}</td>}
+                                {!isCtvWithAF && <td>₹{r.computedCpc ? r.computedCpc.toFixed(2) : "0.00"}</td>}
+                                {globalEffectiveMetrics.hasVideoData && <td>{Number(r.computedVideoFirstQ || 0).toLocaleString('en-IN')}</td>}
+                                {globalEffectiveMetrics.hasVideoData && <td>{Number(r.computedVideoMidpoint || 0).toLocaleString('en-IN')}</td>}
+                                {globalEffectiveMetrics.hasVideoData && <td>{Number(r.computedVideoThirdQ || 0).toLocaleString('en-IN')}</td>}
+                                {globalEffectiveMetrics.hasVideoData && <td>{Number(r.computedVideoComplete || 0).toLocaleString('en-IN')}</td>}
+                                {globalEffectiveMetrics.hasVideoData && !isCtvWithAF && <td>₹{r.computedCpcv ? r.computedCpcv.toFixed(2) : "0.00"}</td>}
+                                {globalEffectiveMetrics.hasAppsflyerData && <td>{Number(r.computedInstalls || 0).toLocaleString('en-IN')}</td>}
+                                {globalEffectiveMetrics.hasAppsflyerData && <td style={{ paddingRight: isCtvWithAF ? "22px" : "auto" }}>{Number(r.computedConversions || 0).toLocaleString('en-IN')}</td>}
+                                {!isCtvWithAF && <td>{r.computedCtr.toFixed(2)}%</td>}
+                                {!isCtvWithAF && <td style={{ paddingRight: "22px" }}>₹{r.computedSpend.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>}
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={colSpan} style={{ textAlign: "center", padding: "24px", color: "#6B7280" }}>
+                                No data available. Please select a campaign and date range, then click Apply Filters.
+                              </td>
+                            </tr>
+                          )}
+                          {perfData.length > 0 && (
+                            <tr className="st-tr-total">
+                              <td style={{ paddingLeft: "22px" }}>Total</td>
+                              <td>{(globalEffectiveMetrics.impressions || 0).toLocaleString('en-IN')}</td>
+                              {globalEffectiveMetrics.reach > 0 && <td>{(globalEffectiveMetrics.reach || 0).toLocaleString('en-IN')}</td>}
+                              {globalEffectiveMetrics.reach > 0 && <td>{(globalEffectiveMetrics.frequency || 0).toFixed(2)}</td>}
+                              {!isCtvWithAF && <td>₹{(globalEffectiveMetrics.eCPM || 0).toFixed(2)}</td>}
+                              {globalEffectiveMetrics.hasVideoData && <td>{(globalEffectiveMetrics.totalViews || globalEffectiveMetrics.totalVideoViews || 0).toLocaleString('en-IN')}</td>}
+                              {globalEffectiveMetrics.hasVideoData && !isCtvWithAF && <td>₹{globalEffectiveMetrics.cpv ? globalEffectiveMetrics.cpv.toFixed(2) : "0.00"}</td>}
+                              {!isCtvWithAF && <td>{(globalEffectiveMetrics.clicks || 0).toLocaleString('en-IN')}</td>}
+                              {!isCtvWithAF && <td>₹{(globalEffectiveMetrics.eCPC || 0).toFixed(2)}</td>}
+                              {globalEffectiveMetrics.hasVideoData && <td>{(globalEffectiveMetrics.totalVideoFirstQ || 0).toLocaleString('en-IN')}</td>}
+                              {globalEffectiveMetrics.hasVideoData && <td>{(globalEffectiveMetrics.totalVideoMidpoint || 0).toLocaleString('en-IN')}</td>}
+                              {globalEffectiveMetrics.hasVideoData && <td>{(globalEffectiveMetrics.totalVideoThirdQ || 0).toLocaleString('en-IN')}</td>}
+                              {globalEffectiveMetrics.hasVideoData && <td>{(globalEffectiveMetrics.totalVideoComplete || 0).toLocaleString('en-IN')}</td>}
+                              {globalEffectiveMetrics.hasVideoData && !isCtvWithAF && <td>₹{globalEffectiveMetrics.cpcv ? globalEffectiveMetrics.cpcv.toFixed(2) : "0.00"}</td>}
+                              {globalEffectiveMetrics.hasAppsflyerData && <td>{(globalEffectiveMetrics.installs || 0).toLocaleString('en-IN')}</td>}
+                              {globalEffectiveMetrics.hasAppsflyerData && <td style={{ paddingRight: isCtvWithAF ? "22px" : "auto" }}>{(globalEffectiveMetrics.conversions || 0).toLocaleString('en-IN')}</td>}
+                              {!isCtvWithAF && <td>{(globalEffectiveMetrics.ctr || 0).toFixed(2)}%</td>}
+                              {!isCtvWithAF && <td style={{ paddingRight: "22px" }}>₹{(globalEffectiveMetrics.spend || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>}
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
 
-          </div>
-        )}
 
-        {/* CONVERSIONS */}
-        {globalEffectiveMetrics.hasAppsflyerData && (
-          <div className="st-kpi-card-q">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: "#FEF3C7", color: "#D97706", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>
-                🏆
-              </div>
-              <ExpandIcon />
-            </div>
-            <div className="st-kpi-tag">CONVERSIONS</div>
-            <div className="st-kpi-num">{(globalEffectiveMetrics.conversions || 0).toLocaleString('en-IN')}</div>
-          </div>
-        )}
+              {!isCtvWithAF && (<CreativePerformanceChart creativeData={creativeData} totalReach={globalEffectiveMetrics.reach} selectedAudience={selectedAudience} hasAppsflyerData={globalEffectiveMetrics.hasAppsflyerData} />)}
+              <CreativeDetails creativeData={creativeData} campaignPricing={campaignPricing} globalEffectiveMetrics={globalEffectiveMetrics} selectedAudience={selectedAudience} />
+              <UrlTable urlData={urlData} campaignPricing={campaignPricing} globalEffectiveMetrics={globalEffectiveMetrics} selectedAudience={selectedAudience} />
+              <DomainDistribution domainData={cityData} campaignPricing={campaignPricing} globalEffectiveMetrics={globalEffectiveMetrics} rawInstallsBreakdown={rawInstallsBreakdown} selectedAudience={selectedAudience} />
+              {
+                !isCtvWithAF && (<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 16 }}>
+                  <PlacementPositionPanel placementPosData={placementPosData} />
+                  <PlacementTypePanel placementTypeData={placementTypeData} />
+                </div>)
+              }
+              {
+                !isCtvWithAF && (<PlatformAnalysis deviceData={deviceData} platformData={placementTypeData} />)
+              }
 
-        {/* VIDEO COMPLETIONS & VCR */}
-        {!isCtvWithAF && globalEffectiveMetrics.hasVideoData && (
-          <div className="st-kpi-card-q">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: "#F0FDF4", color: "#16A34A", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>
-                🎬
-              </div>
-              <ExpandIcon />
-            </div>
-            <div className="st-kpi-tag">VIDEO COMPLETIONS & VCR</div>
-            <div className="st-kpi-num">{(globalEffectiveMetrics.totalVideoComplete || 0).toLocaleString('en-IN')}</div>
-            <div className="st-kpi-meta" style={{ marginBottom: 4 }}>VCR: <b>{(globalEffectiveMetrics.overallVcr || 0).toFixed(2)}%</b></div>
-          </div>
-        )}
-
-        {/* SPEND & eCPM */}
-        {!isCtvWithAF && (
-          <div className="st-kpi-card-q">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: "#F3E8FF", color: "#8B5CF6", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>
-                💎
-              </div>
-              <ExpandIcon />
-            </div>
-            <div className="st-kpi-tag">TOTAL SPEND & eCPM</div>
-            <div className="st-kpi-num">₹{(globalEffectiveMetrics.spend || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
-            <div className="st-kpi-meta" style={{ marginBottom: 4 }}>eCPM: <b>₹{(globalEffectiveMetrics.eCPM || 0).toFixed(2)}</b> · ROAS: <b>{(globalEffectiveMetrics.roas || 0).toFixed(2)}×</b></div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
-              <div className="st-badge-up" style={{ background: "#F3E8FF", color: "#7C3AED" }}>↑ 1.15×</div>
-              <SparklinePurple />
-            </div>
-          </div>
-        )}
-
-      </div>
-
-      {/* ── Trend Analysis ── */}
-      <TrendChart tableData={globalEffectiveMetrics.enrichedTableData} hasAppsflyerData={globalEffectiveMetrics.hasAppsflyerData} selectedAudience={selectedAudience} />
-
-      {/* ── Performance Table ── */}
-      {(() => {
-        const PERF_PAGE_SIZE = 10;
-        const perfData = globalEffectiveMetrics.enrichedTableData;
-        const perfTotalPages = Math.ceil(perfData.length / PERF_PAGE_SIZE) || 1;
-        const perfFrom = perfData.length === 0 ? 0 : (perfPage - 1) * PERF_PAGE_SIZE + 1;
-        const perfTo = Math.min(perfPage * PERF_PAGE_SIZE, perfData.length);
-        const perfRows = perfData.slice((perfPage - 1) * PERF_PAGE_SIZE, perfPage * PERF_PAGE_SIZE);
-        const ctype = String(selectedAudience?.campaignType || selectedAudience?.campaign_type || "").toUpperCase();
-        const isCtvWithAF = ctype.includes("CTV") && !!globalEffectiveMetrics?.hasAppsflyerData;
-        const colSpan = (6 + (globalEffectiveMetrics.hasVideoData ? 7 : 0) + (globalEffectiveMetrics.reach > 0 ? 2 : 0) + (globalEffectiveMetrics.hasAppsflyerData ? 2 : 0)) - (isCtvWithAF ? (globalEffectiveMetrics.hasVideoData ? 7 : 5) : 0);
-        return (
-          <div className="st-panel" style={{ paddingBottom: 0, overflow: "hidden" }}>
-            <div className="st-panel-header">
-              <div>
-                <div className="st-panel-title">Performance</div>
-                <div className="st-panel-sub">Showing <b>{perfFrom}</b> to <b>{perfTo}</b> of <b>{perfData.length}</b> entries</div>
-              </div>
-              <TablePagination
-                currentPage={perfPage}
-                totalPages={perfTotalPages}
-                onPrev={() => setPerfPage(p => Math.max(1, p - 1))}
-                onNext={() => setPerfPage(p => Math.min(perfTotalPages, p + 1))}
+              <DeliveryByWeekday tableData={globalEffectiveMetrics.enrichedTableData} />
+              <AttributionRevenueTraffic
+                operatorData={operatorData}
+                browserData={browserData}
+                cityData={cityData}
+                globalEffectiveMetrics={globalEffectiveMetrics}
+                selectedAudience={selectedAudience}
+                rawInstallsBreakdown={rawInstallsBreakdown}
               />
-            </div>
-            <div style={{ overflowX: "auto", width: "calc(100% + 44px)", margin: "0 -22px" }}>
-              <table className="st-table" style={{ width: "100%", minWidth: "100%", tableLayout: "auto" }}>
-                <thead>
-                  <tr>
-                    <th style={{ paddingLeft: "22px" }}>PERIOD</th>
-                    <th>IMPRESSIONS</th>
-                    {globalEffectiveMetrics.reach > 0 && <th>REACH</th>}
-                    {globalEffectiveMetrics.reach > 0 && <th>FREQUENCY</th>}
-                    {!isCtvWithAF && <th>CPM</th>}
-                    {globalEffectiveMetrics.hasVideoData && <th>VIEWS</th>}
-                    {globalEffectiveMetrics.hasVideoData && !isCtvWithAF && <th>CPV</th>}
-                    {!isCtvWithAF && <th>CLICKS</th>}
-                    {!isCtvWithAF && <th>CPC</th>}
-                    {globalEffectiveMetrics.hasVideoData && <th>1ST QUARTILE VIEWS</th>}
-                    {globalEffectiveMetrics.hasVideoData && <th>MIDPOINT VIEWS</th>}
-                    {globalEffectiveMetrics.hasVideoData && <th>3RD QUARTILE VIEWS</th>}
-                    {globalEffectiveMetrics.hasVideoData && <th>COMPLETE VIEW</th>}
-                    {globalEffectiveMetrics.hasVideoData && !isCtvWithAF && <th>CPCV</th>}
-                    {globalEffectiveMetrics.hasAppsflyerData && <th>INSTALLS</th>}
-                    {globalEffectiveMetrics.hasAppsflyerData && <th style={{ paddingRight: isCtvWithAF ? "22px" : "auto" }}>TOTAL CONVERSIONS</th>}
-                    {!isCtvWithAF && <th>CTR</th>}
-                    {!isCtvWithAF && <th style={{ paddingRight: "22px" }}>SPEND</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {perfRows.length > 0 ? (
-                    perfRows.map((r, i) => (
-                      <tr key={i} className="st-tr">
-                        <td style={{ paddingLeft: "22px", whiteSpace: "nowrap" }}>{r.period || "-"}</td>
-                        <td>{Number(r.Impressions || r.impressions || 0).toLocaleString('en-IN')}</td>
-                        {globalEffectiveMetrics.reach > 0 && <td>{Number(r.computedReach || 0).toLocaleString('en-IN')}</td>}
-                        {globalEffectiveMetrics.reach > 0 && <td>{r.computedFreq ? r.computedFreq.toFixed(2) : "0.00"}</td>}
-                        {!isCtvWithAF && <td>₹{r.computedCpm.toFixed(2)}</td>}
-                        {globalEffectiveMetrics.hasVideoData && <td>{Number(r.computedViews || 0).toLocaleString('en-IN')}</td>}
-                        {globalEffectiveMetrics.hasVideoData && !isCtvWithAF && <td>₹{r.computedCpv ? r.computedCpv.toFixed(2) : "0.00"}</td>}
-                        {!isCtvWithAF && <td>{Number(r.Clicks || r.clicks || 0).toLocaleString('en-IN')}</td>}
-                        {!isCtvWithAF && <td>₹{r.computedCpc ? r.computedCpc.toFixed(2) : "0.00"}</td>}
-                        {globalEffectiveMetrics.hasVideoData && <td>{Number(r.computedVideoFirstQ || 0).toLocaleString('en-IN')}</td>}
-                        {globalEffectiveMetrics.hasVideoData && <td>{Number(r.computedVideoMidpoint || 0).toLocaleString('en-IN')}</td>}
-                        {globalEffectiveMetrics.hasVideoData && <td>{Number(r.computedVideoThirdQ || 0).toLocaleString('en-IN')}</td>}
-                        {globalEffectiveMetrics.hasVideoData && <td>{Number(r.computedVideoComplete || 0).toLocaleString('en-IN')}</td>}
-                        {globalEffectiveMetrics.hasVideoData && !isCtvWithAF && <td>₹{r.computedCpcv ? r.computedCpcv.toFixed(2) : "0.00"}</td>}
-                        {globalEffectiveMetrics.hasAppsflyerData && <td>{Number(r.computedInstalls || 0).toLocaleString('en-IN')}</td>}
-                        {globalEffectiveMetrics.hasAppsflyerData && <td style={{ paddingRight: isCtvWithAF ? "22px" : "auto" }}>{Number(r.computedConversions || 0).toLocaleString('en-IN')}</td>}
-                        {!isCtvWithAF && <td>{r.computedCtr.toFixed(2)}%</td>}
-                        {!isCtvWithAF && <td style={{ paddingRight: "22px" }}>₹{r.computedSpend.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>}
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={colSpan} style={{ textAlign: "center", padding: "24px", color: "#6B7280" }}>
-                        No data available. Please select a campaign and date range, then click Apply Filters.
-                      </td>
-                    </tr>
-                  )}
-                  {perfData.length > 0 && (
-                    <tr className="st-tr-total">
-                      <td style={{ paddingLeft: "22px" }}>Total</td>
-                      <td>{(globalEffectiveMetrics.impressions || 0).toLocaleString('en-IN')}</td>
-                      {globalEffectiveMetrics.reach > 0 && <td>{(globalEffectiveMetrics.reach || 0).toLocaleString('en-IN')}</td>}
-                      {globalEffectiveMetrics.reach > 0 && <td>{(globalEffectiveMetrics.frequency || 0).toFixed(2)}</td>}
-                      {!isCtvWithAF && <td>₹{(globalEffectiveMetrics.eCPM || 0).toFixed(2)}</td>}
-                      {globalEffectiveMetrics.hasVideoData && <td>{(globalEffectiveMetrics.totalViews || globalEffectiveMetrics.totalVideoViews || 0).toLocaleString('en-IN')}</td>}
-                      {globalEffectiveMetrics.hasVideoData && !isCtvWithAF && <td>₹{globalEffectiveMetrics.cpv ? globalEffectiveMetrics.cpv.toFixed(2) : "0.00"}</td>}
-                      {!isCtvWithAF && <td>{(globalEffectiveMetrics.clicks || 0).toLocaleString('en-IN')}</td>}
-                      {!isCtvWithAF && <td>₹{(globalEffectiveMetrics.eCPC || 0).toFixed(2)}</td>}
-                      {globalEffectiveMetrics.hasVideoData && <td>{(globalEffectiveMetrics.totalVideoFirstQ || 0).toLocaleString('en-IN')}</td>}
-                      {globalEffectiveMetrics.hasVideoData && <td>{(globalEffectiveMetrics.totalVideoMidpoint || 0).toLocaleString('en-IN')}</td>}
-                      {globalEffectiveMetrics.hasVideoData && <td>{(globalEffectiveMetrics.totalVideoThirdQ || 0).toLocaleString('en-IN')}</td>}
-                      {globalEffectiveMetrics.hasVideoData && <td>{(globalEffectiveMetrics.totalVideoComplete || 0).toLocaleString('en-IN')}</td>}
-                      {globalEffectiveMetrics.hasVideoData && !isCtvWithAF && <td>₹{globalEffectiveMetrics.cpcv ? globalEffectiveMetrics.cpcv.toFixed(2) : "0.00"}</td>}
-                      {globalEffectiveMetrics.hasAppsflyerData && <td>{(globalEffectiveMetrics.installs || 0).toLocaleString('en-IN')}</td>}
-                      {globalEffectiveMetrics.hasAppsflyerData && <td style={{ paddingRight: isCtvWithAF ? "22px" : "auto" }}>{(globalEffectiveMetrics.conversions || 0).toLocaleString('en-IN')}</td>}
-                      {!isCtvWithAF && <td>{(globalEffectiveMetrics.ctr || 0).toFixed(2)}%</td>}
-                      {!isCtvWithAF && <td style={{ paddingRight: "22px" }}>₹{(globalEffectiveMetrics.spend || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>}
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        );
-      })()}
+              {
+                !isCtvWithAF && (<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 12, margin: "0 16px" }}>
+                  <GenderChart genderData={genderData} />
+                  <AgeChart ageData={ageData} />
+                </div>)
+              }
 
-
-      {!isCtvWithAF && (<CreativePerformanceChart creativeData={creativeData} totalReach={globalEffectiveMetrics.reach} selectedAudience={selectedAudience} hasAppsflyerData={globalEffectiveMetrics.hasAppsflyerData} />)}
-      <CreativeDetails creativeData={creativeData} campaignPricing={campaignPricing} globalEffectiveMetrics={globalEffectiveMetrics} selectedAudience={selectedAudience} />
-      <UrlTable urlData={urlData} campaignPricing={campaignPricing} globalEffectiveMetrics={globalEffectiveMetrics} selectedAudience={selectedAudience} />
-      <DomainDistribution domainData={cityData} campaignPricing={campaignPricing} globalEffectiveMetrics={globalEffectiveMetrics} rawInstallsBreakdown={rawInstallsBreakdown} selectedAudience={selectedAudience} />
-      {
-        !isCtvWithAF && (<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 16 }}>
-          <PlacementPositionPanel placementPosData={placementPosData} />
-          <PlacementTypePanel placementTypeData={placementTypeData} />
-        </div>)
-      }
-      {
-        !isCtvWithAF && (<PlatformAnalysis deviceData={deviceData} platformData={placementTypeData} />)
-      }
-
-      <DeliveryByWeekday tableData={globalEffectiveMetrics.enrichedTableData} />
-      <AttributionRevenueTraffic
-        operatorData={operatorData}
-        browserData={browserData}
-        cityData={cityData}
-        globalEffectiveMetrics={globalEffectiveMetrics}
-        selectedAudience={selectedAudience}
-        rawInstallsBreakdown={rawInstallsBreakdown}
-      />
-      {
-        !isCtvWithAF && (<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 12, margin: "0 16px" }}>
-          <GenderChart genderData={genderData} />
-          <AgeChart ageData={ageData} />
-        </div>)
-      }
-
-
-      <BrowsersOperatorsTables browserData={browserData} operatorData={operatorData} campaignPricing={campaignPricing} globalEffectiveMetrics={globalEffectiveMetrics} selectedAudience={selectedAudience} rawInstallsBreakdown={rawInstallsBreakdown} />
+              <BrowsersOperatorsTables browserData={browserData} operatorData={operatorData} campaignPricing={campaignPricing} globalEffectiveMetrics={globalEffectiveMetrics} selectedAudience={selectedAudience} rawInstallsBreakdown={rawInstallsBreakdown} />
+            </>
+          )}
+        </>
+      )}
 
       {/* ── Styles ── */}
       <style jsx global>{`
@@ -1904,8 +1967,6 @@ export default function DashboardRedesignPage() {
           .st-metric-row { grid-template-columns: 1fr; }
         }
       `}</style>
-      </>
-      )}
     </div>
   );
 }

@@ -64,7 +64,9 @@ export function UrlTable({ urlData: propData, campaignPricing, globalEffectiveMe
     let allocatedImp = 0;
     return rawList.map((r, idx) => {
       let share = 0;
-      if (totalClicksSum > 0) {
+      if (isCtvWithAF || totalClicksSum === 0) {
+        share = totalImpSum > 0 ? r.rawImp / totalImpSum : (1 / rawList.length);
+      } else if (totalClicksSum > 0) {
         share = r.rawClicks / totalClicksSum;
       } else if (totalImpSum > 0) {
         share = r.rawImp / totalImpSum;

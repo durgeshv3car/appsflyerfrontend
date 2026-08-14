@@ -20,18 +20,18 @@ export function DeliveryByWeekday({ tableData: propTableData }) {
   const weekdayList = useMemo(() => {
     return hasData
       ? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(dayName => {
-          const matchingRows = propTableData.filter(r => {
-            const dateStr = r.period || r.Date || r.date;
-            if (!dateStr) return false;
-            const d = new Date(dateStr);
-            return !isNaN(d) && d.toLocaleDateString('en-US', { weekday: 'short' }) === dayName;
-          });
-          const imprSum = matchingRows.reduce((acc, curr) => acc + Number(curr.Impressions || curr.impressions || 0), 0);
-          return {
-            day: dayName,
-            impr: imprSum
-          };
-        })
+        const matchingRows = propTableData.filter(r => {
+          const dateStr = r.period || r.Date || r.date;
+          if (!dateStr) return false;
+          const d = new Date(dateStr);
+          return !isNaN(d) && d.toLocaleDateString('en-US', { weekday: 'short' }) === dayName;
+        });
+        const imprSum = matchingRows.reduce((acc, curr) => acc + Number(curr.Impressions || curr.impressions || 0), 0);
+        return {
+          day: dayName,
+          impr: imprSum
+        };
+      })
       : defaultWeekdayData;
   }, [propTableData, hasData]);
 
@@ -115,7 +115,6 @@ export function DeliveryByWeekday({ tableData: propTableData }) {
               🔥 Peak: {peakDay.day} ({peakDay.impr.toLocaleString('en-IN')})
             </div>
           )}
-          <button className="st-dl-btn"><DownloadIcon /> Download</button>
         </div>
       </div>
 

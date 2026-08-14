@@ -195,7 +195,7 @@ export function AttributionRevenueTraffic({ operatorData, browserData, cityData,
             {operatorItems && (
               <DonutCard
                 title="Network Operators"
-                subTitle={hasRawOperatorData ? "By install / impression share" : "By impression share"}
+                subTitle={hasRawOperatorData ? "By install" : "By impression share"}
                 label={countLabel(operatorItems)}
                 subLabel="Operators"
                 tag="ISP"
@@ -217,7 +217,7 @@ export function AttributionRevenueTraffic({ operatorData, browserData, cityData,
             {geoItems && (
               <DonutCard
                 title={hasAF ? "Top States" : "Top Cities"}
-                subTitle={hasAF ? "By install / impression share" : "By impression share"}
+                subTitle={hasAF ? "By install" : "By impression share"}
                 label={countLabel(geoItems)}
                 subLabel={hasAF ? "States" : "Cities"}
                 tag="GEO"
