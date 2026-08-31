@@ -49,6 +49,12 @@ export const menuList = [
         path: `/new-appflyer-report`,
         icon: 'feather-airplay',
     },
+    {
+        id: 9,
+        name: "Ad Creation",
+        path: `/ad-creation`,
+        icon: 'feather-help-circle',
+    },
 
 
 

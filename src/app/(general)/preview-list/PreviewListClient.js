@@ -6,6 +6,7 @@ import ItemModal from "./components/ItmeModal";
 import CreativeSetSettings from "./components/CreativeSetSettings";
 import { useSession } from "next-auth/react";
 import { getAudience, getAudienceByUser } from "@/services/createaudience";
+import { getDV360CustomerMatchAudiences } from "@/services/dv360CustomerMatch";
 import topTost from "@/utils/topTost";
 
 const PreviewListClient = () => {
@@ -31,19 +32,56 @@ const PreviewListClient = () => {
   const [query, setQuery] = useState("");
   const limit = 10;
 
-  // Fetch Audiences list for dropdown
+  // Fetch Audiences list for dropdown (merges standard, DV360, and local cache)
   useEffect(() => {
     const fetchAudiences = async () => {
       try {
-        let res;
-        if (session?.user?.role === "user" && session?.user?.id) {
-          res = await getAudienceByUser(session.user.id, session.user.role);
-        } else {
-          res = await getAudience();
+        let stdList = [];
+        try {
+          let res;
+          if (session?.user?.role === "user" && session?.user?.id) {
+            res = await getAudienceByUser(session.user.id, session.user.role);
+          } else {
+            res = await getAudience();
+          }
+          if (res && res.data) {
+            stdList = res.data;
+          }
+        } catch (e) {
+          console.warn("Standard audience fetch warning in preview-list:", e);
         }
-        if (res && res.data) {
-          setAudiences(res.data);
+
+        let dv360List = [];
+        try {
+          const dvRes = await getDV360CustomerMatchAudiences();
+          if (Array.isArray(dvRes)) dv360List = dvRes;
+          else if (Array.isArray(dvRes?.data)) dv360List = dvRes.data;
+          else if (Array.isArray(dvRes?.data?.data)) dv360List = dvRes.data.data;
+        } catch (e) {
+          console.warn("DV360 audience fetch warning in preview-list:", e);
         }
+
+        let localList = [];
+        try {
+          const stored = localStorage.getItem("dv360_saved_audiences");
+          if (stored) localList = JSON.parse(stored);
+        } catch (e) {}
+
+        const map = new Map();
+        localList.forEach((a) => {
+          const key = String(a._id || a.dv360AudienceId || a.id);
+          if (key) map.set(key, a);
+        });
+        stdList.forEach((a) => {
+          const key = String(a._id || a.dv360AudienceId || a.id);
+          if (key) map.set(key, a);
+        });
+        dv360List.forEach((a) => {
+          const key = String(a._id || a.dv360AudienceId || a.id);
+          if (key) map.set(key, a);
+        });
+
+        setAudiences(Array.from(map.values()));
       } catch (err) {
         console.error("Failed to fetch audiences:", err);
       }

@@ -67,8 +67,8 @@ const ItemModal = ({
               >
                 <option value="">-- No Audience Linked --</option>
                 {audiences.map((aud) => (
-                  <option key={aud._id || aud.id} value={aud._id || aud.id}>
-                    {aud.reportName || aud.advertiserId}
+                  <option key={aud._id || aud.dv360AudienceId || aud.id} value={aud._id || aud.dv360AudienceId || aud.id}>
+                    {aud.displayName || aud.reportName || aud.advertiserId} {aud.dv360AudienceId ? `(${aud.dv360AudienceId})` : ""}
                   </option>
                 ))}
               </select>
