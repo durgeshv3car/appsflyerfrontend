@@ -81,7 +81,7 @@ function BrowserTable({ data, titleLabel, subLabel, entityKey, defaultData, hasV
     if (!Array.isArray(rawList) || rawList.length === 0) return [];
 
     const filteredRawList = rawList.filter(r => {
-      const n = (r.operator || r.name || r.Operator || "").toString().toLowerCase().trim();
+      const n = (r[entityKey] || r.name || r.operator || r.browser || r.Operator || "").toString().toLowerCase().trim();
       return n && n !== "unknown" && n !== "other" && n !== "none" && n !== "null" && n !== "undefined";
     });
 
@@ -159,7 +159,7 @@ function BrowserTable({ data, titleLabel, subLabel, entityKey, defaultData, hasV
           <thead>
             <tr>
               <th style={{ paddingLeft: "22px" }}>{entityKey.toUpperCase()}</th>
-              {!isCtvWithAF && <th>IMPRESSIONS</th>}
+              {(!isCtvWithAF || entityKey === "browser") && <th>IMPRESSIONS</th>}
               {!isCtvWithAF && <th>CLICKS</th>}
               {!isCtvWithAF && <th>CTR</th>}
               {hasVideo && !isCtvWithAF && <th>VIEWS</th>}
@@ -186,7 +186,7 @@ function BrowserTable({ data, titleLabel, subLabel, entityKey, defaultData, hasV
                       <td style={{ fontWeight: 600, color: "#111827", paddingLeft: "22px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {r[entityKey] || r.name || "–"}
                       </td>
-                      {!isCtvWithAF && <td>{r.impressions}</td>}
+                      {(!isCtvWithAF || entityKey === "browser") && <td>{r.impressions}</td>}
                       {!isCtvWithAF && <td>{r.clicks}</td>}
                       {!isCtvWithAF && <td>{r.ctr}</td>}
                       {hasVideo && !isCtvWithAF && <td>{vViews.toLocaleString('en-IN')}</td>}
@@ -200,7 +200,7 @@ function BrowserTable({ data, titleLabel, subLabel, entityKey, defaultData, hasV
                 })}
                 <tr className="st-tr-total">
                   <td style={{ paddingLeft: "22px" }}>Total</td>
-                  {!isCtvWithAF && <td>{totals.totalImpr}</td>}
+                  {(!isCtvWithAF || entityKey === "browser") && <td>{totals.totalImpr}</td>}
                   {!isCtvWithAF && <td>{totals.totalClicks}</td>}
                   {!isCtvWithAF && <td>{totals.avgCtr}</td>}
                   {hasVideo && !isCtvWithAF && <td>{totals.totalViews}</td>}
@@ -212,7 +212,7 @@ function BrowserTable({ data, titleLabel, subLabel, entityKey, defaultData, hasV
                 </tr>
               </>
             ) : (
-              <tr><td colSpan={1 + (isCtvWithAF ? 0 : 3) + (hasVideo && !isCtvWithAF ? 4 : 0) + (hasAF ? 2 : 0)} style={{ textAlign: "center", padding: 20, color: "#6B7280" }}>No data available.</td></tr>
+              <tr><td colSpan={1 + ((!isCtvWithAF || entityKey === "browser") ? 1 : 0) + (!isCtvWithAF ? 2 : 0) + (hasVideo && !isCtvWithAF ? 4 : 0) + (hasAF ? 2 : 0)} style={{ textAlign: "center", padding: 20, color: "#6B7280" }}>No data available.</td></tr>
             )}
           </tbody>
         </table>
@@ -247,8 +247,10 @@ export function BrowsersOperatorsTables({ browserData: propBrowserData, operator
         const clk = Number(r.Clicks || r.clicks || 0);
         const ctrRaw = Number(r.CTR || r.ctr || 0);
         const ctr = ctrRaw > 1 ? ctrRaw.toFixed(2) + "%" : (imp > 0 ? (clk / imp * 100).toFixed(2) + "%" : "0.00%");
+        const browserName = r.Browser || r.browser || r.name || "Unknown";
         return {
-          browser: r.Browser || r.browser || r.name || "Unknown",
+          browser: browserName,
+          name: browserName,
           rawImp: imp,
           rawClicks: clk,
           impressions: imp.toLocaleString('en-IN'),
@@ -266,8 +268,10 @@ export function BrowsersOperatorsTables({ browserData: propBrowserData, operator
         const clk = Number(r.Clicks || r.clicks || 0);
         const ctrRaw = Number(r.CTR || r.ctr || 0);
         const ctr = ctrRaw > 1 ? ctrRaw.toFixed(2) + "%" : (imp > 0 ? (clk / imp * 100).toFixed(2) + "%" : "0.00%");
+        const operatorName = r.Operator || r.operator || r.name || "Unknown";
         return {
-          operator: r.Operator || r.operator || r.name || "Unknown",
+          operator: operatorName,
+          name: operatorName,
           rawImp: imp,
           rawClicks: clk,
           impressions: imp.toLocaleString('en-IN'),

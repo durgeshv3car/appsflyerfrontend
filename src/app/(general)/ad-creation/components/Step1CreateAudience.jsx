@@ -35,7 +35,6 @@ import {
   createGoogleInterestAudience,
   deleteDV360CustomerMatchAudience,
 } from "@/services/dv360CustomerMatch";
-import { getAudience, deleteAudience } from "@/services/createaudience";
 import topTost from "@/utils/topTost";
 
 // Pre-defined fallback Google Audience categories to ensure instant snappy browsing
@@ -107,7 +106,6 @@ const SAVED_AUDIENCE_CATEGORY_FILTERS = [
   { id: "CUSTOMER_MATCH", label: "Customer Match (1st Party)" },
   { id: "GOOGLE_INTEREST", label: "Google Interest / Affinity" },
   { id: "CUSTOM_INTENT", label: "Custom Intent" },
-  { id: "CAMPAIGN_AUDIENCE", label: "Campaign Audiences" },
 ];
 
 const Step1CreateAudience = ({ onNext, onAudienceSelected, initialAudience }) => {
@@ -241,15 +239,14 @@ const Step1CreateAudience = ({ onNext, onAudienceSelected, initialAudience }) =>
           return false;
         }
       }
-      // Search filter (name, id, advertiser, description, type, campaign name)
+      // Search filter (name, id, advertiser, description, type)
       if (!query) return true;
       const nameMatch = aud.displayName?.toLowerCase().includes(query) || aud.reportName?.toLowerCase().includes(query);
       const idMatch = String(aud.dv360AudienceId || aud._id || "").toLowerCase().includes(query);
       const advMatch = String(aud.advertiserId || "").toLowerCase().includes(query);
       const descMatch = aud.description?.toLowerCase().includes(query);
       const typeMatch = (aud.audienceCategory || aud.audienceType || "").toLowerCase().includes(query);
-      const campaignMatch = aud.campaignName?.toLowerCase().includes(query);
-      return nameMatch || idMatch || advMatch || descMatch || typeMatch || campaignMatch;
+      return nameMatch || idMatch || advMatch || descMatch || typeMatch;
     });
   }, [existingAudiences, searchFilter, listAdvertiserFilter, listCategoryFilter]);
 
@@ -276,7 +273,7 @@ const Step1CreateAudience = ({ onNext, onAudienceSelected, initialAudience }) =>
   }, []);
 
   // ─── Fetch audience list from API (primary source of truth) ───────────────
-  // Fetches DV360 Customer Match audiences + Campaign/Standard audiences from API.
+  // Fetches DV360 Customer Match & Google Interest audiences only (no campaign audiences).
   const fetchExistingAudiences = useCallback(async () => {
     setIsLoadingAudiences(true);
 
@@ -301,54 +298,17 @@ const Step1CreateAudience = ({ onNext, onAudienceSelected, initialAudience }) =>
         console.warn("DV360 API fetch error:", e.message);
       }
 
-      // Fetch campaign/standard audiences from API
-      let standardList = [];
+      // Sort by creation date descending
+      const combined = dv360List.sort(
+        (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+      );
+
+      // Direct source of truth from Database
+      setExistingAudiences(combined);
+
       try {
-        const stdRes = await getAudience("");
-        if (Array.isArray(stdRes?.data)) {
-          standardList = stdRes.data.map((a) => ({
-            _id: String(a._id),
-            dv360AudienceId: a.campaignId || a.insertionOrderId || String(a._id).slice(-8),
-            displayName: a.reportName || a.name || `Campaign Audience — ${a.advertiserId || ""}`,
-            description: a.campaignType ? `Campaign Type: ${a.campaignType}` : "",
-            advertiserId: a.advertiserId,
-            audienceCategory: "CAMPAIGN_AUDIENCE",
-            audienceType: a.campaignType || "STANDARD",
-            memberCountUploaded: 0,
-            createdAt: a.createdAt || new Date().toISOString(),
-          }));
-        }
-      } catch (e) {
-        console.warn("Standard audience API fetch error:", e.message);
-      }
-
-      // Merge both API lists + any created audiences in current state
-      setExistingAudiences((prev) => {
-        const mergedMap = new Map();
-        // Keep locally created audiences in session
-        prev.forEach((a) => {
-          const key = String(a._id || a.dv360AudienceId || a.displayName || "");
-          if (key) mergedMap.set(key, a);
-        });
-        standardList.forEach((a) => {
-          const key = String(a._id || a.dv360AudienceId || a.displayName || "");
-          if (key) mergedMap.set(key, { ...mergedMap.get(key), ...a });
-        });
-        dv360List.forEach((a) => {
-          const key = String(a._id || a.dv360AudienceId || a.displayName || "");
-          if (key) mergedMap.set(key, { ...mergedMap.get(key), ...a });
-        });
-
-        const combined = Array.from(mergedMap.values()).sort(
-          (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
-        );
-
-        try {
-          localStorage.setItem("dv360_saved_audiences", JSON.stringify(combined));
-        } catch (e) {}
-
-        return combined;
-      });
+        localStorage.setItem("dv360_saved_audiences", JSON.stringify(combined));
+      } catch (e) {}
     } catch (err) {
       console.warn("fetchExistingAudiences error:", err);
     } finally {
@@ -768,23 +728,47 @@ const Step1CreateAudience = ({ onNext, onAudienceSelected, initialAudience }) =>
     }
   };
 
-  // Delete audience from both backend and frontend
+  // Delete audience from both database and frontend
   const handleDeleteAudience = async (aud) => {
     const targetId = aud._id || aud.dv360AudienceId || aud.id;
     setIsDeletingId(targetId);
     try {
-      // 1. Delete from Backend (DV360 and standard audience route)
+      // 1. Delete from Backend MongoDB Database
+      let isDeleted = false;
+
+      // Primary attempt by _id or targetId
       try {
         await deleteDV360CustomerMatchAudience(targetId, aud.advertiserId);
+        isDeleted = true;
       } catch (beErr) {
-        console.warn("DV360 route delete note, trying fallback delete:", beErr.message);
-        await deleteAudience(targetId);
+        console.warn("Primary delete attempt error:", beErr.message);
       }
 
-      // 2. Remove from frontend list
+      // Secondary attempt by dv360AudienceId if different from targetId
+      if (aud.dv360AudienceId && aud.dv360AudienceId !== targetId) {
+        try {
+          await deleteDV360CustomerMatchAudience(aud.dv360AudienceId, aud.advertiserId);
+          isDeleted = true;
+        } catch (e2) {
+          console.warn("Secondary delete attempt error:", e2.message);
+        }
+      }
+
+      // Tertiary attempt by displayName if needed
+      if (!isDeleted && aud.displayName) {
+        try {
+          await deleteDV360CustomerMatchAudience(aud.displayName, aud.advertiserId);
+        } catch (e3) {}
+      }
+
+      // 2. Remove from frontend list & localStorage
       setExistingAudiences((prev) => {
         const updated = prev.filter(
-          (a) => (a._id || a.dv360AudienceId || a.id) !== targetId
+          (a) =>
+            (a._id || a.dv360AudienceId || a.id) !== targetId &&
+            a._id !== aud._id &&
+            a.dv360AudienceId !== aud.dv360AudienceId &&
+            a.displayName !== aud.displayName
         );
         try {
           localStorage.setItem("dv360_saved_audiences", JSON.stringify(updated));
@@ -796,7 +780,9 @@ const Step1CreateAudience = ({ onNext, onAudienceSelected, initialAudience }) =>
       if (
         selectedAudience &&
         (selectedAudience._id === targetId ||
-          selectedAudience.dv360AudienceId === targetId)
+          selectedAudience._id === aud._id ||
+          selectedAudience.dv360AudienceId === aud.dv360AudienceId ||
+          selectedAudience.displayName === aud.displayName)
       ) {
         setSelectedAudience(null);
         try {
@@ -808,10 +794,13 @@ const Step1CreateAudience = ({ onNext, onAudienceSelected, initialAudience }) =>
       }
 
       topTost(
-        `Audience "${aud.displayName || aud.reportName || targetId}" deleted successfully`,
+        `Audience "${aud.displayName || aud.reportName || targetId}" deleted from database successfully`,
         "success"
       );
       setConfirmDeleteAud(null);
+
+      // Re-sync with backend database
+      fetchExistingAudiences();
     } catch (err) {
       console.error("Delete audience error:", err);
       topTost(`Failed to delete audience: ${err.message}`, "error");
@@ -2004,8 +1993,7 @@ const Step1CreateAudience = ({ onNext, onAudienceSelected, initialAudience }) =>
                   <tr className="fs-12 text-muted text-uppercase">
                     <th style={{ width: "40px" }}></th>
                     <th>Audience Name & Details</th>
-                    <th>Campaign</th>
-                    <th>DV360 ID</th>
+                    <th>DV360 Audience ID</th>
                     <th>Advertiser</th>
                     <th>Type / Channel</th>
                     <th>Segments / Size</th>
@@ -2082,16 +2070,6 @@ const Step1CreateAudience = ({ onNext, onAudienceSelected, initialAudience }) =>
                             <div className="text-muted fs-11 fst-italic">No description provided</div>
                           )}
                         </td>
-                        {/* Campaign Name column */}
-                        <td>
-                          {aud.campaignName ? (
-                            <span className="badge bg-primary-subtle text-primary rounded-pill fs-11 px-2.5 py-1 fw-semibold">
-                              📁 {aud.campaignName}
-                            </span>
-                          ) : (
-                            <span className="text-muted fs-11 fst-italic">—</span>
-                          )}
-                        </td>
                         <td>
                           <span className="badge bg-light text-dark border font-monospace fs-11">
                             {aud.dv360AudienceId || "-"}
@@ -2111,7 +2089,7 @@ const Step1CreateAudience = ({ onNext, onAudienceSelected, initialAudience }) =>
                                 ? "bg-warning-subtle text-dark"
                                 : isCustomerMatch
                                 ? "bg-primary-subtle text-primary"
-                                : "bg-info-subtle text-info"
+                                : "bg-primary-subtle text-primary"
                             }`}
                           >
                             {isGoogleInterest
@@ -2120,9 +2098,7 @@ const Step1CreateAudience = ({ onNext, onAudienceSelected, initialAudience }) =>
                               ? "⚡ Custom Intent"
                               : aud.audienceType === "CUSTOMER_MATCH_DEVICE_ID"
                               ? "📱 Mobile IDs"
-                              : isCustomerMatch
-                              ? "👥 Contact Info"
-                              : "📊 Campaign Audience"}
+                              : "👥 Contact Info"}
                           </span>
                         </td>
                         <td className="fw-bold fs-13 text-dark">

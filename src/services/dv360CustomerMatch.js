@@ -152,23 +152,40 @@ export const createGoogleInterestAudience = async (payload) => {
 export const deleteDV360CustomerMatchAudience = async (audienceId, advertiserId = "") => {
   try {
     const token = await getToken();
-    let res;
+    const config = {
+      params: { advertiserId },
+      headers: {
+        Authorization: token ? `${token}` : "",
+      },
+    };
+
+    let res = null;
+    let lastError = null;
+
     try {
-      res = await axios.delete(`${API_URL}/dv360-customer-match/${audienceId}`, {
-        params: { advertiserId },
-        headers: {
-          Authorization: token ? `${token}` : "",
-        },
-      });
+      res = await axios.delete(
+        `${API_URL}/dv360-customer-match/${encodeURIComponent(audienceId)}`,
+        config
+      );
     } catch (primaryErr) {
-      // Fallback to standard audience endpoint if route differs
-      res = await axios.delete(`${API_URL}/audience/${audienceId}`, {
-        headers: {
-          Authorization: token ? `${token}` : "",
-        },
-      });
+      lastError = primaryErr;
+      try {
+        res = await axios.delete(
+          `${API_URL}/audience/${encodeURIComponent(audienceId)}`,
+          config
+        );
+      } catch (fallbackErr) {
+        lastError = fallbackErr;
+      }
     }
-    return res?.data || { success: true };
+
+    if (res && res.data) {
+      return res.data;
+    }
+    if (lastError) {
+      throw lastError;
+    }
+    return { success: true };
   } catch (error) {
     console.error("Error deleting DV360 audience:", error.response?.data || error.message);
     throw error;

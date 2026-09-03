@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   FiImage,
   FiVideo,
@@ -14,9 +14,15 @@ import {
   FiTrash2,
   FiFile,
   FiCheck,
+  FiRefreshCw,
+  FiLayers,
 } from "react-icons/fi";
 import topTost from "@/utils/topTost";
 import { getAdvertisers } from "@/services/advertiser";
+import {
+  uploadDV360CreativeDirect,
+  getDV360CreativesList,
+} from "@/services/adCreative";
 
 const CREATIVE_TYPES = [
   { id: "image", label: "Display Image", icon: FiImage, ext: "JPG, PNG, WEBP, GIF" },
@@ -63,13 +69,18 @@ const Step2CreateCreative = ({
   const [manualAdvertiserId, setManualAdvertiserId] = useState("");
   const [isManualAdvertiser, setIsManualAdvertiser] = useState(false);
 
-  // Library of existing creatives
+  // Live DV360 Creatives Library
   const [existingCreatives, setExistingCreatives] = useState([]);
   const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
   const [librarySearch, setLibrarySearch] = useState("");
   const [selectedCreative, setSelectedCreative] = useState(initialCreative || null);
 
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api";
+  // Active advertiser calculation
+  const getActiveAdvertiserId = useCallback(() => {
+    return isManualAdvertiser
+      ? manualAdvertiserId.trim()
+      : selectedAdvertiserId || selectedAudience?.advertiserId || "";
+  }, [isManualAdvertiser, manualAdvertiserId, selectedAdvertiserId, selectedAudience?.advertiserId]);
 
   // Fetch advertiser list on mount
   useEffect(() => {
@@ -83,7 +94,7 @@ const Step2CreateCreative = ({
         else if (Array.isArray(res?.advertises)) list = res.advertises;
         setAdvertisers(list);
         // Only auto-select first if nothing pre-filled from Step 1
-        if (list.length > 0 && !selectedAdvertiserId) {
+        if (list.length > 0 && !selectedAdvertiserId && !selectedAudience?.advertiserId) {
           setSelectedAdvertiserId(list[0].advertise_id || "");
         }
       } catch (err) {
@@ -100,32 +111,38 @@ const Step2CreateCreative = ({
     }
   }, [selectedAudience?.advertiserId]);
 
-  // Fetch creatives library from /ad-creatives
-  const fetchCreativesLibrary = async () => {
+  // Fetch creatives directly from DV360 API (No DB)
+  const fetchCreativesLibrary = useCallback(async () => {
+    const advId = getActiveAdvertiserId();
+    if (!advId) {
+      setExistingCreatives([]);
+      return;
+    }
+
     setIsLoadingLibrary(true);
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/ad-creatives?page=1&limit=50&search=${encodeURIComponent(librarySearch)}${selectedAudience?.advertiserId ? `&advertiserId=${selectedAudience.advertiserId}` : ""}`
-      );
-      if (response.ok) {
-        const result = await response.json();
-        let list = [];
-        if (Array.isArray(result)) list = result;
-        else if (Array.isArray(result?.data)) list = result.data;
-        else if (Array.isArray(result?.data?.data)) list = result.data.data;
-        setExistingCreatives(list);
-      }
+      const res = await getDV360CreativesList({
+        advertiserId: advId,
+        search: librarySearch,
+        pageSize: 50,
+      });
+
+      let list = [];
+      if (Array.isArray(res)) list = res;
+      else if (Array.isArray(res?.data)) list = res.data;
+      else if (Array.isArray(res?.data?.data)) list = res.data.data;
+      setExistingCreatives(list);
     } catch (err) {
-      console.warn("Error fetching creatives library:", err);
+      console.warn("Error fetching DV360 live creatives library:", err);
       setExistingCreatives([]);
     } finally {
       setIsLoadingLibrary(false);
     }
-  };
+  }, [getActiveAdvertiserId, librarySearch]);
 
   useEffect(() => {
     fetchCreativesLibrary();
-  }, [librarySearch]);
+  }, [fetchCreativesLibrary]);
 
   // Handle file selection — auto-detect dimensions for images
   const handleFileChange = (e) => {
@@ -167,7 +184,7 @@ const Step2CreateCreative = ({
     }
   };
 
-  // Upload creative to /ad-creatives/upload → auto-pushes to DV360
+  // Upload creative directly to DV360 (No DB storage)
   const handleUploadCreative = async (e) => {
     e.preventDefault();
 
@@ -181,37 +198,24 @@ const Step2CreateCreative = ({
       return;
     }
 
+    const activeAdvertiserId = getActiveAdvertiserId();
+    if (!activeAdvertiserId) {
+      topTost("Please select or enter a DV360 Advertiser ID", "warning");
+      return;
+    }
+
     setIsUploading(true);
     try {
       const formData = new FormData();
       formData.append("name", creativeName.trim());
       formData.append("creativeType", creativeType);
-      formData.append("pushToDV360", "true");
-
-      // Resolve advertiser: manual input takes priority, then dropdown, then audience
-      const activeAdvertiserId = isManualAdvertiser
-        ? manualAdvertiserId.trim()
-        : selectedAdvertiserId || selectedAudience?.advertiserId || "";
-
-      if (!activeAdvertiserId) {
-        topTost("Please select or enter a DV360 Advertiser ID", "warning");
-        setIsUploading(false);
-        return;
-      }
       formData.append("advertiserId", activeAdvertiserId);
-
-      // Click-through URL (required by DV360 as exit event)
       formData.append("clickUrl", clickUrl.trim() || "https://example.com");
 
-      // Send auto-detected dimensions (required by DV360 for CREATIVE_TYPE_STANDARD)
+      // Auto-detected / customized dimensions
       if (imageDimensions.width && imageDimensions.height) {
         formData.append("width", imageDimensions.width);
         formData.append("height", imageDimensions.height);
-      }
-
-      // Optionally link to audience from Step 1 (not required)
-      if (selectedAudience?._id) {
-        formData.append("audienceId", selectedAudience._id);
       }
 
       if (file) {
@@ -220,34 +224,23 @@ const Step2CreateCreative = ({
         formData.append("fileUrl", externalUrl.trim());
       }
 
-      const response = await fetch(`${API_BASE_URL}/ad-creatives/upload`, {
-        method: "POST",
-        body: formData,
-      });
+      const result = await uploadDV360CreativeDirect(formData);
 
-      const result = await response.json();
-
-      if (response.ok && result.data) {
-        const dv360Pushed = result.dv360 && !result.dv360.error;
-        topTost(
-          dv360Pushed
-            ? "Creative uploaded & pushed to DV360!"
-            : result.dv360?.error
-              ? `Saved locally. DV360: ${result.dv360.error}`
-              : "Creative uploaded successfully!",
-          dv360Pushed ? "success" : "warning"
-        );
-        setSelectedCreative(result.data);
+      if (result && (result.data || result.status === "success")) {
+        const creativeData = result.data || result;
+        topTost("Creative uploaded & created directly in DV360!", "success");
+        setSelectedCreative(creativeData);
         if (onCreativeSelected) {
-          onCreativeSelected(result.data);
+          onCreativeSelected(creativeData);
         }
         fetchCreativesLibrary();
       } else {
-        topTost(result.message || result.error || "Failed to upload creative", "error");
+        topTost(result?.message || result?.error || "Failed to create creative in DV360", "error");
       }
     } catch (err) {
-      console.error("Creative upload error:", err);
-      topTost("Upload error: " + err.message, "error");
+      const errorMsg = err.response?.data?.message || err.message;
+      console.error("DV360 creative upload error:", errorMsg);
+      topTost("DV360 Upload Error: " + errorMsg, "error");
     } finally {
       setIsUploading(false);
     }
@@ -737,113 +730,147 @@ const Step2CreateCreative = ({
         </form>
       )}
 
-      {/* TAB 2: ASSET LIBRARY */}
+      {/* TAB 2: LIVE DV360 ASSET LIBRARY */}
       {activeTab === "library" && (
         <div className="card border-0 shadow-sm rounded-4 p-4" style={{ background: "#ffffff" }}>
           <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
             <div>
-              <h5 className="fw-bold mb-1 text-dark">Creative Media Asset Library</h5>
-              <p className="text-muted fs-13 mb-0">
-                Choose an asset from your previously uploaded creatives library.
+              <div className="d-flex align-items-center gap-2">
+                <h5 className="fw-bold mb-0 text-dark">Live DV360 Creative Assets</h5>
+                <span className="badge bg-primary-subtle text-primary rounded-pill px-2.5 py-1 fs-11">
+                  Advertiser: {getActiveAdvertiserId() || "None"}
+                </span>
+              </div>
+              <p className="text-muted fs-13 mb-0 mt-1">
+                Directly fetched from Google DV360 API for advertiser {getActiveAdvertiserId() || "(Select an advertiser)"}.
               </p>
             </div>
 
-            <input
-              type="text"
-              className="form-control form-control-sm rounded-pill px-3"
-              placeholder="Search creatives..."
-              style={{ width: "240px" }}
-              value={librarySearch}
-              onChange={(e) => setLibrarySearch(e.target.value)}
-            />
+            <div className="d-flex align-items-center gap-2">
+              <input
+                type="text"
+                className="form-control form-control-sm rounded-pill px-3"
+                placeholder="Search DV360 creatives..."
+                style={{ width: "220px" }}
+                value={librarySearch}
+                onChange={(e) => setLibrarySearch(e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={fetchCreativesLibrary}
+                className="btn btn-outline-secondary btn-sm rounded-pill px-3 d-flex align-items-center gap-1"
+                title="Refresh DV360 library"
+              >
+                <FiRefreshCw size={13} className={isLoadingLibrary ? "spin" : ""} /> Refresh
+              </button>
+            </div>
           </div>
 
-          {isLoadingLibrary ? (
-            <div className="text-center py-5">
-              <div className="spinner-border text-primary mb-2" role="status" />
-              <div className="text-muted fs-13">Loading Assets...</div>
-            </div>
-          ) : existingCreatives.length === 0 ? (
-            <div className="text-center py-5 bg-light rounded-4 border border-dashed">
-              <FiImage size={40} className="text-muted mb-2" />
-              <h6 className="fw-bold text-dark mb-1">No Creatives in Library</h6>
-              <p className="text-muted fs-13 mb-3">Upload your first creative media asset to start building ads.</p>
+          {!getActiveAdvertiserId() ? (
+            <div className="text-center py-5 bg-light rounded-4 border border-dashed p-4">
+              <FiLayers size={40} className="text-muted mb-2" />
+              <h6 className="fw-bold text-dark mb-1">No DV360 Advertiser Selected</h6>
+              <p className="text-muted fs-13 mb-3">
+                Please select or enter a DV360 Advertiser ID to load its creative library from Google DV360.
+              </p>
               <button
                 type="button"
                 className="btn btn-primary btn-sm rounded-pill px-4"
                 onClick={() => setActiveTab("upload")}
               >
-                <FiPlus className="me-1" /> Upload Creative
+                Go to Specifications
+              </button>
+            </div>
+          ) : isLoadingLibrary ? (
+            <div className="text-center py-5">
+              <div className="spinner-border text-primary mb-2" role="status" />
+              <div className="text-muted fs-13">Loading DV360 Creatives directly from Google API...</div>
+            </div>
+          ) : existingCreatives.length === 0 ? (
+            <div className="text-center py-5 bg-light rounded-4 border border-dashed">
+              <FiImage size={40} className="text-muted mb-2" />
+              <h6 className="fw-bold text-dark mb-1">No Creatives Found in DV360</h6>
+              <p className="text-muted fs-13 mb-3">
+                No active creatives found for advertiser {getActiveAdvertiserId()}. Upload a new creative directly to DV360.
+              </p>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm rounded-pill px-4"
+                onClick={() => setActiveTab("upload")}
+              >
+                <FiPlus className="me-1" /> Upload DV360 Creative
               </button>
             </div>
           ) : (
             <div className="row g-3">
               {Array.isArray(existingCreatives) &&
                 existingCreatives.map((item) => {
-                  const isSelected = selectedCreative?._id === item._id;
-                  // Support both old model (creativeName/type) and new model (name/creativeType)
-                  const displayName = item.name || item.creativeName || "Untitled";
-                  const displayType = item.creativeType || item.type || "image";
+                  const isSelected =
+                    (selectedCreative?.dv360CreativeId && selectedCreative.dv360CreativeId === item.dv360CreativeId) ||
+                    (selectedCreative?._id && selectedCreative._id === item._id) ||
+                    (selectedCreative?.id && selectedCreative.id === item.id);
+                  const displayName = item.displayName || item.name || item.creativeName || "Untitled";
+                  const displayType = item.creativeType || item.type || "CREATIVE_TYPE_STANDARD";
+                  const width = item.width || item.dimensions?.widthPixels;
+                  const height = item.height || item.dimensions?.heightPixels;
 
-                return (
-                  <div className="col-12 col-sm-6 col-lg-4" key={item._id}>
-                    <div
-                      className={`card h-100 rounded-4 border transition-all ${
-                        isSelected
-                          ? "border-primary shadow-sm bg-primary-subtle/5"
-                          : "border-light-subtle bg-white hover-shadow"
-                      }`}
-                      style={{ cursor: "pointer" }}
-                      onClick={() => handleSelectCreative(item)}
-                    >
+                  return (
+                    <div className="col-12 col-sm-6 col-lg-4" key={item.dv360CreativeId || item.id || item._id}>
                       <div
-                        className="card-img-top bg-light d-flex align-items-center justify-content-center p-3 rounded-top-4 overflow-hidden"
-                        style={{ height: "160px" }}
+                        className={`card h-100 rounded-4 border transition-all ${
+                          isSelected
+                            ? "border-primary shadow-sm bg-primary-subtle/5"
+                            : "border-light-subtle bg-white hover-shadow"
+                        }`}
+                        style={{ cursor: "pointer" }}
+                        onClick={() => handleSelectCreative(item)}
                       >
-                        {displayType === "video" || displayType === "ctv" ? (
+                        <div
+                          className="card-img-top bg-light d-flex align-items-center justify-content-center p-3 rounded-top-4 overflow-hidden"
+                          style={{ height: "140px" }}
+                        >
                           <div className="text-center text-primary">
-                            <FiVideo size={36} />
-                            <div className="fs-10 text-muted mt-1">Video Asset</div>
+                            {String(displayType).includes("VIDEO") ? (
+                              <FiVideo size={36} />
+                            ) : (
+                              <FiImage size={36} />
+                            )}
+                            <div className="fs-11 text-muted mt-1">
+                              {width && height ? `${width} × ${height} px` : displayType}
+                            </div>
                           </div>
-                        ) : item.fileUrl && !item.fileUrl.endsWith(".zip") ? (
-                          <img
-                            src={item.fileUrl}
-                            alt={displayName}
-                            style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }}
-                          />
-                        ) : (
-                          <div className="text-center text-primary">
-                            <FiImage size={36} />
-                            <div className="fs-10 text-muted mt-1">{displayType}</div>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="card-body p-3">
-                        <div className="d-flex justify-content-between align-items-center mb-1">
-                          <span className="badge bg-secondary-subtle text-secondary rounded-pill text-uppercase fs-10">
-                            {displayType}
-                          </span>
-                          {item.dv360CreativeId && (
-                            <span className="badge bg-success-subtle text-success rounded-pill fs-10">✓ DV360</span>
-                          )}
-                          {isSelected && (
-                            <span className="badge bg-success text-white rounded-pill fs-10">
-                              <FiCheck /> Selected
-                            </span>
-                          )}
                         </div>
-                        <h6 className="fw-bold text-dark text-truncate mb-1 fs-13">
-                          {displayName}
-                        </h6>
-                        <div className="text-muted fs-11">
-                          Created: {new Date(item.createdAt || Date.now()).toLocaleDateString()}
+
+                        <div className="card-body p-3">
+                          <div className="d-flex justify-content-between align-items-center mb-1">
+                            <span className="badge bg-secondary-subtle text-secondary rounded-pill fs-10">
+                              {displayType}
+                            </span>
+                            <span className="badge bg-success-subtle text-success rounded-pill fs-10">
+                              ✓ DV360 Live
+                            </span>
+                            {isSelected && (
+                              <span className="badge bg-success text-white rounded-pill fs-10">
+                                <FiCheck /> Selected
+                              </span>
+                            )}
+                          </div>
+                          <h6 className="fw-bold text-dark text-truncate mb-1 fs-13" title={displayName}>
+                            {displayName}
+                          </h6>
+                          <div className="text-muted fs-11 font-monospace">
+                            DV360 ID: {item.dv360CreativeId || item.id}
+                          </div>
+                          {item.status && (
+                            <div className="text-muted fs-11 mt-1">
+                              Status: <span className="text-capitalize">{String(item.status).replace("ENTITY_STATUS_", "").toLowerCase()}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           )}
 

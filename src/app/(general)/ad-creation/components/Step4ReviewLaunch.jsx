@@ -42,10 +42,13 @@ const Step4ReviewLaunch = ({
         memberCountUploaded: selectedAudience?.memberCountUploaded,
       },
       step2_creative: {
-        id: selectedCreative?._id,
-        creativeName: selectedCreative?.creativeName,
-        type: selectedCreative?.type,
-        fileUrl: selectedCreative?.fileUrl,
+        dv360CreativeId: selectedCreative?.dv360CreativeId || selectedCreative?.id,
+        displayName: selectedCreative?.displayName || selectedCreative?.name || selectedCreative?.creativeName,
+        creativeType: selectedCreative?.creativeType || selectedCreative?.type,
+        width: selectedCreative?.width || selectedCreative?.dimensions?.widthPixels,
+        height: selectedCreative?.height || selectedCreative?.dimensions?.heightPixels,
+        advertiserId: selectedCreative?.advertiserId,
+        source: "DV360 Direct",
       },
       step3_campaignSetup: campaignData,
       step4_status: "LAUNCH_READY",
@@ -215,42 +218,41 @@ const Step4ReviewLaunch = ({
               </div>
 
               <div className="mb-3">
-                <span className="text-muted fs-11 d-block">Creative Name</span>
+                <span className="text-muted fs-11 d-block">DV360 Creative Name</span>
                 <strong className="text-dark fs-14">
-                  {selectedCreative?.creativeName || "Selected Media Asset"}
+                  {selectedCreative?.displayName || selectedCreative?.name || selectedCreative?.creativeName || "Selected Media Asset"}
                 </strong>
               </div>
 
               <div className="mb-3">
-                <span className="text-muted fs-11 d-block">Format / Type</span>
-                <span className="badge bg-secondary-subtle text-secondary text-uppercase fs-10">
-                  {selectedCreative?.type || "image"}
+                <span className="text-muted fs-11 d-block">DV360 Creative ID</span>
+                <span className="badge bg-light text-dark border font-monospace fs-12">
+                  {selectedCreative?.dv360CreativeId || selectedCreative?.id || "DV360 Live Asset"}
                 </span>
               </div>
 
-              {/* Asset Preview Thumbnail */}
-              <div
-                className="rounded-3 border bg-light d-flex align-items-center justify-content-center p-2 mb-3 overflow-hidden"
-                style={{ height: "130px" }}
-              >
-                {selectedCreative?.fileUrl && !selectedCreative.fileUrl.endsWith(".zip") ? (
-                  <img
-                    src={selectedCreative.fileUrl}
-                    alt="Creative Preview"
-                    style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }}
-                  />
-                ) : (
-                  <div className="text-center text-muted">
-                    <FiImage size={32} />
-                    <div className="fs-10 mt-1">Creative Media Asset</div>
-                  </div>
-                )}
+              <div className="mb-3">
+                <span className="text-muted fs-11 d-block">Format / Type</span>
+                <span className="badge bg-purple-subtle text-purple text-uppercase fs-10" style={{ background: "#f3e8ff", color: "#7e22ce" }}>
+                  {selectedCreative?.creativeType || selectedCreative?.type || "CREATIVE_TYPE_STANDARD"}
+                </span>
               </div>
 
-              <div className="p-2.5 rounded-3 bg-light fs-11 text-muted text-truncate">
-                <span>Storage URL:</span>
-                <div className="font-monospace text-dark text-truncate">
-                  {selectedCreative?.fileUrl || "Local asset"}
+              {/* Dimensions and status */}
+              <div className="p-2.5 rounded-3 bg-light fs-11 text-muted">
+                <div className="d-flex justify-content-between mb-1">
+                  <span>Dimensions:</span>
+                  <strong className="text-dark font-monospace">
+                    {selectedCreative?.width && selectedCreative?.height
+                      ? `${selectedCreative.width} × ${selectedCreative.height} px`
+                      : selectedCreative?.dimensions?.widthPixels && selectedCreative?.dimensions?.heightPixels
+                      ? `${selectedCreative.dimensions.widthPixels} × ${selectedCreative.dimensions.heightPixels} px`
+                      : "Standard"}
+                  </strong>
+                </div>
+                <div className="d-flex justify-content-between">
+                  <span>Source:</span>
+                  <span className="badge bg-success-subtle text-success fs-10">✓ Google DV360 Live</span>
                 </div>
               </div>
             </div>

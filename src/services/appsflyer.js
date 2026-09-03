@@ -258,6 +258,7 @@ export const getAppsFlyerRawInstalls = async (params) => {
   }
 };
 
+export const getNewAppsFlyerRawInstalls = getAppsFlyerRawInstalls;
 export const getAppsFlyerInstalls = getAppsFlyerRawInstalls;
 
 // New Appflyer Reports & Data Endpoints

@@ -56,6 +56,9 @@ export const getDailyReportsByRange = async (insertionOrderId, startDate, endDat
 
     return res.data;
   } catch (error) {
+    if (error.response && error.response.status === 404) {
+      return { data: [], dailyData: [], tableData: { data: [], totalCount: 0 } };
+    }
     console.log(
       "Error fetching daily reports by range:",
       error.response?.data || error.message

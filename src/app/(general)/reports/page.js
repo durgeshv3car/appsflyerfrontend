@@ -149,6 +149,7 @@ export default function DashboardRedesignPage() {
 
   // Data Fetching State
   const [tableData, setTableData] = useState([]);
+  const [weekData, setWeekData] = useState([]);
   const [creativeData, setCreativeData] = useState([]);
   const [browserData, setBrowserData] = useState([]);
   const [operatorData, setOperatorData] = useState([]);
@@ -284,8 +285,21 @@ export default function DashboardRedesignPage() {
     setIsUpdating(true);
     setPerfPage(1);
     setSelectedAudience(targetAudience);
-    // *** Reset AppsFlyer data immediately so we never show stale data from a previous campaign ***
+    // *** Reset ALL campaign & report data immediately so we never show stale/old data ***
+    setTableData([]);
+    setWeekData([]);
+    setCreativeData([]);
+    setBrowserData([]);
+    setOperatorData([]);
+    setCityData([]);
+    setPlacementTypeData([]);
+    setUrlData([]);
+    setPlacementPosData([]);
+    setDeviceData([]);
+    setGenderData([]);
+    setAgeData([]);
     setAppsflyerData([]);
+    setRawInstallsBreakdown({ operator: {}, os: {}, city: {} });
 
     const ioId = targetAudience.insertionOrderId || targetAudience.advertiserId || getAudId(targetAudience);
     const audId = getAudId(targetAudience);
@@ -346,15 +360,23 @@ export default function DashboardRedesignPage() {
         getDeviceDataByRange(filters.insertionOrderId, filters.dateRange.startDate, filters.dateRange.endDate, 1, 100000),
       ]);
 
-      if (mainRes.status === "fulfilled") setTableData(extractData(mainRes.value));
-      if (creativeRes.status === "fulfilled") setCreativeData(extractData(creativeRes.value));
-      if (browserRes.status === "fulfilled") setBrowserData(extractData(browserRes.value));
-      if (operatorRes.status === "fulfilled") setOperatorData(extractData(operatorRes.value));
-      if (cityRes.status === "fulfilled") setCityData(extractData(cityRes.value));
-      if (placementRes.status === "fulfilled") setPlacementTypeData(extractData(placementRes.value));
-      if (urlRes.status === "fulfilled") setUrlData(extractData(urlRes.value));
-      if (posRes.status === "fulfilled") setPlacementPosData(extractData(posRes.value));
-      if (deviceRes.status === "fulfilled") setDeviceData(extractData(deviceRes.value));
+      if (mainRes.status === "fulfilled") {
+        const ovRes = mainRes.value;
+        const ovData = ovRes?.data || ovRes;
+        setWeekData(ovData?.weekData || ovRes?.weekData || []);
+        setTableData(extractData(ovRes));
+      } else {
+        setWeekData([]);
+        setTableData([]);
+      }
+      setCreativeData(creativeRes.status === "fulfilled" ? extractData(creativeRes.value) : []);
+      setBrowserData(browserRes.status === "fulfilled" ? extractData(browserRes.value) : []);
+      setOperatorData(operatorRes.status === "fulfilled" ? extractData(operatorRes.value) : []);
+      setCityData(cityRes.status === "fulfilled" ? extractData(cityRes.value) : []);
+      setPlacementTypeData(placementRes.status === "fulfilled" ? extractData(placementRes.value) : []);
+      setUrlData(urlRes.status === "fulfilled" ? extractData(urlRes.value) : []);
+      setPlacementPosData(posRes.status === "fulfilled" ? extractData(posRes.value) : []);
+      setDeviceData(deviceRes.status === "fulfilled" ? extractData(deviceRes.value) : []);
       if (demographicsRes.status === "fulfilled") {
         const res = demographicsRes.value;
         const graph = res?.graphData || res?.data?.graphData || res?.data || res;
@@ -362,6 +384,9 @@ export default function DashboardRedesignPage() {
         const genderItems = graph?.gender || res?.gender || res?.genderData || [];
         setAgeData(Array.isArray(ageItems) ? ageItems : extractData(ageItems));
         setGenderData(Array.isArray(genderItems) ? genderItems : extractData(genderItems));
+      } else {
+        setAgeData([]);
+        setGenderData([]);
       }
 
       // ── Fetch AppsFlyer configuration & daily report data ─────────────────
@@ -511,6 +536,7 @@ export default function DashboardRedesignPage() {
       } catch (e) {
         console.error("AppsFlyer fetch error:", e);
         setAppsflyerData([]);
+        setRawInstallsBreakdown({ operator: {}, os: {}, city: {} });
       }
     } catch (err) {
       console.error("Error fetching campaign data:", err);
@@ -1682,7 +1708,7 @@ export default function DashboardRedesignPage() {
                 !isCtvWithAF && (<PlatformAnalysis deviceData={deviceData} platformData={placementTypeData} />)
               }
 
-              <DeliveryByWeekday tableData={globalEffectiveMetrics.enrichedTableData} />
+              <DeliveryByWeekday weekData={weekData} tableData={globalEffectiveMetrics.enrichedTableData} />
               <AttributionRevenueTraffic
                 operatorData={operatorData}
                 browserData={browserData}
@@ -1697,6 +1723,7 @@ export default function DashboardRedesignPage() {
                   <AgeChart ageData={ageData} />
                 </div>)
               }
+
 
               <BrowsersOperatorsTables browserData={browserData} operatorData={operatorData} campaignPricing={campaignPricing} globalEffectiveMetrics={globalEffectiveMetrics} selectedAudience={selectedAudience} rawInstallsBreakdown={rawInstallsBreakdown} />
             </>

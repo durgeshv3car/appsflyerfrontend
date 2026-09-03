@@ -113,7 +113,9 @@ const Step3CampaignSetup = ({
                 Linked Creative
               </span>
               <span className="fw-bold text-dark fs-13">
-                {selectedCreative ? (selectedCreative.name || selectedCreative.creativeName) : "None selected"}
+                {selectedCreative
+                  ? `${selectedCreative.displayName || selectedCreative.name || selectedCreative.creativeName} (ID: ${selectedCreative.dv360CreativeId || selectedCreative.id || "DV360"})`
+                  : "None selected"}
               </span>
             </div>
           </div>
@@ -207,7 +209,10 @@ const Step3CampaignSetup = ({
                   <strong>Audience:</strong> {selectedAudience?.displayName || "DV360 Match Segment"}
                 </div>
                 <div className="fs-12">
-                  <strong>Creative:</strong> {selectedCreative?.creativeName || "Selected Media Asset"}
+                  <strong>DV360 Creative:</strong>{" "}
+                  {selectedCreative
+                    ? `${selectedCreative.displayName || selectedCreative.name || selectedCreative.creativeName} • ${selectedCreative.dv360CreativeId || selectedCreative.id || "DV360 Live"}`
+                    : "None selected"}
                 </div>
               </div>
             </div>
