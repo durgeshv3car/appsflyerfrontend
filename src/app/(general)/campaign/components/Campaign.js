@@ -207,6 +207,7 @@ const Campaign = () => {
     conversion_value: "",
     timezone: "Asia/Kolkata",
     Appflyer_api_token: "",
+    api_type: "both",
   });
   const [editingAppsFlyerId, setEditingAppsFlyerId] = useState(null);
   const [appsFlyerLoading, setAppsFlyerLoading] = useState(false);
@@ -669,6 +670,7 @@ const Campaign = () => {
         conversion_value: "",
         timezone: "Asia/Kolkata",
         Appflyer_api_token: "",
+        api_type: "both",
       });
       setEditingAppsFlyerId(null);
     } catch (err) {
@@ -691,6 +693,7 @@ const Campaign = () => {
       conversion_value: item.conversionValue || "",
       timezone: item.timezone || "Asia/Kolkata",
       Appflyer_api_token: item.Appflyer_api_token || "",
+      api_type: item.api_type || "both",
     });
     setEditingAppsFlyerId(item._id);
   };
@@ -1802,6 +1805,28 @@ const Campaign = () => {
                             </div>
                             <div className="mb-4">
                               <label className="form-label small fw-semibold">
+                                AppsFlyer API Type
+                              </label>
+                              <select
+                                name="api_type"
+                                value={appsFlyerFormData.api_type || "both"}
+                                onChange={handleAppsFlyerInputChange}
+                                className="form-control form-control-sm border-2"
+                              >
+                                <option value="both">Both (Aggregated + Raw)</option>
+                                <option value="aggregated">Aggregated Only (installs)</option>
+                                <option value="raw">Raw Only (events / conversions)</option>
+                              </select>
+                              <div className="form-text text-muted" style={{ fontSize: "11px", marginTop: 4 }}>
+                                {appsFlyerFormData.api_type === "aggregated"
+                                  ? "Only calls partners_by_date_report — good when raw data is unavailable."
+                                  : appsFlyerFormData.api_type === "raw"
+                                  ? "Only calls in_app_events_report — good for conversion / event tracking."
+                                  : "Calls both APIs to sync installs and events together."}
+                              </div>
+                            </div>
+                            <div className="mb-4">
+                              <label className="form-label small fw-semibold">
                                 AppsFlyer API Token
                               </label>
                               <div className="input-group">
@@ -1856,6 +1881,7 @@ const Campaign = () => {
                                       conversion_event: "",
                                       campaign_type: "",
                                       Appflyer_api_token: "",
+                                      api_type: "both",
                                     });
                                   }}
                                 >
@@ -1900,6 +1926,9 @@ const Campaign = () => {
                                     Media Source
                                   </th>
                                   <th className="small fw-bold px-3 py-2">
+                                    API Type
+                                  </th>
+                                  <th className="small fw-bold px-3 py-2">
                                     API Token
                                   </th>
                                   <th className="small fw-bold px-3 py-2 text-end">
@@ -1912,7 +1941,7 @@ const Campaign = () => {
                                   appsFlyerList.length === 0 ? (
                                   <tr>
                                     <td
-                                      colSpan="6"
+                                      colSpan="7"
                                       className="text-center py-5"
                                     >
                                       <div
@@ -1927,7 +1956,7 @@ const Campaign = () => {
                                 ) : appsFlyerList.length === 0 ? (
                                   <tr>
                                     <td
-                                      colSpan="6"
+                                      colSpan="7"
                                       className="text-center py-5 text-muted small italic"
                                     >
                                       No data found. Add your first entry to get
@@ -1969,6 +1998,21 @@ const Campaign = () => {
                                           {item.media_source}
                                         </span>
                                       </td>
+                                      <td className="px-3">
+                                        <span className={`badge small border ${
+                                           item.api_type === "aggregated"
+                                             ? "bg-soft-success text-success"
+                                             : item.api_type === "raw"
+                                             ? "bg-soft-warning text-warning"
+                                             : "bg-soft-info text-info"
+                                         }`}>
+                                           {item.api_type === "aggregated"
+                                             ? "Aggregated"
+                                             : item.api_type === "raw"
+                                             ? "Raw"
+                                             : "Both"}
+                                         </span>
+                                      </td>
                                       <td className="px-3 small text-muted font-monospace">
                                         {item.Appflyer_api_token
                                           ? "••••" + item.Appflyer_api_token.slice(-4)
@@ -1976,13 +2020,6 @@ const Campaign = () => {
                                       </td>
                                       <td className="px-3 text-end">
                                         <div className="btn-group">
-                                          {/* <button 
-                                            className="btn btn-sm btn-outline-secondary border-0 p-1" 
-                                            onClick={() => handleAppsFlyerEdit(item)}
-                                            title="Edit"
-                                          >
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                                          </button> */}
                                           <button
                                             className="btn btn-sm btn-outline-danger border-0 p-1"
                                             onClick={() =>
