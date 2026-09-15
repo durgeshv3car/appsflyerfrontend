@@ -207,7 +207,8 @@ const Campaign = () => {
     conversion_value: "",
     timezone: "Asia/Kolkata",
     Appflyer_api_token: "",
-    api_type: "both",
+    api_type: "raw",
+    geo: "",
   });
   const [editingAppsFlyerId, setEditingAppsFlyerId] = useState(null);
   const [appsFlyerLoading, setAppsFlyerLoading] = useState(false);
@@ -600,7 +601,27 @@ const Campaign = () => {
 
   const handleAppsFlyerInputChange = (e) => {
     const { name, value } = e.target;
-    setAppsFlyerFormData((prev) => ({ ...prev, [name]: value }));
+    setAppsFlyerFormData((prev) => {
+      const updated = { ...prev, [name]: value };
+      // Auto-detect Geo if user hasn't explicitly typed a custom geo
+      if (name === "name" && !prev.geo) {
+        const valLower = value.toLowerCase();
+        if (
+          valLower.includes("zalora id") ||
+          valLower.includes("zalora_id") ||
+          valLower.includes("zalora-id")
+        ) {
+          updated.geo = "ID";
+        } else if (
+          valLower.includes("zalora ph") ||
+          valLower.includes("zalora_ph") ||
+          valLower.includes("zalora-ph")
+        ) {
+          updated.geo = "PH";
+        }
+      }
+      return updated;
+    });
   };
 
   const handleAppsFlyerSave = async (e) => {
@@ -670,7 +691,8 @@ const Campaign = () => {
         conversion_value: "",
         timezone: "Asia/Kolkata",
         Appflyer_api_token: "",
-        api_type: "both",
+        api_type: "raw",
+        geo: "",
       });
       setEditingAppsFlyerId(null);
     } catch (err) {
@@ -693,7 +715,8 @@ const Campaign = () => {
       conversion_value: item.conversionValue || "",
       timezone: item.timezone || "Asia/Kolkata",
       Appflyer_api_token: item.Appflyer_api_token || "",
-      api_type: item.api_type || "both",
+      api_type: item.api_type || "raw",
+      geo: item.geo || "",
     });
     setEditingAppsFlyerId(item._id);
   };
@@ -740,6 +763,7 @@ const Campaign = () => {
       conversion_value: "",
       timezone: "Asia/Kolkata",
       Appflyer_api_token: "",
+      geo: "",
     });
     setEditingAppsFlyerId(null);
     setShowAppsFlyerToken(false);
@@ -1809,20 +1833,33 @@ const Campaign = () => {
                               </label>
                               <select
                                 name="api_type"
-                                value={appsFlyerFormData.api_type || "both"}
+                                value={appsFlyerFormData.api_type || "raw"}
                                 onChange={handleAppsFlyerInputChange}
                                 className="form-control form-control-sm border-2"
                               >
-                                <option value="both">Both (Aggregated + Raw)</option>
-                                <option value="aggregated">Aggregated Only (installs)</option>
-                                <option value="raw">Raw Only (events / conversions)</option>
+                                <option value="aggregated">Aggregated (installs + events)</option>
+                                <option value="raw">Raw (installs + events — full sync)</option>
                               </select>
                               <div className="form-text text-muted" style={{ fontSize: "11px", marginTop: 4 }}>
                                 {appsFlyerFormData.api_type === "aggregated"
-                                  ? "Only calls partners_by_date_report — good when raw data is unavailable."
-                                  : appsFlyerFormData.api_type === "raw"
-                                  ? "Only calls in_app_events_report — good for conversion / event tracking."
-                                  : "Calls both APIs to sync installs and events together."}
+                                  ? "Calls partners_by_date_report only — installs + event count read from aggregated report columns (e.g. 'af_purchase (Event count)')."
+                                  : "Full sync — calls partners_by_date_report (installs) + in_app_events_report (raw event data) day-by-day."}
+                              </div>
+                            </div>
+                            <div className="mb-4">
+                              <label className="form-label small fw-semibold">
+                                Geo / Country Code (Optional)
+                              </label>
+                              <input
+                                name="geo"
+                                value={appsFlyerFormData.geo || ""}
+                                onChange={handleAppsFlyerInputChange}
+                                className="form-control form-control-sm border-2 text-uppercase"
+                                placeholder="e.g. ID, PH, IN"
+                                maxLength={5}
+                              />
+                              <div className="form-text text-muted" style={{ fontSize: "11px", marginTop: 4 }}>
+                                AppsFlyer country filter (e.g. &apos;ID&apos; for Zalora ID, &apos;PH&apos; for Zalora PH). Appended as &amp;geo=... in API request.
                               </div>
                             </div>
                             <div className="mb-4">
@@ -1881,7 +1918,8 @@ const Campaign = () => {
                                       conversion_event: "",
                                       campaign_type: "",
                                       Appflyer_api_token: "",
-                                      api_type: "both",
+                                      api_type: "raw",
+                                      geo: "",
                                     });
                                   }}
                                 >
@@ -1920,6 +1958,9 @@ const Campaign = () => {
                                     App ID
                                   </th>
                                   <th className="small fw-bold px-3 py-2">
+                                    Geo
+                                  </th>
+                                  <th className="small fw-bold px-3 py-2">
                                     Date Range
                                   </th>
                                   <th className="small fw-bold px-3 py-2">
@@ -1941,7 +1982,7 @@ const Campaign = () => {
                                   appsFlyerList.length === 0 ? (
                                   <tr>
                                     <td
-                                      colSpan="7"
+                                      colSpan="8"
                                       className="text-center py-5"
                                     >
                                       <div
@@ -1956,7 +1997,7 @@ const Campaign = () => {
                                 ) : appsFlyerList.length === 0 ? (
                                   <tr>
                                     <td
-                                      colSpan="7"
+                                      colSpan="8"
                                       className="text-center py-5 text-muted small italic"
                                     >
                                       No data found. Add your first entry to get
@@ -1973,6 +2014,11 @@ const Campaign = () => {
                                       </td>
                                       <td className="px-3 small text-muted font-monospace">
                                         {item.app_id}
+                                      </td>
+                                      <td className="px-3">
+                                        <span className="badge bg-light text-dark border font-monospace small">
+                                          {item.geo || "ALL"}
+                                        </span>
                                       </td>
                                       <td className="px-3">
                                         <div className="small">

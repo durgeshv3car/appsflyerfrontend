@@ -750,8 +750,9 @@ export default function DashboardRedesignPage() {
     if (hasAppsflyerData) {
       appsflyerData.forEach(item => {
         const d = normalizeDate(item.date);
-        if (!afMap[d]) afMap[d] = { installs: 0, afclicks: 0, af_payment_unique: 0 };
+        if (!afMap[d]) afMap[d] = { installs: 0, afclicks: 0, af_payment_unique: 0, eventCount: 0 };
         afMap[d].installs += (item.installs || 0);
+        afMap[d].eventCount += (item.event_count || item.eventCount || item.eventcount || 0);
         afMap[d].afclicks += (item.clicks || 0);
 
         const isOldDataLocal = !item.media_source;
@@ -802,6 +803,7 @@ export default function DashboardRedesignPage() {
     let totalSpent = 0;
     let totalInstalls = 0;
     let totalConversions = 0;
+    let totalEventCount = 0;
     let totalRevenue = 0;
     let totalReach = 0;
     let totalVideoViews = 0;
@@ -817,7 +819,7 @@ export default function DashboardRedesignPage() {
       const cks = Number(row.Clicks || row.clicks || 0);
       const rowDate = row.Date || row.date || "";
       const dNorm = normalizeDate(rowDate);
-      const af = afMap[dNorm] || { installs: 0, af_payment_unique: 0 };
+      const af = afMap[dNorm] || { installs: 0, af_payment_unique: 0, eventCount: 0 };
 
       const defaultConversions = Number(row.TotalConversions || row.totalConversions || row.conversions || 0);
 
@@ -884,11 +886,14 @@ export default function DashboardRedesignPage() {
       const rowCpv = Number(row.CPV || row.Cpv || row.cpv || (rowViews > 0 ? spent / rowViews : 0));
       const rowCpcv = Number(row.CPCV || row.Cpcv || row.cpcv || (vComplete > 0 ? spent / vComplete : 0));
 
+      const rowEventCount = hasAppsflyerData ? (af.eventCount || 0) : 0;
+
       enrichedTableData.push({
         ...row,
         period: rowDate,
         computedInstalls: rowInstalls,
         computedConversions: rowConversions,
+        computedEventCount: rowEventCount,
         computedSpend: spent,
         computedRoas: spent > 0 ? (rev / spent) : 0,
         computedCpm: imp > 0 ? (spent / imp) * 1000 : 0,
@@ -911,6 +916,7 @@ export default function DashboardRedesignPage() {
       totalSpent += spent;
       totalInstalls += rowInstalls;
       totalConversions += rowConversions;
+      totalEventCount += hasAppsflyerData ? (afMap[normalizeDate(rowDate)]?.eventCount || 0) : 0;
       totalRevenue += rev;
       totalReach += rowReach;
       totalVideoViews += rowViews;
@@ -948,6 +954,7 @@ export default function DashboardRedesignPage() {
       clicks: totalClicks,
       installs: totalInstalls,
       conversions: totalConversions,
+      eventCount: totalEventCount,
       revenue: totalRevenue,
       spend: totalSpent,
       reach: totalReach,
@@ -1594,7 +1601,8 @@ export default function DashboardRedesignPage() {
                 const perfRows = perfData.slice((perfPage - 1) * PERF_PAGE_SIZE, perfPage * PERF_PAGE_SIZE);
                 const ctype = String(selectedAudience?.campaignType || selectedAudience?.campaign_type || "").toUpperCase();
                 const isCtvWithAF = ctype.includes("CTV") && !!globalEffectiveMetrics?.hasAppsflyerData;
-                const colSpan = (6 + (globalEffectiveMetrics.hasVideoData ? 7 : 0) + (globalEffectiveMetrics.reach > 0 ? 2 : 0) + (globalEffectiveMetrics.hasAppsflyerData ? 2 : 0)) - (isCtvWithAF ? (globalEffectiveMetrics.hasVideoData ? 7 : 5) : 0);
+                const afEventCountVisible = globalEffectiveMetrics.hasAppsflyerData && (globalEffectiveMetrics.eventCount || 0) > 0;
+                const colSpan = (6 + (globalEffectiveMetrics.hasVideoData ? 7 : 0) + (globalEffectiveMetrics.reach > 0 ? 2 : 0) + (globalEffectiveMetrics.hasAppsflyerData ? 2 : 0) + (afEventCountVisible ? 1 : 0)) - (isCtvWithAF ? (globalEffectiveMetrics.hasVideoData ? 7 : 5) : 0);
                 return (
                   <div className="st-panel" style={{ paddingBottom: 0, overflow: "hidden" }}>
                     <div className="st-panel-header">
@@ -1628,6 +1636,7 @@ export default function DashboardRedesignPage() {
                             {globalEffectiveMetrics.hasVideoData && <th>COMPLETE VIEW</th>}
                             {globalEffectiveMetrics.hasVideoData && !isCtvWithAF && <th>CPCV</th>}
                             {globalEffectiveMetrics.hasAppsflyerData && <th>INSTALLS</th>}
+                            {afEventCountVisible && <th>EVENT COUNT</th>}
                             {globalEffectiveMetrics.hasAppsflyerData && <th style={{ paddingRight: isCtvWithAF ? "22px" : "auto" }}>TOTAL CONVERSIONS</th>}
                             {!isCtvWithAF && <th>CTR</th>}
                             {!isCtvWithAF && <th style={{ paddingRight: "22px" }}>SPEND</th>}
@@ -1652,6 +1661,7 @@ export default function DashboardRedesignPage() {
                                 {globalEffectiveMetrics.hasVideoData && <td>{Number(r.computedVideoComplete || 0).toLocaleString('en-IN')}</td>}
                                 {globalEffectiveMetrics.hasVideoData && !isCtvWithAF && <td>₹{r.computedCpcv ? r.computedCpcv.toFixed(2) : "0.00"}</td>}
                                 {globalEffectiveMetrics.hasAppsflyerData && <td>{Number(r.computedInstalls || 0).toLocaleString('en-IN')}</td>}
+                                {afEventCountVisible && <td>{Number(r.computedEventCount || 0).toLocaleString('en-IN')}</td>}
                                 {globalEffectiveMetrics.hasAppsflyerData && <td style={{ paddingRight: isCtvWithAF ? "22px" : "auto" }}>{Number(r.computedConversions || 0).toLocaleString('en-IN')}</td>}
                                 {!isCtvWithAF && <td>{r.computedCtr.toFixed(2)}%</td>}
                                 {!isCtvWithAF && <td style={{ paddingRight: "22px" }}>₹{r.computedSpend.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>}
@@ -1681,6 +1691,7 @@ export default function DashboardRedesignPage() {
                               {globalEffectiveMetrics.hasVideoData && <td>{(globalEffectiveMetrics.totalVideoComplete || 0).toLocaleString('en-IN')}</td>}
                               {globalEffectiveMetrics.hasVideoData && !isCtvWithAF && <td>₹{globalEffectiveMetrics.cpcv ? globalEffectiveMetrics.cpcv.toFixed(2) : "0.00"}</td>}
                               {globalEffectiveMetrics.hasAppsflyerData && <td>{(globalEffectiveMetrics.installs || 0).toLocaleString('en-IN')}</td>}
+                              {afEventCountVisible && <td>{(globalEffectiveMetrics.eventCount || 0).toLocaleString('en-IN')}</td>}
                               {globalEffectiveMetrics.hasAppsflyerData && <td style={{ paddingRight: isCtvWithAF ? "22px" : "auto" }}>{(globalEffectiveMetrics.conversions || 0).toLocaleString('en-IN')}</td>}
                               {!isCtvWithAF && <td>{(globalEffectiveMetrics.ctr || 0).toFixed(2)}%</td>}
                               {!isCtvWithAF && <td style={{ paddingRight: "22px" }}>₹{(globalEffectiveMetrics.spend || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>}
