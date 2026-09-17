@@ -205,6 +205,7 @@ const Campaign = () => {
     campaign_type: "",
     conversion_event: "",
     conversion_value: "",
+    use_event_value: "count",
     timezone: "Asia/Kolkata",
     Appflyer_api_token: "",
     api_type: "raw",
@@ -641,29 +642,26 @@ const Campaign = () => {
     try {
       setAppsFlyerLoading(true);
       if (editingAppsFlyerId) {
-        // Since update route is not provided, we will delete and recreate
-        // OR simply inform that edit is not available yet.
-        // For now, I will keep it as "Not supported" or skip it.
-        toast.info(
-          "Edit is not supported by current backend API. Please delete and recreate.",
-        );
-      } else {
-        // Explicitly format dates to YYYY-MM-DD before sending
-        const formattedData = {
-          ...appsFlyerFormData,
-          from:
-            typeof appsFlyerFormData.from === "string"
-              ? appsFlyerFormData.from.split("T")[0]
-              : appsFlyerFormData.from,
-          to:
-            typeof appsFlyerFormData.to === "string"
-              ? appsFlyerFormData.to.split("T")[0]
-              : appsFlyerFormData.to,
-          audienceId: selectedAudienceForAppsFlyer._id,
-        };
-        await createAppsFlyerData(formattedData);
-        toast.success("AppsFlyer data added");
+        await deleteAppsFlyerData(editingAppsFlyerId);
       }
+      
+      // Explicitly format dates to YYYY-MM-DD before sending
+      const formattedData = {
+        ...appsFlyerFormData,
+        useEventValue: appsFlyerFormData.use_event_value || "count",
+        use_event_value: appsFlyerFormData.use_event_value || "count",
+        from:
+          typeof appsFlyerFormData.from === "string"
+            ? appsFlyerFormData.from.split("T")[0]
+            : appsFlyerFormData.from,
+        to:
+          typeof appsFlyerFormData.to === "string"
+            ? appsFlyerFormData.to.split("T")[0]
+            : appsFlyerFormData.to,
+        audienceId: selectedAudienceForAppsFlyer._id,
+      };
+      await createAppsFlyerData(formattedData);
+      toast.success(editingAppsFlyerId ? "AppsFlyer data updated" : "AppsFlyer data added");
 
       // Refresh list
       const res = await getAllAppsFlyerData();
@@ -689,6 +687,7 @@ const Campaign = () => {
         campaign_type: "",
         conversion_event: "",
         conversion_value: "",
+        use_event_value: "count",
         timezone: "Asia/Kolkata",
         Appflyer_api_token: "",
         api_type: "raw",
@@ -713,6 +712,7 @@ const Campaign = () => {
       campaign_type: item.campaignType || "",
       conversion_event: item.conversionEvent || "",
       conversion_value: item.conversionValue || "",
+      use_event_value: item.useEventValue || item.use_event_value || "count",
       timezone: item.timezone || "Asia/Kolkata",
       Appflyer_api_token: item.Appflyer_api_token || "",
       api_type: item.api_type || "raw",
@@ -761,6 +761,7 @@ const Campaign = () => {
       campaign_type: "",
       conversion_event: "",
       conversion_value: "",
+      use_event_value: "count",
       timezone: "Asia/Kolkata",
       Appflyer_api_token: "",
       geo: "",
@@ -1815,6 +1816,24 @@ const Campaign = () => {
                             </div>
                             <div className="mb-4">
                               <label className="form-label small fw-semibold">
+                                Conversion Data
+                              </label>
+                              <select
+                                name="use_event_value"
+                                value={appsFlyerFormData.use_event_value || "count"}
+                                onChange={handleAppsFlyerInputChange}
+                                className="form-control form-control-sm border-2"
+                              >
+                                <option value="count">Event Count (default)</option>
+                                <option value="event_value">Event Value (revenue / monetary)</option>
+                              </select>
+                              <div className="form-text text-muted" style={{ fontSize: "11px", marginTop: 4 }}>
+                                "Event Count" uses the number of events as conversions (e.g. Zalora, Meesho).
+                                "Event Value" uses the monetary/revenue value of the event as conversions (e.g. Ajio Android).
+                              </div>
+                            </div>
+                            <div className="mb-4">
+                              <label className="form-label small fw-semibold">
                                 Timezone
                               </label>
                               <select
@@ -1916,6 +1935,8 @@ const Campaign = () => {
                                       to: "",
                                       media_source: "",
                                       conversion_event: "",
+                                      conversion_value: "",
+                                      use_event_value: "count",
                                       campaign_type: "",
                                       Appflyer_api_token: "",
                                       api_type: "raw",
@@ -1970,6 +1991,9 @@ const Campaign = () => {
                                     API Type
                                   </th>
                                   <th className="small fw-bold px-3 py-2">
+                                    Conversion Data
+                                  </th>
+                                  <th className="small fw-bold px-3 py-2">
                                     API Token
                                   </th>
                                   <th className="small fw-bold px-3 py-2 text-end">
@@ -1982,7 +2006,7 @@ const Campaign = () => {
                                   appsFlyerList.length === 0 ? (
                                   <tr>
                                     <td
-                                      colSpan="8"
+                                      colSpan="9"
                                       className="text-center py-5"
                                     >
                                       <div
@@ -1997,7 +2021,7 @@ const Campaign = () => {
                                 ) : appsFlyerList.length === 0 ? (
                                   <tr>
                                     <td
-                                      colSpan="8"
+                                      colSpan="9"
                                       className="text-center py-5 text-muted small italic"
                                     >
                                       No data found. Add your first entry to get
@@ -2058,6 +2082,15 @@ const Campaign = () => {
                                              ? "Raw"
                                              : "Both"}
                                          </span>
+                                      </td>
+                                      <td className="px-3">
+                                        <span className={`badge small border ${
+                                          (item.useEventValue || item.use_event_value) === "event_value"
+                                            ? "bg-soft-primary text-primary"
+                                            : "bg-light text-secondary"
+                                        }`}>
+                                          {(item.useEventValue || item.use_event_value) === "event_value" ? "Event Value" : "Event Count"}
+                                        </span>
                                       </td>
                                       <td className="px-3 small text-muted font-monospace">
                                         {item.Appflyer_api_token

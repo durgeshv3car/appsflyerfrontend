@@ -202,10 +202,11 @@ const TrendChart = ({
       const datePriceCPM = getPriceForDate(campaignPricing?.cpm, rowDate);
       const datePriceCPC = getPriceForDate(campaignPricing?.cpc, rowDate);
 
+      const hasRowCpc = datePriceCPC !== undefined && datePriceCPC !== null && !isNaN(Number(datePriceCPC));
       if (datePriceCPM > 0) {
         return (rowImp / 1000) * datePriceCPM;
-      } else if (datePriceCPC > 0) {
-        return rowClicks * datePriceCPC;
+      } else if (hasRowCpc) {
+        return rowClicks * Number(datePriceCPC);
       } else {
         const rowCPM = Number(row.CPM || row.cpm || 0);
         const rowCPC = Number(row.CPC || row.cpc || 0);
@@ -426,6 +427,7 @@ export const PerformanceDashboard = ({
   appsflyerDataLength = 0,
   conversionEvent = "",
   conversionValue = "",
+  useEventValue = "count",
   currencySymbol = "$",
   campaignPermissions = [],
   campaignPricing = { cpm: {}, cpc: {} },
@@ -508,10 +510,9 @@ export const PerformanceDashboard = ({
           };
         afMap[d].installs += item.installs || 0;
         afMap[d].afclicks += item.clicks || 0;
-
         let af_login_unique = 0;
         let af_payment_unique = 0;
-        const isOldData = !item.media_source;
+        const isOldData = !item.media_source && !item.event_count && !item.event_value && !item.revenue;
 
         if (isOldData) {
           // No conversionValue defined — sum matching conversionEvent values
@@ -520,15 +521,31 @@ export const PerformanceDashboard = ({
             item.events.forEach((evt) => {
               const safeEName = String(evt.event_name || "").replace(/\s+/g, "").toLowerCase();
               if (safeEName === safeTarget || safeEName.includes(safeTarget) || safeTarget.includes(safeEName)) {
-                const cleanVal = String(evt.event_value || "").replace(/,/g, "").trim();
+                const cleanVal = String(evt.event_value || evt.revenue || "").replace(/,/g, "").trim();
                 const valNum = Number(cleanVal) || 0;
-                af_payment_unique += valNum === 0 ? (evt.event_count || 0) : valNum;
+                if (useEventValue === "event_value") {
+                  af_payment_unique += valNum;
+                } else {
+                  af_payment_unique += valNum === 0 ? (evt.event_count || 0) : valNum;
+                }
               }
             });
           }
         } else {
-          // Always use event_count as conversions (not total_revenue)
-          af_payment_unique = item.event_count || 0;
+          // Use event_value (revenue) or event_count based on useEventValue setting
+          if (useEventValue === "event_value") {
+            let val = Number(String(item.event_value || item.revenue || item.total_revenue || item.event_revenue || "").replace(/,/g, "").trim()) || 0;
+            if (val === 0 && item.events && Array.isArray(item.events)) {
+              item.events.forEach((evt) => {
+                const cleanVal = Number(String(evt.event_value || evt.revenue || "").replace(/,/g, "").trim()) || 0;
+                val += cleanVal;
+              });
+            }
+            af_payment_unique = val;
+          } else {
+            // Always use event_count as conversions (not total_revenue)
+            af_payment_unique = item.event_count || 0;
+          }
         }
 
         if (item.events && Array.isArray(item.events)) {
@@ -663,7 +680,7 @@ export const PerformanceDashboard = ({
     }
 
     return rows;
-  }, [tableData, appsflyerData, appsflyerDataLength, conversionEvent, conversionValue, audienceEndDate]);
+  }, [tableData, appsflyerData, appsflyerDataLength, conversionEvent, conversionValue, useEventValue, audienceEndDate]);
 
   const stats = useMemo(() => {
     const total = {
@@ -687,18 +704,18 @@ export const PerformanceDashboard = ({
 
       const datePriceCPM = getPriceForDate(campaignPricing?.cpm, rowDate);
       const datePriceCPC = getPriceForDate(campaignPricing?.cpc, rowDate);
-
+      const hasRowCpc = datePriceCPC !== undefined && datePriceCPC !== null && !isNaN(Number(datePriceCPC));
       // FORCE: Calculate Spent, do not use from DB
       const rowCPM =
         datePriceCPM > 0 ? datePriceCPM : Number(row.CPM || row.cpm || 0);
       const rowCPC =
-        datePriceCPC > 0 ? datePriceCPC : Number(row.CPC || row.cpc || 0);
+        hasRowCpc ? Number(datePriceCPC) : Number(row.CPC || row.cpc || 0);
 
       let rowSpent = 0;
       if (datePriceCPM > 0) {
         rowSpent = (rowImp / 1000) * rowCPM;
-      } else if (datePriceCPC > 0) {
-        rowSpent = clicks * rowCPC;
+      } else if (hasRowCpc) {
+        rowSpent = clicks * Number(datePriceCPC);
       } else {
         // Fallback to row metrics if no override exists, but still recalculate
         rowSpent = rowCPM > 0 ? (rowImp / 1000) * rowCPM : clicks * rowCPC;
@@ -741,8 +758,11 @@ export const PerformanceDashboard = ({
     const isCpmCampaign =
       (anyCpmRate !== undefined && Number(anyCpmRate) > 0) || hasBackendCPM;
 
+    const isCpcDefined =
+      anyCpcRate !== undefined && anyCpcRate !== null && !isNaN(Number(anyCpcRate));
+
     const isCpcCampaign =
-      (anyCpcRate !== undefined && Number(anyCpcRate) > 0) || hasBackendCPC;
+      isCpcDefined || hasBackendCPC;
 
     const safeDiv = (a, b) => {
       if (!b) return "0.00";
@@ -761,8 +781,8 @@ export const PerformanceDashboard = ({
       ReachPct: safeDiv(total.Reach, total.Imp),
       // Strictly derive weighted metrics from total spent
       CPC:
-        isCpcCampaign && total.Clicks
-          ? (total.Spent / total.Clicks).toFixed(2)
+        isCpcCampaign
+          ? (isCpcDefined && Number(anyCpcRate) === 0 ? "0.00" : (total.Clicks ? (total.Spent / total.Clicks).toFixed(2) : (isCpcDefined ? Number(anyCpcRate).toFixed(2) : "0.00")))
           : "0.00",
       CPM:
         isCpmCampaign && total.Imp

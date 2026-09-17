@@ -1,9 +1,32 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
-import { TablePagination } from "./Shared";
+import { TablePagination, distributeInteger } from "./Shared";
 import { FiEye, FiExternalLink, FiX } from "react-icons/fi";
 
 const PAGE_SIZE = 10;
+
+const getPriceForDate = (pricingObj, targetDate) => {
+  if (!pricingObj || typeof pricingObj !== 'object') return undefined;
+  const normalize = (d) => String(d).replace(/\//g, '-').split(' ')[0].substring(0, 10);
+  const normalizedTarget = targetDate ? normalize(targetDate) : "9999-12-31"; 
+  const normalizedPricing = {};
+  Object.entries(pricingObj).forEach(([d, v]) => {
+    normalizedPricing[normalize(d)] = v;
+  });
+  const sortedDates = Object.keys(normalizedPricing).sort();
+  let latestValue = undefined;
+  for (const date of sortedDates) {
+    if (date <= normalizedTarget) {
+      latestValue = normalizedPricing[date];
+    } else {
+      break;
+    }
+  }
+  if (latestValue === undefined && sortedDates.length > 0) {
+    latestValue = normalizedPricing[sortedDates[0]];
+  }
+  return latestValue;
+};
 
 export function CreativeDetails({ creativeData: propData, campaignPricing, globalEffectiveMetrics, selectedAudience }) {
   const [page, setPage] = useState(1);
@@ -50,14 +73,59 @@ export function CreativeDetails({ creativeData: propData, campaignPricing, globa
     return cpmRate > 0 ? cpmRate : 320;
   }, [campaignPricing, globalEffectiveMetrics]);
 
+  const anyCpmRate = useMemo(() => {
+    if (campaignPricing?.cpm && typeof campaignPricing.cpm === "object") {
+      const vals = Object.values(campaignPricing.cpm).map(v => Number(v)).filter(v => v > 0);
+      if (vals.length > 0) return vals[vals.length - 1];
+    }
+    return 0;
+  }, [campaignPricing]);
+
+  const anyCpcRate = useMemo(() => {
+    const rate = getPriceForDate(campaignPricing?.cpc, null);
+    if (rate !== undefined && !isNaN(Number(rate))) return Number(rate);
+    return undefined;
+  }, [campaignPricing]);
+
+  const isCpcDefined = anyCpcRate !== undefined;
+  const isCpmCampaign = hasAF ? true : ((anyCpmRate > 0) || !!globalEffectiveMetrics?.isCpmCampaign);
+  const isCpcCampaign = hasAF ? true : (isCpcDefined || !!globalEffectiveMetrics?.isCpcCampaign);
+
   const list = useMemo(() => {
     if (!Array.isArray(propData) || propData.length === 0) return [];
     const rawList = propData.map(r => {
       const imp = Number(r.Impressions || r.impressions || 0);
       const clk = Number(r.Clicks || r.clicks || 0);
       const rawCtr = imp > 0 && clk > 0 ? (clk / imp * 100) : Number(r.CTR || r.ctr || 0) * (Number(r.CTR || r.ctr || 0) > 1 ? 1 : 100);
-      const rowCpm = effectiveCpm || Number(r.CPM || r.cpm || r.eCPM || 320);
-      const spent = (imp / 1000) * rowCpm;
+      
+      let spent = 0;
+      let rowCpm = 0;
+      let rowCpc = 0;
+
+      if (hasAF) {
+        rowCpm = effectiveCpm || Number(r.CPM || r.cpm || r.eCPM || 320);
+        spent = (imp / 1000) * rowCpm;
+        rowCpc = clk > 0 ? spent / clk : 0;
+      } else {
+        if (anyCpmRate > 0) {
+          spent = (imp / 1000) * anyCpmRate;
+        } else if (isCpcDefined) {
+          spent = clk * Number(anyCpcRate);
+        } else if (globalEffectiveMetrics?.eCPM > 0) {
+          spent = (imp / 1000) * globalEffectiveMetrics.eCPM;
+        } else if (globalEffectiveMetrics?.eCPC > 0) {
+          spent = clk * globalEffectiveMetrics.eCPC;
+        } else {
+          const rCPM = Number(r.CPM || r.cpm || 0);
+          const rCPC = Number(r.CPC || r.cpc || 0);
+          spent = rCPM > 0 ? (imp / 1000) * rCPM : (clk * rCPC);
+        }
+
+        rowCpm = isCpmCampaign && imp > 0 ? (spent / imp) * 1000 : 0;
+        rowCpc = isCpcDefined 
+          ? (Number(anyCpcRate) === 0 ? 0 : (clk > 0 ? (spent / clk) : Number(anyCpcRate)))
+          : (isCpcCampaign && clk > 0 ? (spent / clk) : 0);
+      }
 
       const completeViews = hasVideo ? Number(r.completeViewsVideo || r.CompleteViewsVideo || r.complete_views || r.completeViews || Math.round(imp * 0.8846)) : 0;
       const vViews = hasVideo ? Number(r.Views || r.views || r.VideoViews || completeViews || Math.round(imp * 0.98836)) : 0;
@@ -88,11 +156,15 @@ export function CreativeDetails({ creativeData: propData, campaignPricing, globa
         },
         rawImpressions: imp,
         rawClicks: clk,
+        rawSpent: spent,
         impressions: imp.toLocaleString('en-IN'),
         clicks: clk.toLocaleString('en-IN'),
         ctr: rawCtr > 0 ? rawCtr.toFixed(2) + "%" : "0.00%",
         cpmVal: rowCpm,
         cpm: "₹" + rowCpm.toFixed(2),
+        cpcVal: rowCpc,
+        cpc: "₹" + rowCpc.toFixed(2),
+        spentFormatted: "₹" + spent.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         rawViews: vViews,
         rawComplete: completeViews,
         rawFirstQ: vFirstQ,
@@ -103,18 +175,13 @@ export function CreativeDetails({ creativeData: propData, campaignPricing, globa
       };
     });
 
-    const totalClicksSum = rawList.reduce((a, r) => a + r.rawClicks, 0);
-    const totalImpSum = rawList.reduce((a, r) => a + r.rawImpressions, 0);
+    const weights = rawList.map(r => r.rawClicks > 0 ? r.rawClicks : r.rawImpressions);
+    const convAllocated = distributeInteger(totalConversions, weights);
+    const instAllocated = distributeInteger(totalInstalls, weights);
 
-    return rawList.map((r) => {
-      let share = 0;
-      if (totalClicksSum > 0) {
-        share = r.rawClicks / totalClicksSum;
-      } else if (totalImpSum > 0) {
-        share = r.rawImpressions / totalImpSum;
-      }
-      const inst = Math.round(totalInstalls * share);
-      const conv = Math.round(totalConversions * share);
+    return rawList.map((r, idx) => {
+      const inst = instAllocated[idx] || 0;
+      const conv = convAllocated[idx] || 0;
 
       return {
         ...r,
@@ -124,25 +191,36 @@ export function CreativeDetails({ creativeData: propData, campaignPricing, globa
         conversionsFormatted: conv.toLocaleString('en-IN'),
       };
     });
-  }, [propData, effectiveCpm, hasVideo, totalInstalls, totalConversions, dbCreatives]);
+  }, [propData, effectiveCpm, anyCpmRate, anyCpcRate, isCpmCampaign, isCpcCampaign, hasAF, hasVideo, totalInstalls, totalConversions, dbCreatives, globalEffectiveMetrics]);
 
   const totals = useMemo(() => {
     const totalImpr = list.reduce((a, r) => a + r.rawImpressions, 0);
     const totalClicks = list.reduce((a, r) => a + r.rawClicks, 0);
     const avgCtr = totalImpr > 0 ? (totalClicks / totalImpr * 100).toFixed(2) + "%" : "0.00%";
-    const weightedCpm = effectiveCpm;
     const totalViews = list.reduce((a, r) => a + r.rawViews, 0);
     const totalComplete = list.reduce((a, r) => a + r.rawComplete, 0);
     const totalFirstQ = list.reduce((a, r) => a + r.rawFirstQ, 0);
     const totalMidpoint = list.reduce((a, r) => a + r.rawMidpoint, 0);
     const totalThirdQ = list.reduce((a, r) => a + r.rawThirdQ, 0);
-    const totalSpent = (totalImpr / 1000) * weightedCpm;
+    
+    const totalSpent = hasAF 
+      ? (totalImpr / 1000) * effectiveCpm 
+      : list.reduce((sum, r) => sum + (r.rawSpent || 0), 0);
+    const avgCpm = hasAF 
+      ? "₹" + effectiveCpm.toFixed(2) 
+      : (isCpmCampaign && totalImpr > 0 ? "₹" + ((totalSpent / totalImpr) * 1000).toFixed(2) : "₹0.00");
+    const avgCpc = isCpcDefined
+      ? (Number(anyCpcRate) === 0 ? "₹0.00" : (totalClicks > 0 ? "₹" + (totalSpent / totalClicks).toFixed(2) : "₹" + Number(anyCpcRate).toFixed(2)))
+      : (isCpcCampaign && totalClicks > 0 ? "₹" + (totalSpent / totalClicks).toFixed(2) : "₹0.00");
+    const totalSpentFormatted = "₹" + totalSpent.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     return {
       totalImpr: totalImpr.toLocaleString('en-IN'),
       totalClicks: totalClicks.toLocaleString('en-IN'),
       avgCtr,
-      avgCpm: "₹" + weightedCpm.toFixed(2),
+      avgCpm,
+      avgCpc,
+      totalSpentFormatted,
       totalViews: totalViews.toLocaleString('en-IN'),
       totalComplete: totalComplete.toLocaleString('en-IN'),
       totalFirstQ: totalFirstQ.toLocaleString('en-IN'),
@@ -153,7 +231,7 @@ export function CreativeDetails({ creativeData: propData, campaignPricing, globa
       totalInstalls: totalInstalls.toLocaleString('en-IN'),
       totalConversions: totalConversions.toLocaleString('en-IN'),
     };
-  }, [list, effectiveCpm, totalInstalls, totalConversions]);
+  }, [list, effectiveCpm, hasAF, isCpmCampaign, isCpcCampaign, totalInstalls, totalConversions]);
 
   const totalPages = Math.ceil(list.length / PAGE_SIZE) || 1;
   const from = list.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
@@ -162,33 +240,30 @@ export function CreativeDetails({ creativeData: propData, campaignPricing, globa
 
   return (
     <>
-      <div style={{ display: "grid", gridTemplateColumns: isCtvWithAF ? "1fr" : "repeat(3, 1fr)", gap: 12, margin: "0 16px" }}>
-        {
-          !isCtvWithAF && (<div style={{ background: "#fff", border: "1px solid #3B82F6", borderRadius: 8, padding: "10px 14px" }}>
+      {!hasAF && (
+        <div style={{ display: "grid", gridTemplateColumns: isCtvWithAF ? "1fr" : "repeat(3, 1fr)", gap: 12, margin: "0 16px" }}>
+          <div className="st-kpi-card-q">
+            <div className="st-kpi-tag">TOTAL CREATIVES</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: "#1E3A8A", marginTop: 2 }}>
+              {list.length}
+            </div>
+          </div>
+          <div className="st-kpi-card-q">
             <div className="st-kpi-tag">TOTAL IMPRESSIONS</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: "#111827", marginTop: 2 }}>
               {totals.totalImpr}
             </div>
-          </div>)
-        }
-
-        {!isCtvWithAF && (
-          <div style={{ background: "#EFF6FF", border: "1px solid #3B82F6", borderRadius: 8, padding: "10px 14px" }}>
-            <div className="st-kpi-tag">TOTAL CLICKS</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: "#111827", marginTop: 2 }}>
-              {totals.totalClicks}
-            </div>
           </div>
-        )}
-        {!isCtvWithAF && (
-          <div style={{ background: "#F0FDF4", border: "1px solid #22C55E", borderRadius: 8, padding: "10px 14px" }}>
-            <div className="st-kpi-tag">AVG CTR</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: "#166534", marginTop: 2 }}>
-              {totals.avgCtr}
+          {!isCtvWithAF && (
+            <div className="st-kpi-card-q">
+              <div className="st-kpi-tag">AVG CTR</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: "#166534", marginTop: 2 }}>
+                {totals.avgCtr}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       <div className="st-panel" style={{ paddingBottom: 0, overflow: "hidden" }}>
         <div className="st-panel-header">
@@ -212,6 +287,8 @@ export function CreativeDetails({ creativeData: propData, campaignPricing, globa
                 {!isCtvWithAF && <th>CLICKS</th>}
                 {!isCtvWithAF && <th>CTR</th>}
                 {!isCtvWithAF && <th>CPM</th>}
+                {!isCtvWithAF && <th>CPC</th>}
+                {!isCtvWithAF && <th>SPEND</th>}
                 {hasVideo && <th>VIEWS</th>}
                 {hasVideo && !isCtvWithAF && <th>CPV</th>}
                 {hasVideo && <th>1ST QUARTILE VIEWS</th>}
@@ -256,6 +333,8 @@ export function CreativeDetails({ creativeData: propData, campaignPricing, globa
                       {!isCtvWithAF && <td>{r.clicks}</td>}
                       {!isCtvWithAF && <td>{r.ctr}</td>}
                       {!isCtvWithAF && <td>{r.cpm}</td>}
+                      {!isCtvWithAF && <td>{r.cpc}</td>}
+                      {!isCtvWithAF && <td>{r.spentFormatted}</td>}
                       {hasVideo && <td>{r.rawViews.toLocaleString('en-IN')}</td>}
                       {hasVideo && !isCtvWithAF && <td>₹{r.cpvVal.toFixed(2)}</td>}
                       {hasVideo && <td>{r.rawFirstQ.toLocaleString('en-IN')}</td>}
@@ -273,6 +352,8 @@ export function CreativeDetails({ creativeData: propData, campaignPricing, globa
                     {!isCtvWithAF && <td>{totals.totalClicks}</td>}
                     {!isCtvWithAF && <td>{totals.avgCtr}</td>}
                     {!isCtvWithAF && <td>{totals.avgCpm}</td>}
+                    {!isCtvWithAF && <td>{totals.avgCpc}</td>}
+                    {!isCtvWithAF && <td>{totals.totalSpentFormatted}</td>}
                     {hasVideo && <td>{totals.totalViews}</td>}
                     {hasVideo && !isCtvWithAF && <td>{totals.avgCpv}</td>}
                     {hasVideo && <td>{totals.totalFirstQ}</td>}

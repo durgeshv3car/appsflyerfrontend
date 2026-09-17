@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -138,6 +138,7 @@ const CampaignDashboard = () => {
     appsflyerDataLength: 0, 
     app_id: "", // Added app_id
     conversionValue: "",
+    useEventValue: "count",
   });
   const [isUpdating, setIsUpdating] = useState(true);
 
@@ -155,6 +156,7 @@ const CampaignDashboard = () => {
     delete filtersToSave.app_id;
     delete filtersToSave.conversionEvent;
     delete filtersToSave.conversionValue;
+    delete filtersToSave.useEventValue;
     delete filtersToSave.appsflyerCampaignType;
     localStorage.setItem("campaignFilteredData", JSON.stringify(filtersToSave));
     setIsUpdating(true);
@@ -1088,7 +1090,7 @@ const CampaignDashboard = () => {
       if (!afMap[d]) afMap[d] = { installs: 0, af_payment_unique: 0 };
       afMap[d].installs += (item.installs || 0);
 
-      const isOldDataLocal = !item.media_source;
+      const isOldDataLocal = !item.media_source && !item.event_count && !item.event_value && !item.revenue;
       let finalVal = 0;
       if (isOldDataLocal) {
         const safeTarget = String(filters.conversionEvent || "").replace(/\s+/g, "").toLowerCase();
@@ -1096,15 +1098,31 @@ const CampaignDashboard = () => {
           item.events.forEach(evt => {
             const safeEName = String(evt.event_name || "").replace(/\s+/g, "").toLowerCase();
             if (safeEName === safeTarget || safeEName.includes(safeTarget) || safeTarget.includes(safeEName)) {
-              const cleanVal = String(evt.event_value || "").replace(/,/g, "").trim();
+              const cleanVal = String(evt.event_value || evt.revenue || "").replace(/,/g, "").trim();
               const valNum = Number(cleanVal) || 0;
-              finalVal += valNum === 0 ? (evt.event_count || 0) : valNum;
+              if (filters.useEventValue === "event_value") {
+                finalVal += valNum;
+              } else {
+                finalVal += valNum === 0 ? (evt.event_count || 0) : valNum;
+              }
             }
           });
         }
       } else {
-        // Always use event_count as conversions (not total_revenue)
-        finalVal = item.event_count || 0;
+        // Use event_value (revenue) or event_count based on useEventValue setting
+        const useEventValue = filters.useEventValue === "event_value";
+        if (useEventValue) {
+          let val = Number(String(item.event_value || item.revenue || item.total_revenue || item.event_revenue || "").replace(/,/g, "").trim()) || 0;
+          if (val === 0 && item.events && Array.isArray(item.events)) {
+            item.events.forEach(evt => {
+              const cleanVal = Number(String(evt.event_value || evt.revenue || "").replace(/,/g, "").trim()) || 0;
+              val += cleanVal;
+            });
+          }
+          finalVal = val;
+        } else {
+          finalVal = item.event_count || 0;
+        }
       }
       afMap[d].af_payment_unique += finalVal;
     });
@@ -1132,7 +1150,7 @@ const CampaignDashboard = () => {
     });
 
     return { TotalConversions: Math.round(totalConversions), Installs: Math.round(totalInstalls) };
-  }, [tableData.tableData, appsflyerData, filters.conversionEvent, filters.conversionValue, filters.appsflyerDataLength]);
+  }, [tableData.tableData, appsflyerData, filters.conversionEvent, filters.conversionValue, filters.useEventValue, filters.appsflyerDataLength]);
 
   return (
     <div className="bg-light min-vh-100 ">
@@ -1203,6 +1221,7 @@ const CampaignDashboard = () => {
                 appsflyerDataLength={filters.appsflyerDataLength}
                 conversionEvent={filters.conversionEvent}
                 conversionValue={filters.conversionValue}
+                useEventValue={filters.useEventValue}
                 currencySymbol={getCurrencySymbol(filters.currency)}
                 campaignPermissions={campaignPermissions}
                 campaignPricing={campaignPricing}
@@ -1225,6 +1244,7 @@ const CampaignDashboard = () => {
                 appsflyerDataLength={filters.appsflyerDataLength}
                 conversionEvent={filters.conversionEvent}
                 conversionValue={filters.conversionValue}
+                useEventValue={filters.useEventValue}
                 globalTotals={globalTotals}
                 audienceEndDate={filters.audienceEndDate}
               />

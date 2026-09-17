@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useMemo } from "react";
-import { TablePagination } from "./Shared";
+import { TablePagination, distributeInteger } from "./Shared";
 
 const PAGE_SIZE = 10;
 
@@ -95,6 +95,29 @@ const stateCodeToName = {
   "la": "Ladakh"
 };
 
+const getPriceForDate = (pricingObj, targetDate) => {
+  if (!pricingObj || typeof pricingObj !== 'object') return undefined;
+  const normalize = (d) => String(d).replace(/\//g, '-').split(' ')[0].substring(0, 10);
+  const normalizedTarget = targetDate ? normalize(targetDate) : "9999-12-31"; 
+  const normalizedPricing = {};
+  Object.entries(pricingObj).forEach(([d, v]) => {
+    normalizedPricing[normalize(d)] = v;
+  });
+  const sortedDates = Object.keys(normalizedPricing).sort();
+  let latestValue = undefined;
+  for (const date of sortedDates) {
+    if (date <= normalizedTarget) {
+      latestValue = normalizedPricing[date];
+    } else {
+      break;
+    }
+  }
+  if (latestValue === undefined && sortedDates.length > 0) {
+    latestValue = normalizedPricing[sortedDates[0]];
+  }
+  return latestValue;
+};
+
 export function DomainDistribution({ domainData: propData, campaignPricing, globalEffectiveMetrics, rawInstallsBreakdown, selectedAudience }) {
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -108,15 +131,29 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
 
   const effectiveCpm = useMemo(() => {
     let cpmRate = 0;
-    if (campaignPricing?.cpm && typeof campaignPricing.cpm === "object") {
-      const vals = Object.values(campaignPricing.cpm).map(v => Number(v)).filter(v => v > 0);
-      if (vals.length > 0) cpmRate = vals[vals.length - 1];
-    }
+    const pCpm = getPriceForDate(campaignPricing?.cpm, null);
+    if (pCpm !== undefined && Number(pCpm) > 0) cpmRate = Number(pCpm);
     if (!cpmRate && globalEffectiveMetrics?.eCPM) {
       cpmRate = globalEffectiveMetrics.eCPM;
     }
     return cpmRate > 0 ? cpmRate : 320;
   }, [campaignPricing, globalEffectiveMetrics]);
+
+  const anyCpmRate = useMemo(() => {
+    const rate = getPriceForDate(campaignPricing?.cpm, null);
+    if (rate !== undefined && Number(rate) > 0) return Number(rate);
+    return 0;
+  }, [campaignPricing]);
+
+  const anyCpcRate = useMemo(() => {
+    const rate = getPriceForDate(campaignPricing?.cpc, null);
+    if (rate !== undefined && rate !== null && !isNaN(Number(rate))) return Number(rate);
+    return undefined;
+  }, [campaignPricing]);
+
+  const isCpcDefined = anyCpcRate !== undefined;
+  const isCpmCampaign = hasAF ? true : ((anyCpmRate > 0) || !!globalEffectiveMetrics?.isCpmCampaign);
+  const isCpcCampaign = hasAF ? true : (isCpcDefined || !!globalEffectiveMetrics?.isCpcCampaign);
 
   const list = useMemo(() => {
     const hasRawInstalls = rawInstallsBreakdown?.city && Object.keys(rawInstallsBreakdown.city).length > 0;
@@ -178,22 +215,32 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
       const totalImpSum = globalTargetImp > 0 ? globalTargetImp : propDataArr.reduce((a, r) => a + Number(r.Impressions || r.impressions || 0), 0);
       const totalClicksSum = propDataArr.reduce((a, r) => a + Number(r.Clicks || r.clicks || 0), 0);
       const totalViewsSum = propDataArr.reduce((a, r) => a + Number(r.Views || r.views || r.VideoViews || 0), 0);
-      const totalCompleteSum = propDataArr.reduce((a, r) => a + Number(r.completeViewsVideo || r.CompleteViewsVideo || r.complete_views || r.completeViews || 0), 0);
+      const totalCompleteSum = propDataArr.reduce((a, r) => a + Number(r.completeViewsVideo || r.CompleteViewsVideo || 0), 0);
       const totalFirstQSum = propDataArr.reduce((a, r) => a + Number(r.firstQuartileViewsVideo || r.FirstQuartileViewsVideo || 0), 0);
       const totalMidpointSum = propDataArr.reduce((a, r) => a + Number(r.midpointViewsVideo || r.MidpointViewsVideo || 0), 0);
       const totalThirdQSum = propDataArr.reduce((a, r) => a + Number(r.thirdQuartileViewsVideo || r.ThirdQuartileViewsVideo || 0), 0);
 
+      const convWeights = stateList.map(g => Number(g.rawInstalls || 0));
+      const convAllocated = distributeInteger(totalConversions, convWeights);
+
       let allocatedImp = 0;
+      let allocatedClicks = 0;
+
       return stateList.map((g, idx) => {
-        const share = targetInst > 0 ? g.rawInstalls / targetInst : (1 / stateList.length);
+        const share = targetInst > 0 ? (g.rawInstalls / targetInst) : (1 / stateList.length);
         let imp = 0;
+        let clk = 0;
+
         if (idx === stateList.length - 1) {
           imp = Math.max(0, totalImpSum - allocatedImp);
+          clk = Math.max(0, totalClicksSum - allocatedClicks);
         } else {
           imp = Math.round(totalImpSum * share);
+          clk = Math.round(totalClicksSum * share);
           allocatedImp += imp;
+          allocatedClicks += clk;
         }
-        const clk = Math.round(totalClicksSum * share);
+
         const ctrVal = imp > 0 ? (clk / imp * 100) : 0;
         const cpmVal = effectiveCpm;
         const spent = (imp / 1000) * cpmVal;
@@ -206,12 +253,13 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
 
         const cpvVal = vViews > 0 ? spent / vViews : 0;
         const cpcvVal = vComplete > 0 ? spent / vComplete : 0;
-        const conv = Math.round(totalConversions * share);
+        const conv = convAllocated[idx] || 0;
 
         return {
           domain: g.domain,
           rawImp: imp,
           rawClicks: clk,
+          rawSpent: spent,
           impressions: imp.toLocaleString('en-IN'),
           clicks: clk.toLocaleString('en-IN'),
           ctr: ctrVal.toFixed(2) + "%",
@@ -239,6 +287,10 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
     const targetTotalImp = globalTargetImp > 0 ? globalTargetImp : rawCityImpSum;
 
     let allocatedImp = 0;
+    const convWeights = propData.map(r => Number(r.Clicks || r.clicks || r.Impressions || r.impressions || 0));
+    const convAllocated = distributeInteger(totalConversions, convWeights);
+    const instAllocated = distributeInteger(totalInstalls, convWeights);
+
     return propData.map((r, idx) => {
       const rawImp = Number(r.Impressions || r.impressions || 0);
       const share = rawCityImpSum > 0 ? (rawImp / rawCityImpSum) : (1 / propData.length);
@@ -252,8 +304,27 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
       const clk = Number(r.Clicks || r.clicks || 0);
       const ctrRaw = Number(r.CTR || r.ctr || 0);
       const ctrVal = ctrRaw > 1 ? ctrRaw : (imp > 0 ? (clk / imp * 100) : 0);
-      const cpmVal = effectiveCpm || Number(r.CPM || r.cpm || r.eCPM || 320);
-      const spent = (imp / 1000) * cpmVal;
+
+      let spent = 0;
+      if (anyCpmRate > 0) {
+        spent = (imp / 1000) * anyCpmRate;
+      } else if (isCpcDefined) {
+        spent = clk * Number(anyCpcRate);
+      } else if (globalEffectiveMetrics?.eCPM > 0) {
+        spent = (imp / 1000) * globalEffectiveMetrics.eCPM;
+      } else if (globalEffectiveMetrics?.eCPC !== undefined && !isNaN(Number(globalEffectiveMetrics?.eCPC))) {
+        spent = clk * Number(globalEffectiveMetrics.eCPC);
+      } else {
+        const rCPM = Number(r.CPM || r.cpm || 0);
+        const rCPC = Number(r.CPC || r.cpc || 0);
+        spent = rCPM > 0 ? (imp / 1000) * rCPM : (clk * rCPC);
+      }
+
+      const cpmVal = isCpmCampaign && imp > 0 ? (spent / imp) * 1000 : 0;
+      const cpcVal = isCpcCampaign
+        ? (isCpcDefined ? (Number(anyCpcRate) === 0 ? 0 : (clk > 0 ? (spent / clk) : Number(anyCpcRate))) : (clk > 0 ? spent / clk : 0))
+        : (clk > 0 ? spent / clk : 0);
+      const spentFormatted = "₹" + spent.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
       const vComplete = hasVideo ? Number(r.completeViewsVideo || r.CompleteViewsVideo || r.complete_views || r.completeViews || Math.round(imp * 0.8846)) : 0;
       const vFirstQ = hasVideo ? Number(r.firstQuartileViewsVideo || r.FirstQuartileViewsVideo || Math.round(imp * 0.9474)) : 0;
@@ -263,15 +334,22 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
       const cpvVal = vViews > 0 ? spent / vViews : 0;
       const cpcvVal = vComplete > 0 ? spent / vComplete : 0;
 
+      const inst = instAllocated[idx] || 0;
+      const conv = convAllocated[idx] || 0;
+
       return {
         domain: r.name || r.City || r.city || r.Domain || r.domain || "Unknown City",
         rawImp: imp,
         rawClicks: clk,
+        rawSpent: spent,
         impressions: imp.toLocaleString('en-IN'),
         clicks: clk.toLocaleString('en-IN'),
         ctr: ctrVal.toFixed(2) + "%",
         cpmVal,
         cpm: "₹" + cpmVal.toFixed(2),
+        cpcVal,
+        cpc: "₹" + cpcVal.toFixed(2),
+        spentFormatted,
         rawViews: vViews,
         rawComplete: vComplete,
         rawFirstQ: vFirstQ,
@@ -279,31 +357,42 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
         rawThirdQ: vThirdQ,
         cpvVal,
         cpcvVal,
-        installs: 0,
-        conversions: 0,
-        installsFormatted: "0",
-        conversionsFormatted: "0",
+        installs: inst,
+        conversions: conv,
+        installsFormatted: inst.toLocaleString('en-IN'),
+        conversionsFormatted: conv.toLocaleString('en-IN'),
       };
     });
-  }, [propData, effectiveCpm, hasVideo, hasAF, rawInstallsBreakdown, totalInstalls, totalConversions, globalEffectiveMetrics]);
+  }, [propData, effectiveCpm, anyCpmRate, anyCpcRate, isCpcDefined, isCpmCampaign, isCpcCampaign, hasVideo, hasAF, rawInstallsBreakdown, totalInstalls, totalConversions, globalEffectiveMetrics]);
 
   const totals = useMemo(() => {
     const totalImpr = list.reduce((a, r) => a + r.rawImp, 0);
     const totalClicks = list.reduce((a, r) => a + r.rawClicks, 0);
     const avgCtr = totalImpr > 0 ? (totalClicks / totalImpr * 100).toFixed(2) + "%" : "0.00%";
-    const weightedCpm = effectiveCpm;
     const totalViews = list.reduce((a, r) => a + r.rawViews, 0);
     const totalComplete = list.reduce((a, r) => a + r.rawComplete, 0);
     const totalFirstQ = list.reduce((a, r) => a + r.rawFirstQ, 0);
     const totalMidpoint = list.reduce((a, r) => a + r.rawMidpoint, 0);
     const totalThirdQ = list.reduce((a, r) => a + r.rawThirdQ, 0);
-    const totalSpent = (totalImpr / 1000) * weightedCpm;
+    
+    const totalSpent = hasAF 
+      ? (totalImpr / 1000) * effectiveCpm 
+      : list.reduce((sum, r) => sum + (r.rawSpent || 0), 0);
+    const avgCpm = hasAF 
+      ? "₹" + effectiveCpm.toFixed(2) 
+      : (isCpmCampaign && totalImpr > 0 ? "₹" + ((totalSpent / totalImpr) * 1000).toFixed(2) : "₹0.00");
+    const avgCpc = isCpcCampaign
+      ? (isCpcDefined && Number(anyCpcRate) === 0 ? "₹0.00" : (totalClicks > 0 ? "₹" + (totalSpent / totalClicks).toFixed(2) : (isCpcDefined ? "₹" + Number(anyCpcRate).toFixed(2) : "₹0.00")))
+      : (totalClicks > 0 ? "₹" + (totalSpent / totalClicks).toFixed(2) : "₹0.00");
+    const totalSpentFormatted = "₹" + totalSpent.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     return {
       totalImpr: totalImpr.toLocaleString('en-IN'),
       totalClicks: totalClicks.toLocaleString('en-IN'),
       avgCtr,
-      avgCpm: "₹" + weightedCpm.toFixed(2),
+      avgCpm,
+      avgCpc,
+      totalSpentFormatted,
       totalViews: totalViews.toLocaleString('en-IN'),
       totalComplete: totalComplete.toLocaleString('en-IN'),
       totalFirstQ: totalFirstQ.toLocaleString('en-IN'),
@@ -314,7 +403,7 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
       totalInstalls: totalInstalls.toLocaleString('en-IN'),
       totalConversions: totalConversions.toLocaleString('en-IN'),
     };
-  }, [list, effectiveCpm, totalInstalls, totalConversions]);
+  }, [list, effectiveCpm, hasAF, isCpmCampaign, isCpcCampaign, anyCpcRate, totalInstalls, totalConversions]);
 
   const totalPages = Math.ceil(list.length / PAGE_SIZE) || 1;
   const startIndex = (currentPage - 1) * PAGE_SIZE;
@@ -346,6 +435,8 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
               {!isCtvWithAF && <th>CLICKS</th>}
               {!isCtvWithAF && <th>CTR</th>}
               {!isCtvWithAF && <th>CPM</th>}
+              {!hasAF && !isCtvWithAF && <th>CPC</th>}
+              {!hasAF && !isCtvWithAF && <th>SPEND</th>}
               {hasVideo && <th>VIEWS</th>}
               {hasVideo && !isCtvWithAF && <th>CPV</th>}
               {hasVideo && <th>1ST QUARTILE VIEWS</th>}
@@ -354,7 +445,7 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
               {hasVideo && <th>COMPLETE VIEW</th>}
               {hasVideo && !isCtvWithAF && <th>CPCV</th>}
               {hasAF && <th>INSTALLS</th>}
-              {hasAF && <th style={{ paddingRight: "22px" }}>TOTAL CONVERSIONS</th>}
+              <th style={{ paddingRight: "22px" }}>TOTAL CONVERSIONS</th>
             </tr>
           </thead>
           <tbody>
@@ -367,6 +458,8 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
                     {!isCtvWithAF && <td>{r.clicks}</td>}
                     {!isCtvWithAF && <td>{r.ctr}</td>}
                     {!isCtvWithAF && <td>{r.cpm}</td>}
+                    {!hasAF && !isCtvWithAF && <td>{r.cpc}</td>}
+                    {!hasAF && !isCtvWithAF && <td>{r.spentFormatted}</td>}
                     {hasVideo && <td>{r.rawViews.toLocaleString('en-IN')}</td>}
                     {hasVideo && !isCtvWithAF && <td>₹{r.cpvVal.toFixed(2)}</td>}
                     {hasVideo && <td>{r.rawFirstQ.toLocaleString('en-IN')}</td>}
@@ -375,7 +468,7 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
                     {hasVideo && <td>{r.rawComplete.toLocaleString('en-IN')}</td>}
                     {hasVideo && !isCtvWithAF && <td>₹{r.cpcvVal.toFixed(2)}</td>}
                     {hasAF && <td>{r.installsFormatted}</td>}
-                    {hasAF && <td style={{ paddingRight: "22px" }}>{r.conversionsFormatted}</td>}
+                    <td style={{ paddingRight: "22px" }}>{r.conversionsFormatted}</td>
                   </tr>
                 ))}
                 <tr className="st-tr-total">
@@ -384,6 +477,8 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
                   {!isCtvWithAF && <td>{totals.totalClicks}</td>}
                   {!isCtvWithAF && <td>{totals.avgCtr}</td>}
                   {!isCtvWithAF && <td>{totals.avgCpm}</td>}
+                  {!hasAF && !isCtvWithAF && <td>{totals.avgCpc}</td>}
+                  {!hasAF && !isCtvWithAF && <td>{totals.totalSpentFormatted}</td>}
                   {hasVideo && <td>{totals.totalViews}</td>}
                   {hasVideo && !isCtvWithAF && <td>{totals.avgCpv}</td>}
                   {hasVideo && <td>{totals.totalFirstQ}</td>}
@@ -392,7 +487,7 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
                   {hasVideo && <td>{totals.totalComplete}</td>}
                   {hasVideo && !isCtvWithAF && <td>{totals.avgCpcv}</td>}
                   {hasAF && <td>{totals.totalInstalls}</td>}
-                  {hasAF && <td style={{ paddingRight: "22px" }}>{totals.totalConversions}</td>}
+                  <td style={{ paddingRight: "22px" }}>{totals.totalConversions}</td>
                 </tr>
               </>
             ) : (

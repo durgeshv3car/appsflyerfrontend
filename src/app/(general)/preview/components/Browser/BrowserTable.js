@@ -152,16 +152,17 @@ const BrowserTable = ({
 
       const datePriceCPM = getPriceForDate(campaignPricing?.cpm, rowDate);
       const datePriceCPC = getPriceForDate(campaignPricing?.cpc, rowDate);
+      const hasRowCpc = datePriceCPC !== undefined && datePriceCPC !== null && !isNaN(Number(datePriceCPC));
 
       let rowSpent = 0;
       if (datePriceCPM > 0) {
         rowSpent = (imp / 1000) * datePriceCPM;
-      } else if (datePriceCPC > 0) {
-        rowSpent = cks * datePriceCPC;
-      } else if (globalEffectiveMetrics.eCPM > 0) {
+      } else if (hasRowCpc) {
+        rowSpent = cks * Number(datePriceCPC);
+      } else if (globalEffectiveMetrics?.eCPM > 0) {
         rowSpent = (imp / 1000) * globalEffectiveMetrics.eCPM;
-      } else if (globalEffectiveMetrics.eCPC > 0) {
-        rowSpent = cks * globalEffectiveMetrics.eCPC;
+      } else if (globalEffectiveMetrics?.eCPC !== undefined && !isNaN(Number(globalEffectiveMetrics?.eCPC))) {
+        rowSpent = cks * Number(globalEffectiveMetrics.eCPC);
       } else {
         const rCPM = Number(row.CPM || row.cpm || 0);
         const rCPC = Number(row.CPC || row.cpc || 0);

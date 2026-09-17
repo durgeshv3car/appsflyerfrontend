@@ -28,7 +28,7 @@ import { UrlTable } from "./components/UrlTable";
 import { TrendChart } from "./components/TrendChartPreview";
 import { GenderChart, AgeChart } from "./components/DemographicsPanels";
 import { PlacementPositionPanel, PlacementTypePanel } from "./components/PlacementPanels";
-import { TablePagination } from "./components/Shared";
+import { TablePagination, distributeInteger } from "./components/Shared";
 import topTost from "@/utils/topTost";
 
 const SectionHeader = ({ title }) => (
@@ -165,6 +165,7 @@ export default function DashboardRedesignPage() {
   const [isUpdating, setIsUpdating] = useState(true);
   const [perfPage, setPerfPage] = useState(1);
   const [selectedAudience, setSelectedAudience] = useState(null);
+  const [campaignPermissions, setCampaignPermissions] = useState([]);
   const [campaignPricing, setCampaignPricing] = useState({ cpm: {}, cpc: {}, impression: {} });
   const [range, setRange] = useState([
     {
@@ -285,6 +286,7 @@ export default function DashboardRedesignPage() {
     setIsUpdating(true);
     setPerfPage(1);
     setSelectedAudience(targetAudience);
+    setCampaignPermissions(Array.isArray(targetAudience.permissions) ? targetAudience.permissions : (targetAudience.campaignPermissions || []));
     // *** Reset ALL campaign & report data immediately so we never show stale/old data ***
     setTableData([]);
     setWeekData([]);
@@ -430,6 +432,30 @@ export default function DashboardRedesignPage() {
             if (cfg.app_id) appIdsList.push(cfg.app_id);
             if (cfg.appId) appIdsList.push(cfg.appId);
           });
+          if (afConfigRes.data.length > 0) {
+            const firstCfg = afConfigRes.data[0];
+            const audName = String(
+              firstCfg.name ||
+              targetAudience?.reportName ||
+              targetAudience?.campaignDisplayName ||
+              targetAudience?.name ||
+              ""
+            ).toLowerCase();
+            const isAjio = audName.includes("ajio");
+
+            const detectedUseEventValue =
+              firstCfg.useEventValue === "event_value" || firstCfg.use_event_value === "event_value" || isAjio
+                ? "event_value"
+                : (firstCfg.useEventValue || firstCfg.use_event_value || "count");
+
+            setSelectedAudience(prev => ({
+              ...(prev || targetAudience),
+              appsflyerDataLength: afConfigRes.data.length,
+              conversionEvent: firstCfg.conversionEvent || firstCfg.conversion_event || prev?.conversionEvent || targetAudience?.conversionEvent || "",
+              conversionValue: firstCfg.conversionValue || firstCfg.conversion_value || prev?.conversionValue || targetAudience?.conversionValue || "",
+              useEventValue: detectedUseEventValue,
+            }));
+          }
         }
 
         const uniqueAppIds = [...new Set(appIdsList.map(id => String(id).trim()).filter(Boolean))];
@@ -723,6 +749,34 @@ export default function DashboardRedesignPage() {
     return latestValue;
   };
 
+  const hasPermission = (key) => {
+    if (!key) return true;
+    const lower = String(key).toLowerCase().trim();
+    const perms = (campaignPermissions || []).map(p => String(p).toLowerCase().trim());
+
+    if (lower === "operator_table") return !perms.includes("operator_table");
+    if (lower === "operator_graph" || lower === "operator_distribution") {
+      return !perms.includes("operator_graph") && !perms.includes("operator_distribution");
+    }
+    if (lower === "browser_table") return !perms.includes("browser_table");
+    if (lower === "browser_graph" || lower === "browser_distribution") {
+      return !perms.includes("browser_graph") && !perms.includes("browser_distribution");
+    }
+    if (lower === "city_distribution" || lower === "state_distribution" || lower === "state_table") {
+      return !perms.includes("city_distribution");
+    }
+    if (lower === "performance_graph") return !perms.includes("performance_graph");
+    if (lower === "performance_table") return !perms.includes("performance_table");
+    if (lower === "delivery_by_weekday") return !perms.includes("delivery_by_weekday");
+    if (lower === "creative_performance_graph_table" || lower === "creative_performance_graph" || lower === "creative_performance_table") {
+      return !perms.includes("creative_performance_graph_table") && !perms.includes("creative_performance_graph") && !perms.includes("creative_performance_table");
+    }
+    if (lower === "url_table" || lower === "url_distribution") {
+      return !perms.includes("url_table") && !perms.includes("url_distribution");
+    }
+    return !perms.includes(lower);
+  };
+
   const globalEffectiveMetrics = React.useMemo(() => {
     const data = tableData || [];
     const pricing = campaignPricing;
@@ -744,6 +798,7 @@ export default function DashboardRedesignPage() {
     };
 
     const conversionEvent = selectedAudience?.conversionEvent || selectedAudience?.conversion_event || "";
+    const useEventValue = selectedAudience?.useEventValue || selectedAudience?.use_event_value || "count";
 
     // Build per-date AppsFlyer map
     const afMap = {};
@@ -755,7 +810,7 @@ export default function DashboardRedesignPage() {
         afMap[d].eventCount += (item.event_count || item.eventCount || item.eventcount || 0);
         afMap[d].afclicks += (item.clicks || 0);
 
-        const isOldDataLocal = !item.media_source;
+        const isOldDataLocal = !item.media_source && !item.event_count && !item.event_value && !item.revenue;
         let finalVal = 0;
         if (isOldDataLocal) {
           const safeTarget = String(conversionEvent || "").replace(/\s+/g, "").toLowerCase();
@@ -763,15 +818,31 @@ export default function DashboardRedesignPage() {
             item.events.forEach(evt => {
               const safeEName = String(evt.event_name || "").replace(/\s+/g, "").toLowerCase();
               if (!safeTarget || safeEName === safeTarget || safeEName.includes(safeTarget) || safeTarget.includes(safeEName)) {
-                const cleanVal = String(evt.event_value || "").replace(/,/g, "").trim();
+                const cleanVal = String(evt.event_value || evt.revenue || "").replace(/,/g, "").trim();
                 const valNum = Number(cleanVal) || 0;
-                finalVal += valNum === 0 ? (evt.event_count || 0) : valNum;
+                if (useEventValue === "event_value") {
+                  finalVal += valNum;
+                } else {
+                  finalVal += valNum === 0 ? (evt.event_count || 0) : valNum;
+                }
               }
             });
           }
         } else {
-          // Always use event_count as conversions (not total_revenue)
-          finalVal = item.event_count || 0;
+          // Use event_value (revenue) or event_count based on useEventValue setting
+          if (useEventValue === "event_value") {
+            let val = Number(String(item.event_value || item.revenue || item.total_revenue || item.event_revenue || "").replace(/,/g, "").trim()) || 0;
+            if (val === 0 && item.events && Array.isArray(item.events)) {
+              item.events.forEach(evt => {
+                const cleanVal = Number(String(evt.event_value || evt.revenue || "").replace(/,/g, "").trim()) || 0;
+                val += cleanVal;
+              });
+            }
+            finalVal = val;
+          } else {
+            // Always use event_count as conversions (not total_revenue)
+            finalVal = item.event_count || 0;
+          }
         }
         afMap[d].af_payment_unique += finalVal;
       });
@@ -797,6 +868,21 @@ export default function DashboardRedesignPage() {
         return v > 0;
       }))
     );
+
+    const hasBackendCPM = data.some(
+      (row) => Number(row.CPM || row.cpm || 0) > 0,
+    );
+    const hasBackendCPC = data.some(
+      (row) => Number(row.CPC || row.cpc || 0) > 0,
+    );
+    const anyCpmRate = getPriceForDate(pricing?.cpm, null);
+    const anyCpcRate = getPriceForDate(pricing?.cpc, null);
+
+    const isCpmDefined = anyCpmRate !== undefined && anyCpmRate !== null && !isNaN(Number(anyCpmRate));
+    const isCpcDefined = anyCpcRate !== undefined && anyCpcRate !== null && !isNaN(Number(anyCpcRate));
+
+    const isCpmCampaign = (isCpmDefined && Number(anyCpmRate) > 0) || hasBackendCPM;
+    const isCpcCampaign = isCpcDefined || hasBackendCPC;
 
     let totalImp = 0;
     let totalClicks = 0;
@@ -852,11 +938,16 @@ export default function DashboardRedesignPage() {
       const pCPM = getPriceForDate(pricing?.cpm, rowDate);
       const pCPC = getPriceForDate(pricing?.cpc, rowDate);
 
+      const hasRowCpm = pCPM !== undefined && pCPM !== null && !isNaN(Number(pCPM));
+      const hasRowCpc = pCPC !== undefined && pCPC !== null && !isNaN(Number(pCPC));
+
       let spent = 0;
-      if (pCPM > 0) {
-        spent = (imp / 1000) * pCPM;
-      } else if (pCPC > 0) {
-        spent = cks * pCPC;
+      if (hasRowCpm && Number(pCPM) > 0) {
+        spent = (imp / 1000) * Number(pCPM);
+      } else if (hasRowCpc) {
+        spent = cks * Number(pCPC);
+      } else if (hasRowCpm) {
+        spent = 0;
       } else {
         const rCPM = Number(row.eCPM || row.CPM || row.cpm || 0);
         const rCPC = Number(row.eCPC || row.CPC || row.cpc || 0);
@@ -882,7 +973,29 @@ export default function DashboardRedesignPage() {
       const rowReach = Number(row.Reach || row.reach || row.total_reach || row.uniqueReachImpressionReach || 0);
       const rowFreq = rowReach > 0 ? (imp / rowReach) : 0;
       const rowVcr = imp > 0 ? (vComplete / imp * 100) : 0;
-      const rowCpc = cks > 0 ? (spent / cks) : Number(row.CPC || row.cpc || 0);
+
+      let rowCpm = 0;
+      let rowCpc = 0;
+      if (hasAppsflyerData) {
+        rowCpm = imp > 0 ? (spent / imp) * 1000 : 0;
+        rowCpc = cks > 0 ? (spent / cks) : Number(row.CPC || row.cpc || 0);
+      } else {
+        // Mirror Preview page logic
+        if (isCpmCampaign) {
+          rowCpm = hasRowCpm && Number(pCPM) > 0 ? Number(pCPM) : (imp > 0 ? (spent / imp) * 1000 : 0);
+        } else {
+          rowCpm = 0;
+        }
+
+        if (hasRowCpc) {
+          rowCpc = Number(pCPC);
+        } else if (isCpcCampaign) {
+          rowCpc = cks > 0 ? (spent / cks) : Number(row.CPC || row.cpc || 0);
+        } else {
+          rowCpc = 0;
+        }
+      }
+
       const rowCpv = Number(row.CPV || row.Cpv || row.cpv || (rowViews > 0 ? spent / rowViews : 0));
       const rowCpcv = Number(row.CPCV || row.Cpcv || row.cpcv || (vComplete > 0 ? spent / vComplete : 0));
 
@@ -896,7 +1009,7 @@ export default function DashboardRedesignPage() {
         computedEventCount: rowEventCount,
         computedSpend: spent,
         computedRoas: spent > 0 ? (rev / spent) : 0,
-        computedCpm: imp > 0 ? (spent / imp) * 1000 : 0,
+        computedCpm: rowCpm,
         computedCtr: imp > 0 ? (cks / imp) * 100 : 0,
         computedCpc: rowCpc,
         computedReach: rowReach,
@@ -931,19 +1044,12 @@ export default function DashboardRedesignPage() {
     const overallVcr = totalImp > 0 ? (totalVideoComplete / totalImp * 100) : 0;
 
     if (!hasAppsflyerData && showAfMetrics && enrichedTableData.length > 0) {
-      enrichedTableData.forEach(r => {
-        const cks = Number(r.Clicks || r.clicks || 0);
-        const imp = Number(r.Impressions || r.impressions || 0);
-        let share = 0;
-        if (totalClicks > 0) {
-          share = cks / totalClicks;
-        } else if (totalImp > 0) {
-          share = imp / totalImp;
-        }
-        if (share > 0) {
-          r.computedInstalls = Math.round(totalInstalls * share);
-          r.computedConversions = Math.round(totalConversions * share);
-        }
+      const weights = enrichedTableData.map(r => Number(r.Clicks || r.clicks || r.Impressions || r.impressions || 0));
+      const convAllocated = distributeInteger(totalConversions, weights);
+      const instAllocated = distributeInteger(totalInstalls, weights);
+      enrichedTableData.forEach((r, idx) => {
+        r.computedInstalls = instAllocated[idx] || 0;
+        r.computedConversions = convAllocated[idx] || 0;
       });
     }
 
@@ -959,8 +1065,16 @@ export default function DashboardRedesignPage() {
       spend: totalSpent,
       reach: totalReach,
       frequency: totalReach > 0 ? (totalImp / totalReach) : 0,
-      eCPM: totalImp > 0 ? (totalSpent / totalImp) * 1000 : 0,
-      eCPC: totalClicks > 0 ? (totalSpent / totalClicks) : 0,
+      isCpmCampaign,
+      isCpcCampaign,
+      eCPM: hasAppsflyerData
+        ? (totalImp > 0 ? (totalSpent / totalImp) * 1000 : 0)
+        : (isCpmCampaign && totalImp > 0 ? (totalSpent / totalImp) * 1000 : 0),
+      eCPC: hasAppsflyerData
+        ? (totalClicks > 0 ? (totalSpent / totalClicks) : 0)
+        : (isCpcDefined
+            ? (Number(anyCpcRate) === 0 ? 0 : (totalClicks > 0 ? (totalSpent / totalClicks) : Number(anyCpcRate)))
+            : (isCpcCampaign && totalClicks > 0 ? (totalSpent / totalClicks) : 0)),
       cvr: totalInstalls > 0 ? (totalInstalls / totalImp) * 100 : 0,
       cpi: totalInstalls > 0 ? (totalSpent / totalInstalls) : 0,
       roas: totalSpent > 0 ? (totalRevenue / totalSpent) : 0,
@@ -1135,11 +1249,14 @@ export default function DashboardRedesignPage() {
         reportName: search || selectedAudience?.reportName || selectedAudience?.name || "Campaign_Report",
         campaignType: selectedAudience?.campaignType || selectedAudience?.campaign_type || "",
         isCtvWithAF,
+        hiddenSections: campaignPermissions,
         uiData: {
-          enrichedTableData: globalEffectiveMetrics?.enrichedTableData || [],
-          creativeData: creativeData || [],
-          urlData: urlData || [],
-          cityData: cityData || [],
+          enrichedTableData: hasPermission("performance_table") ? (globalEffectiveMetrics?.enrichedTableData || []) : [],
+          creativeData: hasPermission("creative_performance_graph_table") ? (creativeData || []) : [],
+          urlData: hasPermission("url_table") ? (urlData || []) : [],
+          cityData: hasPermission("city_distribution") ? (cityData || []) : [],
+          operatorData: hasPermission("operator_table") ? (operatorData || []) : [],
+          browserData: hasPermission("browser_table") ? (browserData || []) : [],
           rawInstallsBreakdown: rawInstallsBreakdown || {},
           totalInstalls: globalEffectiveMetrics?.installs || 0,
           totalConversions: globalEffectiveMetrics?.conversions || 0,
@@ -1589,10 +1706,12 @@ export default function DashboardRedesignPage() {
               </div>
 
               {/* ── Trend Analysis ── */}
-              <TrendChart tableData={globalEffectiveMetrics.enrichedTableData} hasAppsflyerData={globalEffectiveMetrics.hasAppsflyerData} selectedAudience={selectedAudience} />
+              {hasPermission("performance_graph") && (
+                <TrendChart tableData={globalEffectiveMetrics.enrichedTableData} hasAppsflyerData={globalEffectiveMetrics.hasAppsflyerData} selectedAudience={selectedAudience} />
+              )}
 
               {/* ── Performance Table ── */}
-              {(() => {
+              {hasPermission("performance_table") && (() => {
                 const PERF_PAGE_SIZE = 10;
                 const perfData = globalEffectiveMetrics.enrichedTableData;
                 const perfTotalPages = Math.ceil(perfData.length / PERF_PAGE_SIZE) || 1;
@@ -1664,7 +1783,7 @@ export default function DashboardRedesignPage() {
                                 {afEventCountVisible && <td>{Number(r.computedEventCount || 0).toLocaleString('en-IN')}</td>}
                                 {globalEffectiveMetrics.hasAppsflyerData && <td style={{ paddingRight: isCtvWithAF ? "22px" : "auto" }}>{Number(r.computedConversions || 0).toLocaleString('en-IN')}</td>}
                                 {!isCtvWithAF && <td>{r.computedCtr.toFixed(2)}%</td>}
-                                {!isCtvWithAF && <td style={{ paddingRight: "22px" }}>₹{r.computedSpend.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>}
+                                {!isCtvWithAF && <td style={{ paddingRight: "22px" }}>₹{r.computedSpend.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>}
                               </tr>
                             ))
                           ) : (
@@ -1694,7 +1813,7 @@ export default function DashboardRedesignPage() {
                               {afEventCountVisible && <td>{(globalEffectiveMetrics.eventCount || 0).toLocaleString('en-IN')}</td>}
                               {globalEffectiveMetrics.hasAppsflyerData && <td style={{ paddingRight: isCtvWithAF ? "22px" : "auto" }}>{(globalEffectiveMetrics.conversions || 0).toLocaleString('en-IN')}</td>}
                               {!isCtvWithAF && <td>{(globalEffectiveMetrics.ctr || 0).toFixed(2)}%</td>}
-                              {!isCtvWithAF && <td style={{ paddingRight: "22px" }}>₹{(globalEffectiveMetrics.spend || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>}
+                              {!isCtvWithAF && <td style={{ paddingRight: "22px" }}>₹{(globalEffectiveMetrics.spend || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>}
                             </tr>
                           )}
                         </tbody>
@@ -1704,22 +1823,35 @@ export default function DashboardRedesignPage() {
                 );
               })()}
 
-
-              {!isCtvWithAF && (<CreativePerformanceChart creativeData={creativeData} totalReach={globalEffectiveMetrics.reach} selectedAudience={selectedAudience} hasAppsflyerData={globalEffectiveMetrics.hasAppsflyerData} />)}
-              <CreativeDetails creativeData={creativeData} campaignPricing={campaignPricing} globalEffectiveMetrics={globalEffectiveMetrics} selectedAudience={selectedAudience} />
-              <UrlTable urlData={urlData} campaignPricing={campaignPricing} globalEffectiveMetrics={globalEffectiveMetrics} selectedAudience={selectedAudience} />
-              <DomainDistribution domainData={cityData} campaignPricing={campaignPricing} globalEffectiveMetrics={globalEffectiveMetrics} rawInstallsBreakdown={rawInstallsBreakdown} selectedAudience={selectedAudience} />
+              {!isCtvWithAF && hasPermission("creative_performance_graph") && (
+                <CreativePerformanceChart creativeData={creativeData} totalReach={globalEffectiveMetrics.reach} selectedAudience={selectedAudience} hasAppsflyerData={globalEffectiveMetrics.hasAppsflyerData} />
+              )}
+              {hasPermission("creative_performance_graph_table") && (
+                <CreativeDetails creativeData={creativeData} campaignPricing={campaignPricing} globalEffectiveMetrics={globalEffectiveMetrics} selectedAudience={selectedAudience} />
+              )}
+              {hasPermission("url_table") && (
+                <UrlTable urlData={urlData} campaignPricing={campaignPricing} globalEffectiveMetrics={globalEffectiveMetrics} selectedAudience={selectedAudience} />
+              )}
+              {hasPermission("city_distribution") && (
+                <DomainDistribution domainData={cityData} campaignPricing={campaignPricing} globalEffectiveMetrics={globalEffectiveMetrics} rawInstallsBreakdown={rawInstallsBreakdown} selectedAudience={selectedAudience} />
+              )}
               {
-                !isCtvWithAF && (<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 16 }}>
-                  <PlacementPositionPanel placementPosData={placementPosData} />
-                  <PlacementTypePanel placementTypeData={placementTypeData} />
-                </div>)
+                !isCtvWithAF && (hasPermission("placement_pos_distribution") || hasPermission("placement_interstitial_distribution")) && (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 16 }}>
+                    {hasPermission("placement_pos_distribution") && <PlacementPositionPanel placementPosData={placementPosData} />}
+                    {hasPermission("placement_interstitial_distribution") && <PlacementTypePanel placementTypeData={placementTypeData} />}
+                  </div>
+                )
               }
               {
-                !isCtvWithAF && (<PlatformAnalysis deviceData={deviceData} platformData={placementTypeData} />)
+                !isCtvWithAF && (hasPermission("device_distribution") || hasPermission("placement_interstitial_distribution")) && (
+                  <PlatformAnalysis deviceData={deviceData} platformData={placementTypeData} />
+                )
               }
 
-              <DeliveryByWeekday weekData={weekData} tableData={globalEffectiveMetrics.enrichedTableData} />
+              {hasPermission("delivery_by_weekday") && (
+                <DeliveryByWeekday weekData={weekData} tableData={globalEffectiveMetrics.enrichedTableData} />
+              )}
               <AttributionRevenueTraffic
                 operatorData={operatorData}
                 browserData={browserData}
@@ -1727,16 +1859,28 @@ export default function DashboardRedesignPage() {
                 globalEffectiveMetrics={globalEffectiveMetrics}
                 selectedAudience={selectedAudience}
                 rawInstallsBreakdown={rawInstallsBreakdown}
+                campaignPermissions={campaignPermissions}
               />
               {
-                !isCtvWithAF && (<div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 12, margin: "0 16px" }}>
-                  <GenderChart genderData={genderData} />
-                  <AgeChart ageData={ageData} />
-                </div>)
+                !isCtvWithAF && (hasPermission("platform_gender") || hasPermission("platform_age")) && (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 12, margin: "0 16px" }}>
+                    {hasPermission("platform_gender") && <GenderChart genderData={genderData} />}
+                    {hasPermission("platform_age") && <AgeChart ageData={ageData} />}
+                  </div>
+                )
               }
 
-
-              <BrowsersOperatorsTables browserData={browserData} operatorData={operatorData} campaignPricing={campaignPricing} globalEffectiveMetrics={globalEffectiveMetrics} selectedAudience={selectedAudience} rawInstallsBreakdown={rawInstallsBreakdown} />
+              {(hasPermission("browser_table") || hasPermission("operator_table")) && (
+                <BrowsersOperatorsTables
+                  browserData={browserData}
+                  operatorData={operatorData}
+                  campaignPricing={campaignPricing}
+                  globalEffectiveMetrics={globalEffectiveMetrics}
+                  selectedAudience={selectedAudience}
+                  rawInstallsBreakdown={rawInstallsBreakdown}
+                  campaignPermissions={campaignPermissions}
+                />
+              )}
             </>
           )}
         </>

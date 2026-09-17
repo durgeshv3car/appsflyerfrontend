@@ -1,6 +1,6 @@
 "use client";
 
-import { DonutChart } from "./Shared";
+import { DonutChart, distributeInteger } from "./Shared";
 
 const COLORS = ["#2563EB", "#22C55E", "#F97316", "#A855F7", "#EF4444", "#06B6D4", "#EAB308"];
 
@@ -128,13 +128,14 @@ function buildOperatorShareItems(operatorData, rawInstallsBreakdown, hasAF) {
   return buildShareItems(operatorData, "Operator", "operator");
 }
 
-function buildGeoShareItems(cityData, rawInstallsBreakdown, hasAF) {
+function buildGeoShareItems(cityData, rawInstallsBreakdown, hasAF, globalEffectiveMetrics) {
   if (hasAF) {
+    const totalInstalls = Number(globalEffectiveMetrics?.installs || 0);
     const groups = {};
     if (rawInstallsBreakdown?.city && Object.keys(rawInstallsBreakdown.city).length > 0) {
       Object.entries(rawInstallsBreakdown.city).forEach(([cityKey, count]) => {
         const stateCode = cityKey.toLowerCase();
-        const stateName = stateCodeToName[stateCode] || cityKey.toUpperCase();
+        const stateName = stateCodeToName[stateCode] || (cityKey.charAt(0).toUpperCase() + cityKey.slice(1));
         const val = Number(count || 0);
         if (val > 0) {
           groups[stateName] = (groups[stateName] || 0) + val;
@@ -147,11 +148,25 @@ function buildGeoShareItems(cityData, rawInstallsBreakdown, hasAF) {
         const rawName = String(r.name || r.City || r.city || r.Domain || r.domain || "Unknown").trim();
         const stateCode = cityToStateCode[rawName.toLowerCase()] || rawName.toLowerCase();
         const stateName = stateCodeToName[stateCode] || rawName;
-        const imp = Number(r.Impressions || r.impressions || r.Clicks || r.clicks || 0);
-        if (imp > 0) {
-          groups[stateName] = (groups[stateName] || 0) + imp;
+        const imp = Number(r.Impressions || r.impressions || 0);
+        const clk = Number(r.Clicks || r.clicks || 0);
+        const weight = imp > 0 ? imp : clk;
+        if (weight > 0) {
+          groups[stateName] = (groups[stateName] || 0) + weight;
         }
       });
+
+      if (Object.keys(groups).length > 0 && totalInstalls > 0) {
+        const sorted = Object.entries(groups).sort((a, b) => b[1] - a[1]);
+        const weights = sorted.map(e => e[1]);
+        const instAllocated = distributeInteger(totalInstalls, weights);
+        const scaledGroups = {};
+        sorted.forEach(([name], idx) => {
+          scaledGroups[name] = instAllocated[idx] || 0;
+        });
+        Object.keys(groups).forEach(k => delete groups[k]);
+        Object.assign(groups, scaledGroups);
+      }
     }
 
     const total = Object.values(groups).reduce((s, v) => s + v, 0);
@@ -162,7 +177,7 @@ function buildGeoShareItems(cityData, rawInstallsBreakdown, hasAF) {
       .slice(0, 6)
       .map(([stateName, val], i) => ({
         label: stateName,
-        value: (val / total * 100),
+        value: total > 0 ? (val / total * 100) : 0,
         displayVal: val.toLocaleString('en-IN'),
         color: COLORS[i % COLORS.length],
       }));
@@ -171,16 +186,21 @@ function buildGeoShareItems(cityData, rawInstallsBreakdown, hasAF) {
   return buildShareItems(cityData, "City", "city");
 }
 
-export function AttributionRevenueTraffic({ operatorData, browserData, cityData, globalEffectiveMetrics, selectedAudience, rawInstallsBreakdown }) {
+export function AttributionRevenueTraffic({ operatorData, browserData, cityData, globalEffectiveMetrics, selectedAudience, rawInstallsBreakdown, campaignPermissions = [] }) {
   const hasAF = !!globalEffectiveMetrics?.hasAppsflyerData;
   const ctype = String(selectedAudience?.campaignType || selectedAudience?.campaign_type || "").toUpperCase();
   const isCtvWithAF = ctype.includes("CTV") && hasAF;
   const hasRawOperatorData = hasAF && rawInstallsBreakdown?.operator && Object.keys(rawInstallsBreakdown.operator).length > 0;
 
+  const perms = (campaignPermissions || []).map(p => String(p).toLowerCase().trim());
+  const showOperator = !perms.includes("operator_graph") && !perms.includes("operator_distribution");
+  const showBrowser = !isCtvWithAF && !perms.includes("browser_graph") && !perms.includes("browser_distribution");
+  const showGeo = !perms.includes("city_distribution");
+
   // ── Traffic Breakdown from real API data ──────────────────────────────────
-  const operatorItems = buildOperatorShareItems(operatorData, rawInstallsBreakdown, hasAF);
-  const browserItems = isCtvWithAF ? null : buildShareItems(browserData, "Browser", "browser");
-  const geoItems = buildGeoShareItems(cityData, rawInstallsBreakdown, hasAF);
+  const operatorItems = showOperator ? buildOperatorShareItems(operatorData, rawInstallsBreakdown, hasAF) : null;
+  const browserItems = showBrowser ? buildShareItems(browserData, "Browser", "browser") : null;
+  const geoItems = showGeo ? buildGeoShareItems(cityData, rawInstallsBreakdown, hasAF, globalEffectiveMetrics) : null;
 
   const countLabel = (items) => items ? `${items.length}` : "–";
 

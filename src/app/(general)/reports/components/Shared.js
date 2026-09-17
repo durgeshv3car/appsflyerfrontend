@@ -95,3 +95,36 @@ export const DonutChart = ({ size = 120, data = [], label, subLabel }) => {
     </div>
   );
 };
+
+export function distributeInteger(total, weights) {
+  if (!total || total <= 0 || !Array.isArray(weights) || weights.length === 0) {
+    return (weights || []).map(() => 0);
+  }
+  const totalInt = Math.round(Number(total || 0));
+  if (totalInt <= 0) return weights.map(() => 0);
+
+  const totalWeight = weights.reduce((s, w) => s + Math.max(0, Number(w || 0)), 0);
+  if (totalWeight <= 0) {
+    const res = new Array(weights.length).fill(0);
+    res[0] = totalInt;
+    return res;
+  }
+
+  // Quota calculation (Hamilton-Hare largest remainder method)
+  const quotas = weights.map(w => (Math.max(0, Number(w || 0)) / totalWeight) * totalInt);
+  const floors = quotas.map(q => Math.floor(q));
+  let allocated = floors.reduce((s, f) => s + f, 0);
+  let remainder = totalInt - allocated;
+
+  if (remainder > 0) {
+    const remainders = quotas.map((q, idx) => ({ idx, rem: q - floors[idx] }));
+    remainders.sort((a, b) => b.rem - a.rem);
+    for (let i = 0; i < remainder && i < remainders.length; i++) {
+      floors[remainders[i].idx] += 1;
+    }
+  }
+
+  return floors;
+}
+
+

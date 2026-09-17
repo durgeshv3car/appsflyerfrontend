@@ -126,6 +126,7 @@ const ReportsFilter = ({
       initialFilters.app_id = "";
       initialFilters.conversionEvent = "";
       initialFilters.conversionValue = "";
+      initialFilters.useEventValue = "count";
       initialFilters.appsflyerCampaignType = "";
     }
 
@@ -285,6 +286,22 @@ const ReportsFilter = ({
       if (res.success && res.data && res.data.length > 0) {
         const item = res.data[0];
         
+        const audName = String(
+          item.name ||
+          selectedAud?.reportName ||
+          selectedAud?.campaignDisplayName ||
+          selectedAud?.name ||
+          filters.reportName ||
+          filters.campaignDisplayName ||
+          ""
+        ).toLowerCase();
+        const isAjio = audName.includes("ajio");
+
+        const detectedUseEventValue =
+          item.useEventValue === "event_value" || item.use_event_value === "event_value" || isAjio
+            ? "event_value"
+            : (item.useEventValue || item.use_event_value || "count");
+
         // Construct the updated filters synchronously (preserving the currently selected/persisted dateRange)
         const updatedFilters = {
           ...filters,
@@ -293,6 +310,7 @@ const ReportsFilter = ({
           appsflyerDataLength: res.data.length,
           conversionEvent: item.conversionEvent || "",
           conversionValue: item.conversionValue || "",
+          useEventValue: detectedUseEventValue,
           audienceEndDate: selectedAud?.endDate || "",
         };
 
@@ -304,6 +322,8 @@ const ReportsFilter = ({
           fetchAppsflyerData(updatedFilters);
         }
       } else {
+        const audName = String(selectedAud?.reportName || selectedAud?.name || "").toLowerCase();
+        const isAjio = audName.includes("ajio");
         const resetFilters = {
           ...filters,
           app_id: "",
@@ -311,6 +331,7 @@ const ReportsFilter = ({
           appsflyerCampaignType: "",
           conversionEvent: "",
           conversionValue: "",
+          useEventValue: isAjio ? "event_value" : "count",
           audienceEndDate: selectedAud?.endDate || "",
         };
         setFilters(resetFilters);
@@ -329,6 +350,7 @@ const ReportsFilter = ({
         appsflyerCampaignType: "",
         conversionEvent: "",
         conversionValue: "",
+        useEventValue: "count",
         audienceEndDate: selectedAud?.endDate || "",
       };
       setFilters(resetFilters);
@@ -473,6 +495,7 @@ const ReportsFilter = ({
        delete filtersToSave.app_id;
        delete filtersToSave.conversionEvent;
        delete filtersToSave.conversionValue;
+       delete filtersToSave.useEventValue;
        delete filtersToSave.appsflyerCampaignType;
        
        localStorage.setItem("campaignFilteredData", JSON.stringify(filtersToSave));
@@ -834,6 +857,7 @@ const ReportsFilter = ({
                     appsflyerCampaignType: "",
                     conversionEvent: "",
                     conversionValue: "",
+                    useEventValue: "count",
                     audienceEndDate: advertiserObj.endDate || "",
                   }));
                 }}

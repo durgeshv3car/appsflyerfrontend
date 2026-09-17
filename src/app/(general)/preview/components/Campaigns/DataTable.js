@@ -67,6 +67,7 @@ const PerformanceTable = ({
   appsflyerDataLength = 0,
   conversionEvent = "",
   conversionValue = "",
+  useEventValue = "count",
   globalTotals = { TotalConversions: 0, Installs: 0 },
   audienceEndDate = "",
 }) => {
@@ -219,7 +220,7 @@ const PerformanceTable = ({
 
       let af_login_unique = 0;
       let af_payment_unique = 0;
-      const isOldData = !item.media_source;
+      const isOldData = !item.media_source && !item.event_count && !item.event_value && !item.revenue;
 
       if (isOldData) {
         // No conversionValue defined — sum matching conversionEvent values
@@ -228,15 +229,31 @@ const PerformanceTable = ({
           item.events.forEach((evt) => {
             const safeEName = String(evt.event_name || "").replace(/\s+/g, "").toLowerCase();
             if (safeEName === safeTarget || safeEName.includes(safeTarget) || safeTarget.includes(safeEName)) {
-              const cleanVal = String(evt.event_value || "").replace(/,/g, "").trim();
+              const cleanVal = String(evt.event_value || evt.revenue || "").replace(/,/g, "").trim();
               const valNum = Number(cleanVal) || 0;
-              af_payment_unique += valNum === 0 ? (evt.event_count || 0) : valNum;
+              if (useEventValue === "event_value") {
+                af_payment_unique += valNum;
+              } else {
+                af_payment_unique += valNum === 0 ? (evt.event_count || 0) : valNum;
+              }
             }
           });
         }
       } else {
-        // Always use event_count as conversions (not total_revenue)
-        af_payment_unique = item.event_count || 0;
+        // Use event_value (revenue) or event_count based on useEventValue setting
+        if (useEventValue === "event_value") {
+          let val = Number(String(item.event_value || item.revenue || item.total_revenue || item.event_revenue || "").replace(/,/g, "").trim()) || 0;
+          if (val === 0 && item.events && Array.isArray(item.events)) {
+            item.events.forEach((evt) => {
+              const cleanVal = Number(String(evt.event_value || evt.revenue || "").replace(/,/g, "").trim()) || 0;
+              val += cleanVal;
+            });
+          }
+          af_payment_unique = val;
+        } else {
+          // Always use event_count as conversions (not total_revenue)
+          af_payment_unique = item.event_count || 0;
+        }
       }
 
       if (item.events && Array.isArray(item.events)) {
@@ -378,7 +395,7 @@ const PerformanceTable = ({
     }
 
     return rows;
-  }, [tableData, appsflyerData, conversionEvent, conversionValue, appsflyerDataLength, globalTotals, audienceEndDate]);
+  }, [tableData, appsflyerData, conversionEvent, conversionValue, useEventValue, appsflyerDataLength, globalTotals, audienceEndDate]);
 
   const sortedTableData = React.useMemo(() => {
     if (!mergedData) return [];
@@ -424,12 +441,14 @@ const PerformanceTable = ({
           0,
         );
 
+        const hasRowCpc = dateSpecificCPC !== undefined && dateSpecificCPC !== null && !isNaN(Number(dateSpecificCPC));
+
         // Determine effective CPM/CPC
         let spent = 0;
         if (dateSpecificCPM > 0) {
           spent = (imp / 1000) * dateSpecificCPM;
-        } else if (dateSpecificCPC > 0) {
-          spent = clicks * dateSpecificCPC;
+        } else if (hasRowCpc) {
+          spent = clicks * Number(dateSpecificCPC);
         } else {
           const rowCPM = Number(row.CPM || row.cpm || 0);
           const rowCPC = Number(row.CPC || row.cpc || 0);
@@ -441,8 +460,8 @@ const PerformanceTable = ({
             ? dateSpecificCPM
             : Number(row.CPM || row.cpm || 0);
         const cpc =
-          dateSpecificCPC > 0
-            ? dateSpecificCPC
+          hasRowCpc
+            ? Number(dateSpecificCPC)
             : Number(row.CPC || row.cpc || 0);
 
         const videoComplete = Number(
@@ -676,11 +695,12 @@ const PerformanceTable = ({
                       rowDate,
                     );
 
+                    const hasRowCpc = dateSpecificCPC !== undefined && dateSpecificCPC !== null && !isNaN(Number(dateSpecificCPC));
                     let rowSpent = 0;
                     if (dateSpecificCPM > 0) {
                       rowSpent = (imp / 1000) * dateSpecificCPM;
-                    } else if (dateSpecificCPC > 0) {
-                      rowSpent = cks * dateSpecificCPC;
+                    } else if (hasRowCpc) {
+                      rowSpent = cks * Number(dateSpecificCPC);
                     } else {
                       const rowCPM = Number(rawCPM || 0);
                       const rowCPC = Number(rawCPC || 0);
@@ -710,8 +730,8 @@ const PerformanceTable = ({
                         const finalClicks = cks + afClicks;
                         val = finalClicks > 0 ? rowSpent / finalClicks : 0;
                       } else {
-                        if (dateSpecificCPC > 0) {
-                          val = dateSpecificCPC;
+                        if (hasRowCpc) {
+                          val = Number(dateSpecificCPC);
                         } else {
                           val = Number(rawCPC || 0);
                         }
