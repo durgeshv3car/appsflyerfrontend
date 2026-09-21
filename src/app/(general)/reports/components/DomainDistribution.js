@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useMemo } from "react";
-import { TablePagination, distributeInteger } from "./Shared";
+import { TablePagination, distributeInteger, distributeValues, getDistributionWeights } from "./Shared";
 
 const PAGE_SIZE = 10;
 
@@ -178,16 +178,18 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
       }
 
       if (Object.keys(groups).length === 0 && Array.isArray(propData)) {
+        const hasClicks = propData.some(r => Number(r.Clicks || r.clicks || 0) > 0);
         propData.forEach(r => {
           const rawName = String(r.name || r.City || r.city || r.Domain || r.domain || "Unknown").trim();
           const stateCode = cityToStateCode[rawName.toLowerCase()] || rawName.toLowerCase();
           const stateName = stateCodeToName[stateCode] || rawName;
           const clk = Number(r.Clicks || r.clicks || 0);
           const imp = Number(r.Impressions || r.impressions || 0);
+          const val = hasClicks ? clk : imp;
           if (!groups[stateName]) {
-            groups[stateName] = { domain: stateName, rawInstalls: clk > 0 ? clk : imp };
+            groups[stateName] = { domain: stateName, rawInstalls: val };
           } else {
-            groups[stateName].rawInstalls += clk > 0 ? clk : imp;
+            groups[stateName].rawInstalls += val;
           }
         });
       }
@@ -197,19 +199,19 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
 
       const currentSumInst = stateList.reduce((sum, g) => sum + g.rawInstalls, 0);
       const targetInst = totalInstalls > 0 ? totalInstalls : currentSumInst;
-      const scale = currentSumInst > 0 ? targetInst / currentSumInst : 0;
 
-      let allocatedInstalls = 0;
-      stateList = stateList.map((g, idx) => {
-        let inst = 0;
-        if (idx === stateList.length - 1) {
-          inst = Math.max(0, targetInst - allocatedInstalls);
-        } else {
-          inst = Math.round(g.rawInstalls * scale);
-          allocatedInstalls += inst;
-        }
-        return { ...g, rawInstalls: inst };
-      }).sort((a, b) => b.rawInstalls - a.rawInstalls);
+      // Sort by initial raw weight
+      stateList.sort((a, b) => b.rawInstalls - a.rawInstalls);
+
+      const weights = stateList.map(g => Number(g.rawInstalls || 0));
+      const instAllocated = distributeInteger(targetInst, weights);
+      const convAllocated = distributeValues(totalConversions, weights);
+
+      stateList = stateList.map((g, idx) => ({
+        ...g,
+        rawInstalls: instAllocated[idx] || 0,
+        rawConversions: convAllocated[idx] || 0,
+      }));
 
       const propDataArr = Array.isArray(propData) ? propData : [];
       const totalImpSum = globalTargetImp > 0 ? globalTargetImp : propDataArr.reduce((a, r) => a + Number(r.Impressions || r.impressions || 0), 0);
@@ -219,9 +221,6 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
       const totalFirstQSum = propDataArr.reduce((a, r) => a + Number(r.firstQuartileViewsVideo || r.FirstQuartileViewsVideo || 0), 0);
       const totalMidpointSum = propDataArr.reduce((a, r) => a + Number(r.midpointViewsVideo || r.MidpointViewsVideo || 0), 0);
       const totalThirdQSum = propDataArr.reduce((a, r) => a + Number(r.thirdQuartileViewsVideo || r.ThirdQuartileViewsVideo || 0), 0);
-
-      const convWeights = stateList.map(g => Number(g.rawInstalls || 0));
-      const convAllocated = distributeInteger(totalConversions, convWeights);
 
       let allocatedImp = 0;
       let allocatedClicks = 0;
@@ -287,8 +286,8 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
     const targetTotalImp = globalTargetImp > 0 ? globalTargetImp : rawCityImpSum;
 
     let allocatedImp = 0;
-    const convWeights = propData.map(r => Number(r.Clicks || r.clicks || r.Impressions || r.impressions || 0));
-    const convAllocated = distributeInteger(totalConversions, convWeights);
+    const convWeights = getDistributionWeights(propData);
+    const convAllocated = distributeValues(totalConversions, convWeights);
     const instAllocated = distributeInteger(totalInstalls, convWeights);
 
     return propData.map((r, idx) => {

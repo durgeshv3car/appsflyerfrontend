@@ -59,7 +59,7 @@ export function CreativePerformanceChart({ creativeData: propData, totalReach = 
       </div>
 
       {list.length > 0 ? (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: 24, alignItems: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20, alignItems: "start" }}>
           {/* Left Column: Creative Ranked List */}
           <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 310, overflowY: "auto", paddingRight: 4 }}>
             {list.map((c, idx) => (

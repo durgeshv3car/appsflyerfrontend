@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useMemo } from "react";
-import { TablePagination, distributeInteger } from "./Shared";
+import { TablePagination, distributeInteger, distributeValues, getDistributionWeights } from "./Shared";
 
 const PAGE_SIZE = 10;
 
@@ -88,7 +88,7 @@ function BrowserTable({
 
         const opWeights = entries.map(e => Number(e[1] || 0));
         const instAllocated = distributeInteger(targetInst, opWeights);
-        const convAllocated = distributeInteger(totalConversions, opWeights);
+        const convAllocated = distributeValues(totalConversions, opWeights);
 
         return entries.map(([name, rawInst], idx) => {
           const inst = instAllocated[idx] || 0;
@@ -123,13 +123,13 @@ function BrowserTable({
         return n && n !== "unknown" && n !== "other" && n !== "none" && n !== "null" && n !== "undefined";
       });
 
-      const weights = filteredRawList.map(r => {
-        const imp = r.rawImp !== undefined ? r.rawImp : Number(String(r.impressions || 0).replace(/,/g, ''));
-        const clk = r.rawClicks !== undefined ? r.rawClicks : Number(String(r.clicks || 0).replace(/,/g, ''));
-        return clk > 0 ? clk : imp;
-      });
+      const weights = getDistributionWeights(
+        filteredRawList,
+        r => (r.rawClicks !== undefined ? r.rawClicks : Number(String(r.clicks || 0).replace(/,/g, ''))),
+        r => (r.rawImp !== undefined ? r.rawImp : Number(String(r.impressions || 0).replace(/,/g, '')))
+      );
       const instAllocated = distributeInteger(totalInstalls, weights);
-      const convAllocated = distributeInteger(totalConversions, weights);
+      const convAllocated = distributeValues(totalConversions, weights);
 
       return filteredRawList.map((r, idx) => {
         const imp = r.rawImp !== undefined ? r.rawImp : Number(String(r.impressions || 0).replace(/,/g, ''));

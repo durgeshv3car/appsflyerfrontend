@@ -121,7 +121,7 @@ export function PlatformAnalysis({ deviceData = [], platformData = [] }) {
       </div>
 
       {dList.length > 0 ? (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32, alignItems: "center", marginTop: 8 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20, alignItems: "center", marginTop: 8 }}>
           {/* Left: Device Cards */}
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {dList.map((item, idx) => (

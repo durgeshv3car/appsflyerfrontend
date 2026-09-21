@@ -206,16 +206,20 @@ const UrlTable = ({
   let summedConv = 0;
   let summedInst = 0;
 
-  const currentTotalImp = result.reduce((sum, g) => sum + g.Impressions, 0);
+  const hasClicks = result.some(g => Number(g.Clicks || 0) > 0);
+  const currentTotalBase = result.reduce((sum, g) => sum + (hasClicks ? Number(g.Clicks || 0) : Number(g.Impressions || 0)), 0);
 
+  const isConvInteger = Number.isInteger(targetConversions);
   result.forEach((g, idx) => {
-    const share = currentTotalImp > 0 ? g.Impressions / currentTotalImp : (result.length > 0 ? 1 / result.length : 0);
+    const metricVal = hasClicks ? Number(g.Clicks || 0) : Number(g.Impressions || 0);
+    const share = currentTotalBase > 0 ? metricVal / currentTotalBase : (result.length > 0 ? 1 / result.length : 0);
     if (idx === result.length - 1) {
       // Last row gets remainder to avoid rounding drift
-      g.TotalConversions = targetConversions - summedConv;
-      g.Installs = targetInstalls - summedInst;
+      g.TotalConversions = isConvInteger ? Math.round(targetConversions - summedConv) : parseFloat((targetConversions - summedConv).toFixed(2));
+      g.Installs = Math.round(targetInstalls - summedInst);
     } else {
-      g.TotalConversions = Math.round(targetConversions * share);
+      const cVal = isConvInteger ? Math.round(targetConversions * share) : parseFloat((targetConversions * share).toFixed(2));
+      g.TotalConversions = cVal;
       g.Installs = Math.round(targetInstalls * share);
       summedConv += g.TotalConversions;
       summedInst += g.Installs;

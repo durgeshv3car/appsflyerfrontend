@@ -127,4 +127,54 @@ export function distributeInteger(total, weights) {
   return floors;
 }
 
+export function getDistributionWeights(items, getClicks, getImp) {
+  if (!Array.isArray(items) || items.length === 0) return [];
+  const getClk = getClicks || ((r) => Number(r.clicks || r.Clicks || r.rawClicks || 0));
+  const getIm = getImp || ((r) => Number(r.impressions || r.Impressions || r.rawImp || 0));
+
+  const hasClicks = items.some(r => getClk(r) > 0);
+  if (hasClicks) {
+    const weights = items.map(r => Math.max(0, getClk(r)));
+    const totalW = weights.reduce((a, b) => a + b, 0);
+    if (totalW > 0) return weights;
+  }
+
+  const weights = items.map(r => Math.max(0, getIm(r)));
+  const totalW = weights.reduce((a, b) => a + b, 0);
+  if (totalW > 0) return weights;
+
+  return items.map(() => 1);
+}
+
+export function distributeValues(total, weights) {
+  if (!total || total <= 0 || !Array.isArray(weights) || weights.length === 0) {
+    return (weights || []).map(() => 0);
+  }
+  const numTotal = Number(total || 0);
+  if (numTotal <= 0) return weights.map(() => 0);
+
+  if (Number.isInteger(numTotal)) {
+    return distributeInteger(numTotal, weights);
+  }
+
+  const totalWeight = weights.reduce((s, w) => s + Math.max(0, Number(w || 0)), 0);
+  if (totalWeight <= 0) {
+    const res = new Array(weights.length).fill(0);
+    res[0] = parseFloat(numTotal.toFixed(2));
+    return res;
+  }
+
+  let runningSum = 0;
+  return weights.map((w, idx) => {
+    if (idx === weights.length - 1) {
+      return parseFloat((numTotal - runningSum).toFixed(2));
+    }
+    const share = (Math.max(0, Number(w || 0)) / totalWeight) * numTotal;
+    const val = parseFloat(share.toFixed(2));
+    runningSum += val;
+    return val;
+  });
+}
+
+
 

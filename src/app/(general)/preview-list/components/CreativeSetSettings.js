@@ -165,12 +165,12 @@ const CreativeSetSettings = ({ onCancel, onSave, audiences = [], defaultAudience
 
 
   return (
-    <div className="bg-white rounded-3 shadow-sm p-5 m-3" style={{ border: "1px solid #f1f5f9", minHeight: '80vh' }}>
-      <h4 className="mb-5 fw-bold text-dark" style={{ fontSize: '1.25rem' }}>Creative Set Settings</h4>
+    <div className="bg-white rounded-3 shadow-sm p-3 p-sm-4 p-md-5 m-1 m-sm-2 m-md-3" style={{ border: "1px solid #f1f5f9", minHeight: '80vh' }}>
+      <h4 className="mb-4 mb-md-5 fw-bold text-dark" style={{ fontSize: '1.25rem' }}>Creative Set Settings</h4>
 
-      <div className="row mb-5 g-4">
-        <div className="col-md-6">
-          <label className="d-flex align-items-center gap-2 mb-3">
+      <div className="row mb-4 mb-md-5 g-3 g-md-4">
+        <div className="col-12 col-md-6">
+          <label className="d-flex align-items-center gap-2 mb-2 mb-md-3">
             <span className="fw-semibold text-muted" style={{ fontSize: "0.85rem", letterSpacing: '0.3px' }}>Creative Set Title</span>
             <div className="bg-light rounded-circle d-flex align-items-center justify-content-center" style={{ width: '18px', height: '18px' }}>
               <Info size={12} className="text-primary" />
@@ -193,8 +193,8 @@ const CreativeSetSettings = ({ onCancel, onSave, audiences = [], defaultAudience
           />
         </div>
 
-        <div className="col-md-6">
-          <label className="d-flex align-items-center gap-2 mb-3">
+        <div className="col-12 col-md-6">
+          <label className="d-flex align-items-center gap-2 mb-2 mb-md-3">
             <span className="fw-semibold text-muted" style={{ fontSize: "0.85rem", letterSpacing: '0.3px' }}>Select Audience</span>
             <div className="bg-light rounded-circle d-flex align-items-center justify-content-center" style={{ width: '18px', height: '18px' }}>
               <Info size={12} className="text-primary" />
@@ -221,13 +221,13 @@ const CreativeSetSettings = ({ onCancel, onSave, audiences = [], defaultAudience
         </div>
       </div>
 
-      <div className="border-top mb-5" style={{ borderColor: "#f1f5f9" }}></div>
+      <div className="border-top mb-4 mb-md-5" style={{ borderColor: "#f1f5f9" }}></div>
 
-      <div className="row g-5">
+      <div className="row g-4 g-lg-5">
         {/* Creative Format Column */}
-        <div className="col-md-5">
-          <h6 className="fw-bold mb-4 text-dark" style={{ fontSize: '1rem' }}>Creative Format</h6>
-          <div className="d-flex flex-column gap-3">
+        <div className="col-12 col-md-5">
+          <h6 className="fw-bold mb-3 mb-md-4 text-dark" style={{ fontSize: '1rem' }}>Creative Format</h6>
+          <div className="d-flex flex-column gap-2 gap-md-3">
             {creativeFormats.map((format) => (
               <div 
                 key={format.id} 
@@ -252,11 +252,11 @@ const CreativeSetSettings = ({ onCancel, onSave, audiences = [], defaultAudience
         </div>
 
         {/* Description and Sub-format Column */}
-        <div className="col-md-7">
-          <div className="d-flex gap-5 h-100 position-relative">
+        <div className="col-12 col-md-7">
+          <div className="d-flex flex-column flex-lg-row gap-4 gap-lg-5 h-100 position-relative">
             {/* Format Description Box */}
-            <div className="position-relative" style={{ width: "240px", flexShrink: 0 }}>
-                <div className="p-4 rounded-3" style={{ backgroundColor: "#fdfdfd", border: "1px solid #f8fafc", boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+            <div className="position-relative w-100" style={{ maxWidth: "320px", flexShrink: 0 }}>
+                <div className="p-3 p-sm-4 rounded-3" style={{ backgroundColor: "#fdfdfd", border: "1px solid #f8fafc", boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
                     <p className="text-muted m-0" style={{ fontSize: "0.85rem", lineHeight: "1.7", color: '#64748b' }}>
                         {currentFormat?.description}
                     </p>
@@ -267,18 +267,18 @@ const CreativeSetSettings = ({ onCancel, onSave, audiences = [], defaultAudience
             <div className="d-none d-lg-block" style={{ width: "1px", backgroundColor: "#f1f5f9" }}></div>
 
             {/* Sub Formats */}
-            <div className="flex-grow-1">
-              <h6 className="fw-bold mb-4 text-dark" style={{ fontSize: '1rem' }}>
+            <div className="flex-grow-1 w-100">
+              <h6 className="fw-bold mb-3 mb-md-4 text-dark" style={{ fontSize: '1rem' }}>
                 {currentFormat?.label} Format
               </h6>
               
               {selectedFormat === "banner" && (
                 <div className="mb-4">
                   <label className="fw-semibold mb-2 text-dark" style={{ fontSize: "0.9rem" }}>Upload Mode</label>
-                  <div className="d-flex gap-3">
+                  <div className="d-flex flex-wrap gap-2">
                     <button
                       type="button"
-                      className={`btn btn-sm px-4 py-2 fw-semibold rounded-3 transition-all ${
+                      className={`btn btn-sm px-3 px-sm-4 py-2 fw-semibold rounded-3 transition-all flex-grow-1 flex-sm-grow-0 ${
                         !isMultiple
                           ? "bg-primary text-white"
                           : "btn-outline-secondary border-light-custom text-muted"
@@ -299,7 +299,7 @@ const CreativeSetSettings = ({ onCancel, onSave, audiences = [], defaultAudience
                     </button>
                     <button
                       type="button"
-                      className={`btn btn-sm px-4 py-2 fw-semibold rounded-3 transition-all ${
+                      className={`btn btn-sm px-3 px-sm-4 py-2 fw-semibold rounded-3 transition-all flex-grow-1 flex-sm-grow-0 ${
                         isMultiple
                           ? "bg-primary text-white"
                           : "btn-outline-secondary border-light-custom text-muted"
@@ -477,9 +477,9 @@ const CreativeSetSettings = ({ onCancel, onSave, audiences = [], defaultAudience
         </div>
       </div>
 
-      <div className="d-flex justify-content-end gap-3 mt-5 pt-5 border-top" style={{ borderColor: "#f1f5f9" }}>
+      <div className="d-flex flex-column-reverse flex-sm-row justify-content-end gap-2 gap-sm-3 mt-4 mt-sm-5 pt-4 pt-sm-5 border-top" style={{ borderColor: "#f1f5f9" }}>
         <button 
-          className="btn px-5 py-2 fw-bold transition-all" 
+          className="btn px-4 px-sm-5 py-2 fw-bold transition-all w-100 w-sm-auto" 
           onClick={onCancel}
           style={{ 
             color: "#6b46c1", 
@@ -492,7 +492,7 @@ const CreativeSetSettings = ({ onCancel, onSave, audiences = [], defaultAudience
           Cancel
         </button>
         <button 
-          className="btn px-5 py-2 fw-bold transition-all text-white shadow-sm" 
+          className="btn px-4 px-sm-5 py-2 fw-bold transition-all text-white shadow-sm w-100 w-sm-auto" 
           onClick={handleSave}
           disabled={
             isMultiple && selectedFormat === "banner"

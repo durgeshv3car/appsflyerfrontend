@@ -222,7 +222,7 @@ const ItemTable = ({
 
       {/* Pagination Controls */}
       {totalPages > 1 && (
-        <div className="d-flex justify-content-between align-items-center p-3 border-top bg-white rounded-bottom">
+        <div className="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-2 p-3 border-top bg-white rounded-bottom">
           <span className="text-muted small">
             Page {page} of {totalPages}
           </span>
@@ -252,7 +252,7 @@ const ItemTable = ({
           tabIndex="-1"
           style={{ backgroundColor: "rgba(0,0,0,0.6)", zIndex: 1050 }}
         >
-          <div className="modal-dialog modal-dialog-centered modal-lg">
+          <div className="modal-dialog modal-dialog-centered modal-lg" style={{ margin: "10px auto", maxWidth: "min(800px, calc(100% - 20px))" }}>
             <div className="modal-content overflow-hidden border-0 shadow">
               <div className="modal-header border-bottom-0 bg-light">
                 <h6 className="modal-title fw-bold text-dark m-0">
@@ -342,7 +342,7 @@ const ItemTable = ({
                       src={previewMedia.url}
                       controls
                       autoPlay
-                      className="w-75"
+                      className="w-100"
                     >
                       Your browser does not support the audio element.
                     </audio>

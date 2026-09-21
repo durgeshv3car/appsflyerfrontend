@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
-import { TablePagination, distributeInteger } from "./Shared";
+import { TablePagination, distributeInteger, distributeValues, getDistributionWeights } from "./Shared";
 import { FiEye, FiExternalLink, FiX } from "react-icons/fi";
 
 const PAGE_SIZE = 10;
@@ -175,8 +175,8 @@ export function CreativeDetails({ creativeData: propData, campaignPricing, globa
       };
     });
 
-    const weights = rawList.map(r => r.rawClicks > 0 ? r.rawClicks : r.rawImpressions);
-    const convAllocated = distributeInteger(totalConversions, weights);
+    const weights = getDistributionWeights(rawList, r => r.rawClicks, r => r.rawImpressions);
+    const convAllocated = distributeValues(totalConversions, weights);
     const instAllocated = distributeInteger(totalInstalls, weights);
 
     return rawList.map((r, idx) => {

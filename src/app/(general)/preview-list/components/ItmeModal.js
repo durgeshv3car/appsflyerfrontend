@@ -39,8 +39,8 @@ const ItemModal = ({
   const mediaType = formData.previewUrl ? getMediaType(formData.previewUrl, formData.description, formData.type) : 'link';
 
   return (
-    <div className="modal d-block" tabIndex="-1">
-      <div className="modal-dialog modal-dialog-centered">
+    <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
+      <div className="modal-dialog modal-dialog-centered" style={{ margin: "10px auto", maxWidth: "min(550px, calc(100% - 20px))" }}>
         <div className="modal-content">
           <div className="modal-header">
             <h5 className="modal-title">{title}</h5>
@@ -150,11 +150,11 @@ const ItemModal = ({
             </div>
           </div>
 
-          <div className="modal-footer">
-            <button className="btn btn-secondary" onClick={onClose}>
+          <div className="modal-footer d-flex flex-column-reverse flex-sm-row justify-content-end gap-2">
+            <button className="btn btn-secondary w-100 w-sm-auto" onClick={onClose}>
               Close
             </button>
-            <button className="btn btn-primary" onClick={onSubmit}>
+            <button className="btn btn-primary w-100 w-sm-auto" onClick={onSubmit}>
               {submitLabel}
             </button>
           </div>

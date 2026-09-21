@@ -251,13 +251,15 @@ const OperatorTable = ({
 
     if (result.length > 0) {
       if (convScale === 0 && targetConversions > 0) {
+        const totalImp = result.reduce((s, g) => s + Number(g.Impressions || 0), 0);
         let tempConv = 0;
         result.forEach((g, idx) => {
           let cToAdd = 0;
           if (idx === result.length - 1) {
             cToAdd = targetConversions - tempConv;
           } else {
-            cToAdd = Math.round(targetConversions / result.length);
+            const share = totalImp > 0 ? Number(g.Impressions || 0) / totalImp : 1 / result.length;
+            cToAdd = Math.round(targetConversions * share);
             tempConv += cToAdd;
           }
           g.TotalConversions = cToAdd;
@@ -265,13 +267,15 @@ const OperatorTable = ({
         summedConv = targetConversions;
       }
       if (instScale === 0 && targetInstalls > 0) {
+        const totalImp = result.reduce((s, g) => s + Number(g.Impressions || 0), 0);
         let tempInst = 0;
         result.forEach((g, idx) => {
           let iToAdd = 0;
           if (idx === result.length - 1) {
             iToAdd = targetInstalls - tempInst;
           } else {
-            iToAdd = Math.round(targetInstalls / result.length);
+            const share = totalImp > 0 ? Number(g.Impressions || 0) / totalImp : 1 / result.length;
+            iToAdd = Math.round(targetInstalls * share);
             tempInst += iToAdd;
           }
           g.Installs = iToAdd;

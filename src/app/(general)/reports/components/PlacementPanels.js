@@ -98,7 +98,7 @@ export function PlacementPositionPanel({ placementPosData = [] }) {
       {processedData.length > 0 ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 20, marginTop: 8, flex: 1 }}>
           {/* Top: Donut Chart & Legend */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", gap: 16, background: "#F8FAFC", borderRadius: 12, padding: "16px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", gap: 16, background: "#F8FAFC", borderRadius: 12, padding: "16px", flexWrap: "wrap" }}>
             <div style={{ position: "relative", width: "140px", height: "140px", flexShrink: 0 }}>
               <Doughnut data={chartData} options={chartOptions} />
               <div style={{
@@ -292,7 +292,7 @@ export function PlacementTypePanel({ placementTypeData = [] }) {
       {processedData.length > 0 ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 20, marginTop: 8, flex: 1 }}>
           {/* Top: Donut Chart & Legend */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", gap: 16, background: "#F8FAFC", borderRadius: 12, padding: "16px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-around", gap: 16, background: "#F8FAFC", borderRadius: 12, padding: "16px", flexWrap: "wrap" }}>
             <div style={{ position: "relative", width: "140px", height: "140px", flexShrink: 0 }}>
               <Doughnut data={chartData} options={chartOptions} />
               <div style={{

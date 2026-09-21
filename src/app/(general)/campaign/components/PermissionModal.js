@@ -30,13 +30,13 @@ const PermissionModal = ({ show, onClose, user, onSave }) => {
 
   return (
     <>
-      <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050, padding: '20px' }}>
-        <div className="bg-white rounded-3 shadow-lg p-0 d-flex flex-column" style={{ width: '100%', maxWidth: '850px', maxHeight: '90vh' }}>
-          <div className="d-flex justify-content-between align-items-center p-4 border-bottom">
+      <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050, padding: '10px' }}>
+        <div className="bg-white rounded-3 shadow-lg p-0 d-flex flex-column" style={{ width: '100%', maxWidth: '850px', maxHeight: '92vh' }}>
+          <div className="d-flex justify-content-between align-items-center p-3 p-sm-4 border-bottom">
             <h5 className="m-0 text-dark fw-bold">Manage Permissions</h5>
             <button type="button" className="btn-close" onClick={onClose}></button>
           </div>
-          <div className="p-4" style={{ overflowY: 'auto' }}>
+          <div className="p-3 p-sm-4" style={{ overflowY: 'auto' }}>
             <form onSubmit={handleSubmit}>
             <div className="mb-4">
 
@@ -67,7 +67,7 @@ const PermissionModal = ({ show, onClose, user, onSave }) => {
                     "placement_interstitial_distribution",
                     "creative_performance_graph_table",
                   ].map((perm) => (
-                    <div className="col-4" key={perm}>
+                    <div className="col-12 col-sm-6 col-md-4" key={perm}>
                       <div className="form-check">
                         <input
                           type="checkbox"
@@ -87,15 +87,15 @@ const PermissionModal = ({ show, onClose, user, onSave }) => {
               </div>
             </div>
 
-            <div className="d-flex justify-content-end gap-2 mt-4">
+            <div className="d-flex flex-column-reverse flex-sm-row justify-content-end gap-2 mt-4">
               <button
                 type="button"
-                className="btn btn-secondary px-4"
+                className="btn btn-secondary px-4 w-100 w-sm-auto"
                 onClick={onClose}
               >
                 Cancel
               </button>
-              <button type="submit" className="btn btn-primary px-4">
+              <button type="submit" className="btn btn-primary px-4 w-100 w-sm-auto">
                 Save Permissions
               </button>
             </div>

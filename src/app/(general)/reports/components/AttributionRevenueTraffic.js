@@ -41,7 +41,7 @@ const operatorNameMap = {
 };
 
 const SectionHeader = ({ title }) => (
-  <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "32px 24px 16px" }}>
+  <div className="st-sec-header" style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 16px 14px" }}>
     <span style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", letterSpacing: "0.12em", textTransform: "uppercase" }}>{title}</span>
     <div style={{ flex: 1, height: 1, background: "#E5E7EB" }} />
   </div>
@@ -49,7 +49,7 @@ const SectionHeader = ({ title }) => (
 
 function DonutCard({ title, subTitle, label, subLabel, items, tag, tagColor }) {
   return (
-    <div style={{ background: "#fff", border: "1px solid #E9EEF5", borderRadius: 12, padding: "24px", display: "flex", flexDirection: "column", height: "100%" }}>
+    <div className="st-donut-card" style={{ background: "#fff", border: "1px solid #E9EEF5", borderRadius: 12, padding: "16px", display: "flex", flexDirection: "column", height: "100%" }}>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 700, color: "#6B7280", letterSpacing: "0.08em", textTransform: "uppercase" }}>{title}</div>
@@ -144,13 +144,14 @@ function buildGeoShareItems(cityData, rawInstallsBreakdown, hasAF, globalEffecti
     }
 
     if (Object.keys(groups).length === 0 && Array.isArray(cityData)) {
+      const hasClicks = cityData.some(r => Number(r.Clicks || r.clicks || 0) > 0);
       cityData.forEach(r => {
         const rawName = String(r.name || r.City || r.city || r.Domain || r.domain || "Unknown").trim();
         const stateCode = cityToStateCode[rawName.toLowerCase()] || rawName.toLowerCase();
         const stateName = stateCodeToName[stateCode] || rawName;
         const imp = Number(r.Impressions || r.impressions || 0);
         const clk = Number(r.Clicks || r.clicks || 0);
-        const weight = imp > 0 ? imp : clk;
+        const weight = hasClicks ? clk : imp;
         if (weight > 0) {
           groups[stateName] = (groups[stateName] || 0) + weight;
         }
@@ -211,7 +212,7 @@ export function AttributionRevenueTraffic({ operatorData, browserData, cityData,
       {/* ── Traffic Breakdown ── */}
       {hasTrafficData && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, margin: "0 24px" }}>
+          <div className="st-traffic-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, margin: "0 16px" }}>
             {operatorItems && (
               <DonutCard
                 title="Network Operators"

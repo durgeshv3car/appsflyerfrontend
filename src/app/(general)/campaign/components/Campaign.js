@@ -823,7 +823,7 @@ const Campaign = () => {
         <CampaignLoader progress={progress} status={loadingStatus} />
       ) : (
         <div className="card">
-          <div className="card-body p-3 d-flex align-items-center justify-content-between">
+          <div className="card-body p-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
             <h5 className="fw-bold mb-0">Campaigns</h5>
             <div className="d-flex gap-2 align-items-center">
               <button
@@ -880,7 +880,11 @@ const Campaign = () => {
                   {!loading &&
                     campaigns.map((c, idx) => (
                       <tr key={c._id || idx}>
-                        <td className="align-middle sticky-col-1 text-truncate" title={c.reportName}>
+                        <td
+                          className="align-middle sticky-col-1 text-truncate camp-name-cell"
+                          title={c.reportName}
+                          data-fullname={c.reportName}
+                        >
                           {c.reportName}
                         </td>
                         <td className="align-middle">
@@ -955,7 +959,7 @@ const Campaign = () => {
                           {/* action buttons as a single row with gap and inline SVG icons */}
 
                           <div
-                            className="d-flex align-items-center justify-content-end"
+                            className="campaign-action-btns d-flex align-items-center justify-content-end"
                             style={{ gap: 8 }}
                           >
                             <button
@@ -1019,7 +1023,7 @@ const Campaign = () => {
                             </button>
 
                             {confirmDeleteId === c._id ? (
-                              <div className="d-flex gap-1 align-items-center">
+                              <div className="btn-campaign-delete d-flex gap-1 align-items-center">
                                 <button
                                   className="btn btn-sm btn-danger px-2"
                                   onClick={() => handleDelete(c._id)}
@@ -1040,7 +1044,7 @@ const Campaign = () => {
                               </div>
                             ) : (
                               <button
-                                className="btn btn-sm btn-outline-danger d-flex align-items-center justify-content-center"
+                                className="btn-campaign-delete btn btn-sm btn-outline-danger d-flex align-items-center justify-content-center"
                                 onClick={() => setConfirmDeleteId(c._id)}
                                 title="Delete"
                                 aria-label="Delete"
@@ -1094,7 +1098,7 @@ const Campaign = () => {
                 tabIndex={-1}
                 style={{ display: "block" }}
               >
-                <div className="modal-dialog modal-lg modal-dialog-centered">
+                <div className="modal-dialog modal-lg modal-dialog-centered" style={{ margin: "10px auto", maxWidth: "min(800px, calc(100% - 20px))" }}>
                   <div className="modal-content">
                     <form onSubmit={handleSave}>
                       <div className="modal-header">
@@ -1110,13 +1114,13 @@ const Campaign = () => {
                         ></button>
                       </div>
                       <div className="modal-body">
-                        <div className="row mb-4">
-                          <div className="col-4 d-flex align-items-center">
+                        <div className="row mb-3">
+                          <div className="col-12 col-md-4 d-flex align-items-center mb-1 mb-md-0">
                             <label className="fw-semibold mb-0">
                               Data Source
                             </label>
                           </div>
-                          <div className="col-8">
+                          <div className="col-12 col-md-8">
                             <div className="btn-group w-100" role="group">
                               <button
                                 type="button"
@@ -1152,12 +1156,12 @@ const Campaign = () => {
                         </div>
 
                         <div className="row mb-3">
-                          <div className="col-4 d-flex align-items-center">
+                          <div className="col-12 col-md-4 d-flex align-items-center mb-1 mb-md-0">
                             <label className="fw-semibold mb-0">
                               Report Name
                             </label>
                           </div>
-                          <div className="col-8">
+                          <div className="col-12 col-md-8">
                             <input
                               name="reportName"
                               value={campaignData?.reportName || ""}
@@ -1171,12 +1175,12 @@ const Campaign = () => {
                         </div>
 
                         <div className="row mb-3">
-                          <div className="col-4 d-flex align-items-center">
+                          <div className="col-12 col-md-4 d-flex align-items-center mb-1 mb-md-0">
                             <label className="fw-semibold mb-0">
                               Advertiser ID
                             </label>
                           </div>
-                          <div className="col-8">
+                          <div className="col-12 col-md-8">
                             <input
                               name="advertiserId"
                               value={campaignData?.advertiserId || ""}
@@ -1190,12 +1194,12 @@ const Campaign = () => {
                         </div>
 
                         <div className="row mb-3">
-                          <div className="col-4 d-flex align-items-center">
+                          <div className="col-12 col-md-4 d-flex align-items-center mb-1 mb-md-0">
                             <label className="fw-semibold mb-0">
                               End Date Campaign
                             </label>
                           </div>
-                          <div className="col-8">
+                          <div className="col-12 col-md-8">
                             <input
                               type="date"
                               name="endDate"
@@ -1209,12 +1213,12 @@ const Campaign = () => {
                         {campaignData?.source === "DV360" && (
                           <>
                             <div className="row mb-3">
-                              <div className="col-4 d-flex align-items-center">
+                              <div className="col-12 col-md-4 d-flex align-items-center mb-1 mb-md-0">
                                 <label className="fw-semibold mb-0">
                                   Campaign ID
                                 </label>
                               </div>
-                              <div className="col-8">
+                              <div className="col-12 col-md-8">
                                 <input
                                   name="campaignId"
                                   value={campaignData?.campaignId || ""}
@@ -1228,12 +1232,12 @@ const Campaign = () => {
                             </div>
 
                             <div className="row mb-3">
-                              <div className="col-4 d-flex align-items-center">
+                              <div className="col-12 col-md-4 d-flex align-items-center mb-1 mb-md-0">
                                 <label className="fw-semibold mb-0">
                                   Insertion Order ID
                                 </label>
                               </div>
-                              <div className="col-8">
+                              <div className="col-12 col-md-8">
                                 <input
                                   name="insertionOrderId"
                                   value={campaignData?.insertionOrderId || ""}
@@ -1248,13 +1252,13 @@ const Campaign = () => {
                           </>
                         )}
                         <div className="row mb-3">
-                          <div className="col-4">
+                          <div className="col-12 col-md-4 mb-1 mb-md-0">
                             <label className="fw-semibold mb-0">
                               Date-wise CPM
                             </label>
                           </div>
-                          <div className="col-8">
-                            <div className="d-flex gap-2 mb-2">
+                          <div className="col-12 col-md-8">
+                            <div className="d-flex flex-column flex-sm-row gap-2 mb-2">
                               <input
                                 type="date"
                                 className="form-control form-control-sm"
@@ -1274,7 +1278,7 @@ const Campaign = () => {
                               />
                               <button
                                 type="button"
-                                className="btn btn-sm btn-outline-primary"
+                                className="btn btn-sm btn-outline-primary px-3"
                                 onClick={handleAddCpmEntry}
                               >
                                 Add
@@ -1319,13 +1323,13 @@ const Campaign = () => {
                         </div>
 
                         <div className="row mb-3">
-                          <div className="col-4">
+                          <div className="col-12 col-md-4 mb-1 mb-md-0">
                             <label className="fw-semibold mb-0">
                               Date-wise CPC
                             </label>
                           </div>
-                          <div className="col-8">
-                            <div className="d-flex gap-2 mb-2">
+                          <div className="col-12 col-md-8">
+                            <div className="d-flex flex-column flex-sm-row gap-2 mb-2">
                               <input
                                 type="date"
                                 className="form-control form-control-sm"
@@ -1345,7 +1349,7 @@ const Campaign = () => {
                               />
                               <button
                                 type="button"
-                                className="btn btn-sm btn-outline-primary"
+                                className="btn btn-sm btn-outline-primary px-3"
                                 onClick={handleAddCpcEntry}
                               >
                                 Add
@@ -1390,13 +1394,13 @@ const Campaign = () => {
                         </div>
 
                         <div className="row mb-3">
-                          <div className="col-4">
+                          <div className="col-12 col-md-4 mb-1 mb-md-0">
                             <label className="fw-semibold mb-0">
                               Date-wise Impression
                             </label>
                           </div>
-                          <div className="col-8">
-                            <div className="d-flex gap-2 mb-2">
+                          <div className="col-12 col-md-8">
+                            <div className="d-flex flex-column flex-sm-row gap-2 mb-2">
                               <input
                                 type="date"
                                 className="form-control form-control-sm"
@@ -1416,7 +1420,7 @@ const Campaign = () => {
                               />
                               <button
                                 type="button"
-                                className="btn btn-sm btn-outline-primary"
+                                className="btn btn-sm btn-outline-primary px-3"
                                 onClick={handleAddImpressionEntry}
                               >
                                 Add
@@ -1461,10 +1465,10 @@ const Campaign = () => {
                         </div>
 
                         <div className="row mb-3">
-                          <div className="col-4 d-flex align-items-center">
+                          <div className="col-12 col-md-4 d-flex align-items-center mb-1 mb-md-0">
                             <label className="fw-semibold mb-0">Currency</label>
                           </div>
-                          <div className="col-8">
+                          <div className="col-12 col-md-8">
                             <input
                               type="text"
                               name="currency"
@@ -1477,12 +1481,12 @@ const Campaign = () => {
                         </div>
 
                         <div className="row mb-3">
-                          <div className="col-4 d-flex align-items-center">
+                          <div className="col-12 col-md-4 d-flex align-items-center mb-1 mb-md-0">
                             <label className="fw-semibold mb-0">
                               Campaign Type
                             </label>
                           </div>
-                          <div className="col-8">
+                          <div className="col-12 col-md-8">
                             <select
                               name="campaignType"
                               value={campaignData?.campaignType || "CTV"}
@@ -1498,12 +1502,12 @@ const Campaign = () => {
                         </div>
 
                         <div className="row mb-3">
-                          <div className="col-4 d-flex align-items-center">
+                          <div className="col-12 col-md-4 d-flex align-items-center mb-1 mb-md-0">
                             <label className="fw-semibold mb-0">
                               Campaign Status
                             </label>
                           </div>
-                          <div className="col-8">
+                          <div className="col-12 col-md-8">
                             <div className="form-check form-switch pt-1">
                               <input
                                 className="form-check-input"
@@ -1575,7 +1579,7 @@ const Campaign = () => {
 
           {showEmailModal && (
             <div className="modal fade show d-block" tabIndex="-1">
-              <div className="modal-dialog modal-dialog-centered">
+              <div className="modal-dialog modal-dialog-centered" style={{ margin: "10px auto", maxWidth: "min(500px, calc(100% - 20px))" }}>
                 <div className="modal-content shadow-lg border-0 rounded-3">
                   {/* Header */}
                   <div className="modal-header py-3">
@@ -1676,7 +1680,7 @@ const Campaign = () => {
           style={{ backgroundColor: "rgba(0,0,0,0.5)", zIndex: 1050 }}
         >
           <div className="modal d-block" tabIndex={-1} style={{ zIndex: 1060 }}>
-            <div className="modal-dialog modal-xl modal-dialog-centered shadow-lg">
+            <div className="modal-dialog modal-xl modal-dialog-centered shadow-lg" style={{ margin: "10px auto", maxWidth: "min(1200px, calc(100% - 20px))" }}>
               <div className="modal-content border-0">
                 <div className="modal-header bg-primary text-white py-3">
                   <h5 className="modal-title d-flex align-items-center">
@@ -1692,10 +1696,10 @@ const Campaign = () => {
                     onClick={closeAppsFlyerModal}
                   ></button>
                 </div>
-                <div className="modal-body p-4 bg-light">
-                  <div className="row">
+                <div className="modal-body p-3 p-md-4 bg-light">
+                  <div className="row g-3 g-md-4">
                     {/* Form Section */}
-                    <div className="col-md-4">
+                    <div className="col-12 col-md-4">
                       <div className="card border-0 shadow-sm">
                         <div className="card-header bg-white border-bottom-0 pt-3 pb-0">
                           <h6 className="fw-bold mb-0 text-primary">
@@ -1732,8 +1736,8 @@ const Campaign = () => {
                                 required
                               />
                             </div>
-                            <div className="row mb-3">
-                              <div className="col">
+                            <div className="row g-2 mb-3">
+                              <div className="col-12 col-sm-6">
                                 <label className="form-label small fw-semibold">
                                   From Date
                                 </label>
@@ -1746,7 +1750,7 @@ const Campaign = () => {
                                   required
                                 />
                               </div>
-                              <div className="col">
+                              <div className="col-12 col-sm-6">
                                 <label className="form-label small fw-semibold">
                                   To Date
                                 </label>
@@ -1954,7 +1958,7 @@ const Campaign = () => {
                     </div>
 
                     {/* List Section */}
-                    <div className="col-md-8">
+                    <div className="col-12 col-md-8">
                       <div className="card border-0 shadow-sm h-100">
                         <div className="card-header bg-white border-bottom-0 pt-3 d-flex justify-content-between align-items-center">
                           <h6 className="fw-bold mb-0 text-primary">
@@ -2161,74 +2165,195 @@ const Campaign = () => {
         </div>
       )}
       <style>{`
-        /* Sticky columns styles */
-        .sticky-col-1 {
-          position: sticky !important;
-          left: 0 !important;
-          z-index: 2 !important;
-          background-color: #fff !important;
-          box-shadow: 2px 0 5px -2px rgba(0,0,0,0.15) !important;
-          min-width: 320px !important;
-          max-width: 320px !important;
-          width: 320px !important;
-          white-space: nowrap !important;
-          overflow: hidden !important;
-          text-overflow: ellipsis !important;
+        /* Mobile press-and-hold name tooltip (CSS-only, no JS) */
+        .camp-name-cell {
+          position: relative;
+        }
+        .camp-name-cell::after {
+          content: attr(data-fullname);
+          position: absolute;
+          bottom: calc(100% + 8px);
+          left: 0;
+          background: #1E293B;
+          color: #fff;
+          font-size: 12px;
+          font-weight: 500;
+          padding: 7px 11px;
+          border-radius: 8px;
+          white-space: normal;
+          word-break: break-word;
+          max-width: 260px;
+          min-width: 140px;
+          z-index: 9999;
+          box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+          pointer-events: none;
+          line-height: 1.5;
+          opacity: 0;
+          visibility: hidden;
+          transition: opacity 0.15s ease;
+        }
+        .camp-name-cell::before {
+          content: '';
+          position: absolute;
+          bottom: calc(100% + 2px);
+          left: 16px;
+          border: 6px solid transparent;
+          border-top-color: #1E293B;
+          z-index: 9999;
+          opacity: 0;
+          visibility: hidden;
+          transition: opacity 0.15s ease;
+        }
+        .camp-name-cell:active::after,
+        .camp-name-cell:active::before {
+          opacity: 1;
+          visibility: visible;
         }
 
-        .sticky-col-cron {
-          position: sticky !important;
-          right: 380px !important;
-          z-index: 2 !important;
-          background-color: #fff !important;
-          box-shadow: -2px 0 5px -2px rgba(0,0,0,0.15) !important;
-          min-width: 160px !important;
-          max-width: 160px !important;
-          width: 160px !important;
+        /* Sticky columns styles - enabled on desktop screens (>=992px) */
+        @media (min-width: 992px) {
+          .sticky-col-1 {
+            position: sticky !important;
+            left: 0 !important;
+            z-index: 2 !important;
+            background-color: #fff !important;
+            box-shadow: 2px 0 5px -2px rgba(0,0,0,0.15) !important;
+            min-width: 320px !important;
+            max-width: 320px !important;
+            width: 320px !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+          }
+
+          .sticky-col-cron {
+            position: sticky !important;
+            right: 380px !important;
+            z-index: 2 !important;
+            background-color: #fff !important;
+            box-shadow: -2px 0 5px -2px rgba(0,0,0,0.15) !important;
+            min-width: 160px !important;
+            max-width: 160px !important;
+            width: 160px !important;
+          }
+
+          .sticky-col-actions {
+            position: sticky !important;
+            right: 0 !important;
+            z-index: 2 !important;
+            background-color: #fff !important;
+            box-shadow: -2px 0 5px -2px rgba(0,0,0,0.15) !important;
+            min-width: 380px !important;
+            max-width: 380px !important;
+            width: 380px !important;
+          }
+
+          /* Header sticky cells should have higher z-index */
+          th.sticky-col-1 {
+            z-index: 3 !important;
+            background-color: #f8f9fa !important;
+          }
+          th.sticky-col-cron {
+            z-index: 3 !important;
+            background-color: #f8f9fa !important;
+          }
+          th.sticky-col-actions {
+            z-index: 3 !important;
+            background-color: #f8f9fa !important;
+          }
+
+          /* Striping and Hover for sticky columns */
+          .table-striped tbody tr:nth-of-type(odd) .sticky-col-1,
+          .table-striped tbody tr:nth-of-type(odd) .sticky-col-cron,
+          .table-striped tbody tr:nth-of-type(odd) .sticky-col-actions {
+            background-color: #f8f9fa !important;
+          }
+
+          .table-striped tbody tr:nth-of-type(even) .sticky-col-1,
+          .table-striped tbody tr:nth-of-type(even) .sticky-col-cron,
+          .table-striped tbody tr:nth-of-type(even) .sticky-col-actions {
+            background-color: #fff !important;
+          }
+
+          .table-hover tbody tr:hover .sticky-col-1,
+          .table-hover tbody tr:hover .sticky-col-cron,
+          .table-hover tbody tr:hover .sticky-col-actions {
+            background-color: #ececec !important;
+          }
         }
 
-        .sticky-col-actions {
-          position: sticky !important;
-          right: 0 !important;
-          z-index: 2 !important;
-          background-color: #fff !important;
-          box-shadow: -2px 0 5px -2px rgba(0,0,0,0.15) !important;
-          min-width: 380px !important;
-          max-width: 380px !important;
-          width: 380px !important;
+        .campaign-action-btns {
+          gap: 8px;
         }
 
-        /* Header sticky cells should have higher z-index */
-        th.sticky-col-1 {
-          z-index: 3 !important;
-          background-color: #f8f9fa !important;
-        }
-        th.sticky-col-cron {
-          z-index: 3 !important;
-          background-color: #f8f9fa !important;
-        }
-        th.sticky-col-actions {
-          z-index: 3 !important;
-          background-color: #f8f9fa !important;
+        .btn-campaign-delete {
+          margin-left: 4px;
+          margin-right: 4px;
         }
 
-        /* Striping and Hover for sticky columns */
-        .table-striped tbody tr:nth-of-type(odd) .sticky-col-1,
-        .table-striped tbody tr:nth-of-type(odd) .sticky-col-cron,
-        .table-striped tbody tr:nth-of-type(odd) .sticky-col-actions {
-          background-color: #f8f9fa !important;
-        }
+        /* Mobile & Tablet styles (<992px): keep Report Name sticky on left while scrolling right */
+        @media (max-width: 991.98px) {
+          .sticky-col-1 {
+            position: sticky !important;
+            left: 0 !important;
+            z-index: 5 !important;
+            background-color: #fff !important;
+            box-shadow: 2px 0 6px -2px rgba(0,0,0,0.2) !important;
+            min-width: 140px !important;
+            max-width: 170px !important;
+            width: 150px !important;
+            white-space: normal !important;
+            word-break: break-word !important;
+            font-size: 0.85rem !important;
+          }
 
-        .table-striped tbody tr:nth-of-type(even) .sticky-col-1,
-        .table-striped tbody tr:nth-of-type(even) .sticky-col-cron,
-        .table-striped tbody tr:nth-of-type(even) .sticky-col-actions {
-          background-color: #fff !important;
-        }
+          th.sticky-col-1 {
+            position: sticky !important;
+            left: 0 !important;
+            z-index: 6 !important;
+            background-color: #f8f9fa !important;
+            box-shadow: 2px 0 6px -2px rgba(0,0,0,0.2) !important;
+          }
 
-        .table-hover tbody tr:hover .sticky-col-1,
-        .table-hover tbody tr:hover .sticky-col-cron,
-        .table-hover tbody tr:hover .sticky-col-actions {
-          background-color: #ececec !important;
+          .table-striped tbody tr:nth-of-type(odd) .sticky-col-1 {
+            background-color: #f8f9fa !important;
+          }
+
+          .table-striped tbody tr:nth-of-type(even) .sticky-col-1 {
+            background-color: #fff !important;
+          }
+
+          .table-hover tbody tr:hover .sticky-col-1 {
+            background-color: #ececec !important;
+          }
+
+          .sticky-col-cron,
+          .sticky-col-actions {
+            position: static !important;
+            box-shadow: none !important;
+            right: auto !important;
+            left: auto !important;
+          }
+
+          .sticky-col-cron {
+            min-width: 130px !important;
+            white-space: nowrap !important;
+          }
+
+          .sticky-col-actions {
+            min-width: 440px !important;
+            white-space: nowrap !important;
+          }
+
+          .campaign-action-btns {
+            gap: 10px !important;
+          }
+
+          /* Generous safety gap on mobile around delete button to avoid accidental touches */
+          .btn-campaign-delete {
+            margin-left: 28px !important;
+            margin-right: 28px !important;
+          }
         }
       `}</style>
     </>

@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useMemo } from "react";
-import { TablePagination, distributeInteger } from "./Shared";
+import { TablePagination } from "./Shared";
 
 const PAGE_SIZE = 10;
 
@@ -24,16 +24,23 @@ const getPriceForDate = (pricingObj, targetDate) => {
   return latestValue;
 };
 
-export function UrlTable({ urlData: propData, campaignPricing, globalEffectiveMetrics, selectedAudience }) {
+export function UrlTable({ urlData: propData, campaignPricing, globalEffectiveMetrics, selectedAudience, appsflyerData }) {
   const [currentPage, setCurrentPage] = useState(1);
 
   const hasVideo = !!globalEffectiveMetrics?.hasVideoData;
   const hasAF = !!globalEffectiveMetrics?.hasAppsflyerData;
-  const totalInstalls = Number(globalEffectiveMetrics?.installs || 0);
-  const totalConversions = Number(globalEffectiveMetrics?.conversions || 0);
+  const targetInstalls = Math.round(Number(globalEffectiveMetrics?.installs || 0));
+  const targetConversions = Math.round(Number(globalEffectiveMetrics?.conversions || 0));
+  const targetImpressions = Number(globalEffectiveMetrics?.impressions || 0);
 
   const ctype = String(selectedAudience?.campaignType || selectedAudience?.campaign_type || "").toUpperCase();
   const isCtvWithAF = ctype.includes("CTV") && hasAF;
+
+  const afData = appsflyerData || globalEffectiveMetrics?.appsflyerData || [];
+  const appsflyerDataLength = afData.length || selectedAudience?.appsflyerDataLength || (hasAF ? 1 : 0);
+  const totalAfClicks = (appsflyerDataLength > 0 && afData.length > 0)
+    ? afData.reduce((sum, item) => sum + Number(item.clicks || 0), 0)
+    : (globalEffectiveMetrics?.totalAfClicks || 0);
 
   const effectiveCpm = useMemo(() => {
     let cpmRate = 0;
@@ -59,119 +66,22 @@ export function UrlTable({ urlData: propData, campaignPricing, globalEffectiveMe
     return undefined;
   }, [campaignPricing]);
 
-  const isCpcDefined = anyCpcRate !== undefined;
+  const isCpcDefined = anyCpcRate !== undefined && anyCpcRate > 0; // CPC=0 means it's a CPM campaign
   const isCpmCampaign = hasAF ? true : ((anyCpmRate > 0) || !!globalEffectiveMetrics?.isCpmCampaign);
   const isCpcCampaign = hasAF ? true : (isCpcDefined || !!globalEffectiveMetrics?.isCpcCampaign);
 
   const list = useMemo(() => {
     if (!Array.isArray(propData) || propData.length === 0) return [];
 
-    if (hasAF) {
-      // 100% UNTOUCHED AppsFlyer Logic
-      const globalTargetImp = Number(globalEffectiveMetrics?.impressions || 0);
-      const rawList = propData.map(r => {
-        const imp = Number(r.Impressions || r.impressions || 0);
-        const clk = Number(r.Clicks || r.clicks || 0);
-        const ctrRaw = Number(r.CTR || r.ctr || 0);
-        const cpmVal = effectiveCpm || Number(r.CPM || r.cpm || r.eCPM || 320);
-
-        const vComplete = hasVideo ? Number(r.completeViewsVideo || r.CompleteViewsVideo || r.complete_views || r.completeViews || 0) : 0;
-        const vFirstQ = hasVideo ? Number(r.firstQuartileViewsVideo || r.FirstQuartileViewsVideo || 0) : 0;
-        const vMidpoint = hasVideo ? Number(r.midpointViewsVideo || r.MidpointViewsVideo || 0) : 0;
-        const vThirdQ = hasVideo ? Number(r.thirdQuartileViewsVideo || r.ThirdQuartileViewsVideo || 0) : 0;
-        const vViews = hasVideo ? Number(r.Views || r.views || r.VideoViews || vComplete || 0) : 0;
-
-        return {
-          url: r.name || r.Url || r.url || r.Domain || r.domain || "Unknown URL",
-          rawImp: imp,
-          rawClicks: clk,
-          ctrRaw,
-          cpmVal,
-          vComplete,
-          vFirstQ,
-          vMidpoint,
-          vThirdQ,
-          vViews,
-        };
-      });
-
-      const totalImpSum = rawList.reduce((a, r) => a + r.rawImp, 0);
-      const targetTotalImp = globalTargetImp > 0 ? globalTargetImp : totalImpSum;
-
-      const weights = rawList.map(r => r.rawClicks > 0 ? r.rawClicks : r.rawImp);
-      const convAllocated = distributeInteger(totalConversions, weights);
-      const instAllocated = distributeInteger(totalInstalls, weights);
-
-      let allocatedImp = 0;
-      return rawList.map((r, idx) => {
-        let scaledImp = 0;
-        if (idx === rawList.length - 1) {
-          scaledImp = Math.max(0, targetTotalImp - allocatedImp);
-        } else {
-          const impRatio = totalImpSum > 0 ? r.rawImp / totalImpSum : (1 / rawList.length);
-          scaledImp = Math.round(targetTotalImp * impRatio);
-          allocatedImp += scaledImp;
-        }
-
-        const clk = r.rawClicks;
-        const ctrVal = r.ctrRaw > 1 ? r.ctrRaw : (scaledImp > 0 ? (clk / scaledImp * 100) : 0);
-        const spent = (scaledImp / 1000) * (effectiveCpm || 320);
-        const cpmVal = effectiveCpm || 320;
-
-        const vViews = hasVideo ? (r.vViews > 0 ? Math.round(r.vViews * (totalImpSum > 0 ? scaledImp / totalImpSum : 1)) : Math.round(scaledImp * 0.98836)) : 0;
-        const vComplete = hasVideo ? (r.vComplete > 0 ? Math.round(r.vComplete * (totalImpSum > 0 ? scaledImp / totalImpSum : 1)) : Math.round(scaledImp * 0.8846)) : 0;
-        const vFirstQ = hasVideo ? (r.vFirstQ > 0 ? Math.round(r.vFirstQ * (totalImpSum > 0 ? scaledImp / totalImpSum : 1)) : Math.round(scaledImp * 0.9474)) : 0;
-        const vMidpoint = hasVideo ? (r.vMidpoint > 0 ? Math.round(r.vMidpoint * (totalImpSum > 0 ? scaledImp / totalImpSum : 1)) : Math.round(scaledImp * 0.9222)) : 0;
-        const vThirdQ = hasVideo ? (r.vThirdQ > 0 ? Math.round(r.vThirdQ * (totalImpSum > 0 ? scaledImp / totalImpSum : 1)) : Math.round(scaledImp * 0.8999)) : 0;
-
-        const cpvVal = vViews > 0 ? spent / vViews : 0;
-        const cpcvVal = vComplete > 0 ? spent / vComplete : 0;
-
-        const inst = instAllocated[idx] || 0;
-        const conv = convAllocated[idx] || 0;
-
-        return {
-          url: r.url,
-          rawImp: scaledImp,
-          rawClicks: clk,
-          rawSpent: spent,
-          impressions: scaledImp.toLocaleString('en-IN'),
-          clicks: clk.toLocaleString('en-IN'),
-          ctr: ctrVal.toFixed(2) + "%",
-          cpmVal,
-          cpm: "₹" + cpmVal.toFixed(2),
-          cpc: "₹0.00",
-          spentFormatted: "₹" + spent.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-          rawViews: vViews,
-          rawComplete: vComplete,
-          rawFirstQ: vFirstQ,
-          rawMidpoint: vMidpoint,
-          rawThirdQ: vThirdQ,
-          cpvVal,
-          cpcvVal,
-          installs: inst,
-          conversions: conv,
-          installsFormatted: inst.toLocaleString('en-IN'),
-          conversionsFormatted: conv.toLocaleString('en-IN'),
-        };
-      });
-    }
-
-    // NON-APPSFLYER: Match Preview UrlTable exactly
     const groups = {};
+
     propData.forEach(row => {
-      const title = (row.name || row.url || row.Url || row.domain || row.Domain || row.site || "Unknown URL").trim();
+      const title = (row.name || row.url || row.Url || row.domain || row.Domain || row.site || "-").trim();
       if (!title || title.toLowerCase() === "null" || title.toLowerCase() === "undefined") return;
 
-      const imp = Number(row.rawImp !== undefined ? row.rawImp : (row.Impressions || row.impressions || 0));
-      const cks = Number(row.rawClicks !== undefined ? row.rawClicks : (row.Clicks || row.clicks || 0));
+      const imp = Number(row.Impressions || row.impressions || row.rawImp || 0);
+      const cks = Number(row.Clicks || row.clicks || row.rawClicks || 0);
       const rowDate = row.Date || row.date || "";
-
-      const vComplete = hasVideo ? Number(row.completeViewsVideo || row.CompleteViewsVideo || row.complete_views || row.completeViews || 0) : 0;
-      const vFirstQ = hasVideo ? Number(row.firstQuartileViewsVideo || row.FirstQuartileViewsVideo || 0) : 0;
-      const vMidpoint = hasVideo ? Number(row.midpointViewsVideo || row.MidpointViewsVideo || 0) : 0;
-      const vThirdQ = hasVideo ? Number(row.thirdQuartileViewsVideo || row.ThirdQuartileViewsVideo || 0) : 0;
-      const vViews = hasVideo ? Number(row.Views || row.views || row.VideoViews || vComplete || 0) : 0;
 
       const datePriceCPM = getPriceForDate(campaignPricing?.cpm, rowDate);
       const datePriceCPC = getPriceForDate(campaignPricing?.cpc, rowDate);
@@ -192,44 +102,147 @@ export function UrlTable({ urlData: propData, campaignPricing, globalEffectiveMe
         rowSpent = rCPM > 0 ? (imp / 1000) * rCPM : (cks * rCPC);
       }
 
+      const vComplete = hasVideo ? Number(row.completeViewsVideo || row.CompleteViewsVideo || row.complete_views || row.completeViews || 0) : 0;
+      const vFirstQ = hasVideo ? Number(row.firstQuartileViewsVideo || row.FirstQuartileViewsVideo || 0) : 0;
+      const vMidpoint = hasVideo ? Number(row.midpointViewsVideo || row.MidpointViewsVideo || 0) : 0;
+      const vThirdQ = hasVideo ? Number(row.thirdQuartileViewsVideo || row.ThirdQuartileViewsVideo || 0) : 0;
+      const vViews = hasVideo ? Number(row.Views || row.views || row.VideoViews || vComplete || 0) : 0;
+
       if (!groups[title]) {
         groups[title] = {
+          Title: title,
           url: title,
-          rawImp: 0,
-          rawClicks: 0,
-          rawSpent: 0,
+          Impressions: 0,
+          Clicks: 0,
+          Spent: 0,
+          TotalConversions: 0,
+          Installs: 0,
           rawViews: 0,
           rawComplete: 0,
           rawFirstQ: 0,
           rawMidpoint: 0,
           rawThirdQ: 0,
-          installs: 0,
-          conversions: 0,
         };
       }
 
-      groups[title].rawImp += imp;
-      groups[title].rawClicks += cks;
-      groups[title].rawSpent += rowSpent;
-      groups[title].rawViews += vViews;
-      groups[title].rawComplete += vComplete;
-      groups[title].rawFirstQ += vFirstQ;
-      groups[title].rawMidpoint += vMidpoint;
-      groups[title].rawThirdQ += vThirdQ;
+      groups[title].Impressions += imp;
+      groups[title].Clicks += cks;
+      groups[title].Spent += rowSpent;
+      if (hasVideo) {
+        groups[title].rawViews += vViews;
+        groups[title].rawComplete += vComplete;
+        groups[title].rawFirstQ += vFirstQ;
+        groups[title].rawMidpoint += vMidpoint;
+        groups[title].rawThirdQ += vThirdQ;
+      }
     });
 
     const result = Object.values(groups);
-    result.sort((a, b) => b.rawImp - a.rawImp);
+
+    if (result.length === 0 && (totalAfClicks > 0 || targetConversions > 0 || targetInstalls > 0)) {
+      result.push({
+        Title: "Other",
+        url: "Other",
+        Impressions: 0,
+        Clicks: totalAfClicks,
+        Spent: 0,
+        TotalConversions: targetConversions,
+        Installs: targetInstalls,
+        rawViews: 0,
+        rawComplete: 0,
+        rawFirstQ: 0,
+        rawMidpoint: 0,
+        rawThirdQ: 0,
+      });
+    }
+
+    // Scale impressions if targetImpressions is defined and differs
+    const totalImpressions = result.reduce((sum, g) => sum + g.Impressions, 0);
+    if (targetImpressions > 0 && totalImpressions > 0 && targetImpressions !== totalImpressions) {
+      let allocatedImp = 0;
+      result.forEach((g, idx) => {
+        if (idx === result.length - 1) {
+          g.Impressions = Math.max(0, targetImpressions - allocatedImp);
+        } else {
+          const ratio = g.Impressions / totalImpressions;
+          const scaled = Math.round(targetImpressions * ratio);
+          g.Impressions = scaled;
+          allocatedImp += scaled;
+        }
+      });
+    }
+
+    // Distribute Installs and Conversions: clicks if present, otherwise impressions
+    let summedConv = 0;
+    let summedInst = 0;
+    const hasClicks = result.some(g => Number(g.Clicks || 0) > 0);
+    const currentTotalBase = result.reduce((sum, g) => sum + (hasClicks ? Number(g.Clicks || 0) : Number(g.Impressions || 0)), 0);
+
+    const isConvInteger = Number.isInteger(targetConversions);
+    result.forEach((g, idx) => {
+      const metricVal = hasClicks ? Number(g.Clicks || 0) : Number(g.Impressions || 0);
+      const share = currentTotalBase > 0 ? metricVal / currentTotalBase : (result.length > 0 ? 1 / result.length : 0);
+      if (idx === result.length - 1) {
+        g.TotalConversions = isConvInteger ? Math.round(targetConversions - summedConv) : parseFloat((targetConversions - summedConv).toFixed(2));
+        g.Installs = Math.round(targetInstalls - summedInst);
+      } else {
+        const cVal = isConvInteger ? Math.round(targetConversions * share) : parseFloat((targetConversions * share).toFixed(2));
+        g.TotalConversions = cVal;
+        g.Installs = Math.round(targetInstalls * share);
+        summedConv += g.TotalConversions;
+        summedInst += g.Installs;
+      }
+    });
+
+    // Distribute AppsFlyer clicks if appsflyerDataLength > 0
+    if (appsflyerDataLength > 0 && totalAfClicks > 0) {
+      const totalBaseClicks = result.reduce((sum, g) => sum + g.Clicks, 0);
+
+      if (totalBaseClicks > 0) {
+        let summedClicks = 0;
+        result.forEach(g => {
+          const clickPct = g.Clicks / totalBaseClicks;
+          const clicksToAdd = totalAfClicks * clickPct;
+          g.Clicks = Math.round(g.Clicks + clicksToAdd);
+          summedClicks += g.Clicks;
+        });
+
+        if (result.length > 0) {
+          const targetClicks = totalBaseClicks + totalAfClicks;
+          const diffClicks = targetClicks - summedClicks;
+          if (diffClicks !== 0) {
+            const largest = result.reduce((prev, current) => (prev.Clicks > current.Clicks) ? prev : current);
+            largest.Clicks += diffClicks;
+          }
+        }
+      } else if (totalBaseClicks === 0) {
+        if (result.length > 0) {
+          let summedClicks = 0;
+          result.forEach((g, idx) => {
+            let clicksToAdd = 0;
+            if (idx === result.length - 1) {
+              clicksToAdd = totalAfClicks - summedClicks;
+            } else {
+              clicksToAdd = Math.round(totalAfClicks / result.length);
+              summedClicks += clicksToAdd;
+            }
+            g.Clicks = clicksToAdd;
+          });
+        }
+      }
+    }
+
+    result.sort((a, b) => b.Impressions - a.Impressions);
 
     return result.map(g => {
-      const imp = g.rawImp;
-      const clk = g.rawClicks;
-      const spent = g.rawSpent;
-      const ctrVal = imp > 0 ? (clk / imp * 100).toFixed(2) + "%" : "0.00%";
+      const imp = g.Impressions;
+      const clk = g.Clicks;
+      const spent = g.Spent;
+      const ctrVal = imp > 0 ? (clk / imp) * 100 : 0;
       const cpmVal = isCpmCampaign ? (imp > 0 ? (spent / imp) * 1000 : 0) : 0;
-      const cpcVal = isCpcCampaign
-        ? (isCpcDefined ? (Number(anyCpcRate) === 0 ? 0 : (clk > 0 ? spent / clk : Number(anyCpcRate))) : (clk > 0 ? spent / clk : 0))
-        : (clk > 0 ? spent / clk : 0);
+      // Only compute a meaningful CPC when the campaign is actually CPC-priced (rate > 0).
+      // For CPM campaigns where CPC rate is 0, show 0 to avoid spend/clicks nonsense.
+      const cpcVal = (isCpcCampaign && !isCpmCampaign && clk > 0) ? (spent / clk) : 0;
 
       const vViews = hasVideo ? (g.rawViews > 0 ? g.rawViews : Math.round(imp * 0.98836)) : 0;
       const vComplete = hasVideo ? (g.rawComplete > 0 ? g.rawComplete : Math.round(imp * 0.8846)) : 0;
@@ -241,15 +254,18 @@ export function UrlTable({ urlData: propData, campaignPricing, globalEffectiveMe
       const cpcvVal = vComplete > 0 ? spent / vComplete : 0;
 
       return {
-        ...g,
-        impressions: imp.toLocaleString('en-IN'),
-        clicks: clk.toLocaleString('en-IN'),
-        ctr: ctrVal,
+        url: g.url,
+        rawImp: imp,
+        rawClicks: clk,
+        rawSpent: spent,
+        impressions: imp.toLocaleString(),
+        clicks: clk.toLocaleString(),
+        ctr: ctrVal.toFixed(2) + "%",
         cpmVal,
         cpm: "₹" + cpmVal.toFixed(2),
         cpcVal,
         cpc: "₹" + cpcVal.toFixed(2),
-        spentFormatted: "₹" + spent.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        spentFormatted: "₹" + spent.toFixed(2),
         rawViews: vViews,
         rawComplete: vComplete,
         rawFirstQ: vFirstQ,
@@ -257,50 +273,46 @@ export function UrlTable({ urlData: propData, campaignPricing, globalEffectiveMe
         rawThirdQ: vThirdQ,
         cpvVal,
         cpcvVal,
-        installsFormatted: (g.installs || 0).toLocaleString('en-IN'),
-        conversionsFormatted: (g.conversions || 0).toLocaleString('en-IN'),
+        installs: g.Installs,
+        conversions: g.TotalConversions,
+        installsFormatted: Math.round(g.Installs).toLocaleString(),
+        conversionsFormatted: Math.round(g.TotalConversions).toLocaleString(),
       };
     });
-  }, [propData, effectiveCpm, anyCpmRate, anyCpcRate, isCpcDefined, isCpmCampaign, isCpcCampaign, hasAF, hasVideo, totalInstalls, totalConversions, globalEffectiveMetrics, campaignPricing]);
+  }, [propData, campaignPricing, globalEffectiveMetrics, selectedAudience, appsflyerData, effectiveCpm, hasAF, hasVideo, totalAfClicks, targetInstalls, targetConversions, targetImpressions, appsflyerDataLength, isCpmCampaign]);
 
   const totals = useMemo(() => {
     const totalImpr = list.reduce((a, r) => a + r.rawImp, 0);
     const totalClicks = list.reduce((a, r) => a + r.rawClicks, 0);
+    const totalSpent = list.reduce((a, r) => a + r.rawSpent, 0);
     const avgCtr = totalImpr > 0 ? (totalClicks / totalImpr * 100).toFixed(2) + "%" : "0.00%";
+    const avgCpm = isCpmCampaign && totalImpr > 0 ? "₹" + ((totalSpent / totalImpr) * 1000).toFixed(2) : "₹0.00";
+    const avgCpc = (isCpcCampaign && !isCpmCampaign && totalClicks > 0) ? "₹" + (totalSpent / totalClicks).toFixed(2) : "₹0.00";
+
     const totalViews = list.reduce((a, r) => a + r.rawViews, 0);
     const totalComplete = list.reduce((a, r) => a + r.rawComplete, 0);
     const totalFirstQ = list.reduce((a, r) => a + r.rawFirstQ, 0);
     const totalMidpoint = list.reduce((a, r) => a + r.rawMidpoint, 0);
     const totalThirdQ = list.reduce((a, r) => a + r.rawThirdQ, 0);
-    
-    const totalSpent = hasAF 
-      ? (totalImpr / 1000) * effectiveCpm 
-      : list.reduce((sum, r) => sum + (r.rawSpent || 0), 0);
-    const avgCpm = hasAF 
-      ? "₹" + effectiveCpm.toFixed(2) 
-      : (isCpmCampaign && totalImpr > 0 ? "₹" + ((totalSpent / totalImpr) * 1000).toFixed(2) : "₹0.00");
-    const avgCpc = isCpcCampaign
-      ? (isCpcDefined && Number(anyCpcRate) === 0 ? "₹0.00" : (totalClicks > 0 ? "₹" + (totalSpent / totalClicks).toFixed(2) : (isCpcDefined ? "₹" + Number(anyCpcRate).toFixed(2) : "₹0.00")))
-      : (totalClicks > 0 ? "₹" + (totalSpent / totalClicks).toFixed(2) : "₹0.00");
 
     return {
-      totalImpr: totalImpr.toLocaleString('en-IN'),
-      totalClicks: totalClicks.toLocaleString('en-IN'),
+      totalImpr: totalImpr.toLocaleString(),
+      totalClicks: totalClicks.toLocaleString(),
       avgCtr,
       avgCpm,
       avgCpc,
-      totalSpentFormatted: "₹" + totalSpent.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-      totalViews: totalViews.toLocaleString('en-IN'),
-      totalComplete: totalComplete.toLocaleString('en-IN'),
-      totalFirstQ: totalFirstQ.toLocaleString('en-IN'),
-      totalMidpoint: totalMidpoint.toLocaleString('en-IN'),
-      totalThirdQ: totalThirdQ.toLocaleString('en-IN'),
+      totalSpentFormatted: "₹" + totalSpent.toFixed(2),
+      totalViews: totalViews.toLocaleString(),
+      totalComplete: totalComplete.toLocaleString(),
+      totalFirstQ: totalFirstQ.toLocaleString(),
+      totalMidpoint: totalMidpoint.toLocaleString(),
+      totalThirdQ: totalThirdQ.toLocaleString(),
       avgCpv: "₹" + (totalViews > 0 ? totalSpent / totalViews : 0).toFixed(2),
       avgCpcv: "₹" + (totalComplete > 0 ? totalSpent / totalComplete : 0).toFixed(2),
-      totalInstalls: totalInstalls.toLocaleString('en-IN'),
-      totalConversions: totalConversions.toLocaleString('en-IN'),
+      totalInstalls: targetInstalls.toLocaleString(),
+      totalConversions: targetConversions.toLocaleString(),
     };
-  }, [list, effectiveCpm, hasAF, isCpmCampaign, isCpcCampaign, anyCpcRate, totalInstalls, totalConversions]);
+  }, [list, isCpmCampaign, targetInstalls, targetConversions]);
 
   const totalPages = Math.ceil(list.length / PAGE_SIZE) || 1;
   const startIndex = (currentPage - 1) * PAGE_SIZE;
@@ -332,8 +344,8 @@ export function UrlTable({ urlData: propData, campaignPricing, globalEffectiveMe
               {!isCtvWithAF && <th>CLICKS</th>}
               {!isCtvWithAF && <th>CTR</th>}
               {!isCtvWithAF && <th>CPM</th>}
-              {!hasAF && !isCtvWithAF && <th>CPC</th>}
-              {!hasAF && !isCtvWithAF && <th>SPEND</th>}
+              {!isCtvWithAF && <th>CPC</th>}
+              {!isCtvWithAF && <th>SPEND</th>}
               {hasVideo && <th>VIEWS</th>}
               {hasVideo && !isCtvWithAF && <th>CPV</th>}
               {hasVideo && <th>1ST QUARTILE VIEWS</th>}
@@ -357,14 +369,14 @@ export function UrlTable({ urlData: propData, campaignPricing, globalEffectiveMe
                     {!isCtvWithAF && <td>{r.clicks}</td>}
                     {!isCtvWithAF && <td>{r.ctr}</td>}
                     {!isCtvWithAF && <td>{r.cpm}</td>}
-                    {!hasAF && !isCtvWithAF && <td>{r.cpc}</td>}
-                    {!hasAF && !isCtvWithAF && <td>{r.spentFormatted}</td>}
-                    {hasVideo && <td>{r.rawViews.toLocaleString('en-IN')}</td>}
+                    {!isCtvWithAF && <td>{r.cpc}</td>}
+                    {!isCtvWithAF && <td>{r.spentFormatted}</td>}
+                    {hasVideo && <td>{r.rawViews.toLocaleString()}</td>}
                     {hasVideo && !isCtvWithAF && <td>₹{r.cpvVal.toFixed(2)}</td>}
-                    {hasVideo && <td>{r.rawFirstQ.toLocaleString('en-IN')}</td>}
-                    {hasVideo && <td>{r.rawMidpoint.toLocaleString('en-IN')}</td>}
-                    {hasVideo && <td>{r.rawThirdQ.toLocaleString('en-IN')}</td>}
-                    {hasVideo && <td>{r.rawComplete.toLocaleString('en-IN')}</td>}
+                    {hasVideo && <td>{r.rawFirstQ.toLocaleString()}</td>}
+                    {hasVideo && <td>{r.rawMidpoint.toLocaleString()}</td>}
+                    {hasVideo && <td>{r.rawThirdQ.toLocaleString()}</td>}
+                    {hasVideo && <td>{r.rawComplete.toLocaleString()}</td>}
                     {hasVideo && !isCtvWithAF && <td>₹{r.cpcvVal.toFixed(2)}</td>}
                     {hasAF && <td>{r.installsFormatted}</td>}
                     <td style={{ paddingRight: "22px" }}>{r.conversionsFormatted}</td>
@@ -376,8 +388,8 @@ export function UrlTable({ urlData: propData, campaignPricing, globalEffectiveMe
                   {!isCtvWithAF && <td>{totals.totalClicks}</td>}
                   {!isCtvWithAF && <td>{totals.avgCtr}</td>}
                   {!isCtvWithAF && <td>{totals.avgCpm}</td>}
-                  {!hasAF && !isCtvWithAF && <td>{totals.avgCpc}</td>}
-                  {!hasAF && !isCtvWithAF && <td>{totals.totalSpentFormatted}</td>}
+                  {!isCtvWithAF && <td>{totals.avgCpc}</td>}
+                  {!isCtvWithAF && <td>{totals.totalSpentFormatted}</td>}
                   {hasVideo && <td>{totals.totalViews}</td>}
                   {hasVideo && !isCtvWithAF && <td>{totals.avgCpv}</td>}
                   {hasVideo && <td>{totals.totalFirstQ}</td>}

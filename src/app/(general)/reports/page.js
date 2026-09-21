@@ -28,11 +28,11 @@ import { UrlTable } from "./components/UrlTable";
 import { TrendChart } from "./components/TrendChartPreview";
 import { GenderChart, AgeChart } from "./components/DemographicsPanels";
 import { PlacementPositionPanel, PlacementTypePanel } from "./components/PlacementPanels";
-import { TablePagination, distributeInteger } from "./components/Shared";
+import { TablePagination, distributeInteger, distributeValues, getDistributionWeights } from "./components/Shared";
 import topTost from "@/utils/topTost";
 
 const SectionHeader = ({ title }) => (
-  <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "16px 24px 16px" }}>
+  <div className="st-sec-header" style={{ display: "flex", alignItems: "center", gap: 12, margin: "16px 16px 14px" }}>
     <span style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", letterSpacing: "0.12em", textTransform: "uppercase" }}>{title}</span>
     <div style={{ flex: 1, height: 1, background: "#CBD5E1" }} />
   </div>
@@ -176,6 +176,18 @@ export default function DashboardRedesignPage() {
   ]);
   const calRef = useRef(null);
   const searchRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const blurTimerRef = useRef(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const setPreset = (type) => {
     const today = new Date();
@@ -1039,13 +1051,70 @@ export default function DashboardRedesignPage() {
       totalVideoThirdQ += vThirdQ;
     });
 
+    if (hasAppsflyerData) {
+      const existingDates = new Set(enrichedTableData.map(r => normalizeDate(r.period || r.Date || r.date)));
+      Object.keys(afMap).forEach(d => {
+        if (!existingDates.has(d)) {
+          const af = afMap[d];
+          if (af && (af.installs > 0 || af.af_payment_unique > 0 || af.eventCount > 0 || af.afclicks > 0)) {
+            const rowInstalls = af.installs;
+            let rowConversions = af.af_payment_unique;
+            if (rowConversions === 0 && af.afclicks > 0) {
+              rowConversions = Math.round(af.afclicks * 0.011194);
+            }
+            const rowEventCount = af.eventCount || 0;
+
+            enrichedTableData.push({
+              period: d,
+              date: d,
+              Date: d,
+              Impressions: 0,
+              impressions: 0,
+              Clicks: 0,
+              clicks: 0,
+              Reach: 0,
+              reach: 0,
+              computedInstalls: rowInstalls,
+              computedConversions: rowConversions,
+              computedEventCount: rowEventCount,
+              computedSpend: 0,
+              computedRoas: 0,
+              computedCpm: 0,
+              computedCtr: 0,
+              computedCpc: 0,
+              computedReach: 0,
+              computedFreq: 0,
+              computedViews: 0,
+              computedCpv: 0,
+              computedCpcv: 0,
+              computedVcr: 0,
+              computedVideoComplete: 0,
+              computedVideoFirstQ: 0,
+              computedVideoMidpoint: 0,
+              computedVideoThirdQ: 0,
+            });
+
+            totalInstalls += rowInstalls;
+            totalConversions += rowConversions;
+            totalEventCount += rowEventCount;
+          }
+        }
+      });
+
+      enrichedTableData.sort((a, b) => {
+        const da = normalizeDate(a.period || a.Date || a.date);
+        const db = normalizeDate(b.period || b.Date || b.date);
+        return da.localeCompare(db);
+      });
+    }
+
     const showAfMetrics = hasAppsflyerData || (hasAFConfig && totalInstalls > 0);
     const hasVideoData = !isBanner && (isVideoCampaign || totalVideoComplete > 0 || totalVideoViews > 0);
     const overallVcr = totalImp > 0 ? (totalVideoComplete / totalImp * 100) : 0;
 
     if (!hasAppsflyerData && showAfMetrics && enrichedTableData.length > 0) {
-      const weights = enrichedTableData.map(r => Number(r.Clicks || r.clicks || r.Impressions || r.impressions || 0));
-      const convAllocated = distributeInteger(totalConversions, weights);
+      const weights = getDistributionWeights(enrichedTableData);
+      const convAllocated = distributeValues(totalConversions, weights);
       const instAllocated = distributeInteger(totalInstalls, weights);
       enrichedTableData.forEach((r, idx) => {
         r.computedInstalls = instAllocated[idx] || 0;
@@ -1053,9 +1122,13 @@ export default function DashboardRedesignPage() {
       });
     }
 
+    const totalAfClicks = Array.isArray(appsflyerData) ? appsflyerData.reduce((sum, item) => sum + Number(item.clicks || 0), 0) : 0;
+
     return {
       enrichedTableData,
       hasAppsflyerData: showAfMetrics,
+      appsflyerData,
+      totalAfClicks,
       impressions: totalImp,
       clicks: totalClicks,
       installs: totalInstalls,
@@ -1337,17 +1410,29 @@ export default function DashboardRedesignPage() {
           <div className="st-filter-bar">
             {!isPdfLoading ? (
               <>
-                <div className="st-search-wrap" ref={searchRef}>
+                <div
+                  className="st-search-wrap"
+                  ref={searchRef}
+                  onMouseDown={(e) => {
+                    // Any click inside the wrapper opens the dropdown
+                    // Don't preventDefault here so input naturally receives focus
+                    setIsFocused(true);
+                  }}
+                >
                   <span className="st-search-icon"><SearchIcon /></span>
                   <input className="st-search" placeholder="Search campaigns, creatives, domains..."
-                    value={search} onChange={e => setSearch(e.target.value)}
-                    onFocus={() => setIsFocused(true)} />
+                    ref={searchInputRef}
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    onFocus={() => setIsFocused(true)}
+                    readOnly={false}
+                  />
                   {search && (
                     <span
                       onMouseDown={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
+                        e.preventDefault(); // keep focus on input
                         setSearch("");
+                        setIsFocused(true);
                       }}
                       style={{
                         position: "absolute",
@@ -1404,33 +1489,120 @@ export default function DashboardRedesignPage() {
                   )}
                 </div>
 
-                <div style={{ position: "relative" }} ref={calRef}>
+
+                <div className="st-date-wrap" style={{ position: "relative" }} ref={calRef}>
                   <div className="st-chip" onClick={() => setShowCalendar(!showCalendar)} style={{ cursor: "pointer" }}>
                     <CalIcon />
                     <span>
                       {format(range[0].startDate, "d MMM yyyy")} – {format(range[0].endDate, "d MMM yyyy")}
                     </span>
                   </div>
+                  {showCalendar && isMobile && (
+                    <div
+                      style={{
+                        position: "fixed",
+                        top: 0,
+                        left: 0,
+                        width: "100vw",
+                        height: "100vh",
+                        backgroundColor: "rgba(0,0,0,0.5)",
+                        zIndex: 1040,
+                      }}
+                      onClick={() => setShowCalendar(false)}
+                    />
+                  )}
                   {showCalendar && (
-                    <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 8, zIndex: 100, boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)", borderRadius: 12, overflow: "hidden", border: "1px solid #E5E7EB", backgroundColor: "#fff", display: "flex", flexDirection: "column", minWidth: "820px" }}>
+                    <div
+                      style={
+                        isMobile
+                          ? {
+                              position: "fixed",
+                              top: "50%",
+                              left: "50%",
+                              transform: "translate(-50%, -50%)",
+                              width: "calc(100vw - 24px)",
+                              maxWidth: "360px",
+                              maxHeight: "90vh",
+                              overflowY: "auto",
+                              zIndex: 1050,
+                              backgroundColor: "#fff",
+                              borderRadius: 14,
+                              boxShadow: "0 20px 30px -10px rgba(0,0,0,0.3)",
+                              border: "1px solid #E5E7EB",
+                              display: "flex",
+                              flexDirection: "column",
+                            }
+                          : {
+                              position: "absolute",
+                              top: "100%",
+                              left: 0,
+                              marginTop: 8,
+                              zIndex: 100,
+                              boxShadow:
+                                "0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)",
+                              borderRadius: 12,
+                              overflow: "hidden",
+                              border: "1px solid #E5E7EB",
+                              backgroundColor: "#fff",
+                              display: "flex",
+                              flexDirection: "column",
+                              minWidth: "820px",
+                            }
+                      }
+                    >
                       <style>{`
-                    .rdrMonth { width: 330px !important; padding: 0 15px !important; }
-                    .rdrCalendarWrapper { font-size: 12px !important; color: #334155 !important; border-radius: 12px !important; width: 100% !important; }
-                    .rdrDateDisplayWrapper { display: none !important; }
-                    .rdrDay { height: 2.8em !important; line-height: 2.8em !important; }
-                    .rdrMonthAndYearWrapper { padding: 10px 0 !important; height: 45px !important; }
-                    .rdrMonths { 
-                      gap: 20px !important; 
-                      padding: 10px !important; 
-                      flex-direction: row !important;
-                    }
-                    .rdrMonthName { font-weight: 700 !important; color: #0f172a !important; padding-bottom: 10px !important; }
-                    .rdrDayNumber span { color: #334155 !important; font-weight: 500 !important; }
-                    .rdrDayToday .rdrDayNumber span:after { background: #4c84ff !important; bottom: 4px !important; }
-                  `}</style>
-                      <div style={{ display: "flex", flexDirection: "row-reverse", backgroundColor: "#fff" }}>
-                        <div style={{ borderLeft: "1px solid #E5E7EB", padding: "16px", backgroundColor: "#F8FAFC", display: "flex", flexDirection: "column", gap: "4px", width: "170px" }}>
-                          <label style={{ fontWeight: 700, color: "#64748B", marginBottom: "12px", padding: "4px 8px", fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.1em" }}>Quick Select</label>
+                        .rdrMonth { width: ${isMobile ? "100%" : "330px"} !important; padding: ${isMobile ? "0 4px" : "0 15px"} !important; }
+                        .rdrCalendarWrapper { font-size: ${isMobile ? "11px" : "12px"} !important; color: #334155 !important; border-radius: 12px !important; width: 100% !important; }
+                        .rdrDateDisplayWrapper { display: none !important; }
+                        .rdrDay { height: 2.6em !important; line-height: 2.6em !important; }
+                        .rdrMonthAndYearWrapper { padding: 8px 0 !important; height: 42px !important; }
+                        .rdrMonths { 
+                          gap: ${isMobile ? "0px" : "20px"} !important; 
+                          padding: ${isMobile ? "4px" : "10px"} !important; 
+                          flex-direction: ${isMobile ? "column" : "row"} !important;
+                        }
+                        .rdrMonthName { font-weight: 700 !important; color: #0f172a !important; padding-bottom: 8px !important; }
+                        .rdrDayNumber span { color: #334155 !important; font-weight: 500 !important; }
+                        .rdrDayToday .rdrDayNumber span:after { background: #4c84ff !important; bottom: 4px !important; }
+                      `}</style>
+                      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row-reverse", backgroundColor: "#fff" }}>
+                        <div
+                          style={
+                            isMobile
+                              ? {
+                                  borderBottom: "1px solid #E5E7EB",
+                                  padding: "10px 12px",
+                                  backgroundColor: "#F8FAFC",
+                                  display: "flex",
+                                  flexWrap: "wrap",
+                                  gap: "6px",
+                                  width: "100%",
+                                }
+                              : {
+                                  borderLeft: "1px solid #E5E7EB",
+                                  padding: "16px",
+                                  backgroundColor: "#F8FAFC",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: "4px",
+                                  width: "170px",
+                                }
+                          }
+                        >
+                          <label
+                            style={{
+                              fontWeight: 700,
+                              color: "#64748B",
+                              marginBottom: isMobile ? "4px" : "12px",
+                              padding: "2px 4px",
+                              fontSize: "10px",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.1em",
+                              width: "100%",
+                            }}
+                          >
+                            Quick Select
+                          </label>
                           {[
                             { label: 'Today', key: 'today' },
                             { label: 'Yesterday', key: 'yesterday' },
@@ -1441,17 +1613,30 @@ export default function DashboardRedesignPage() {
                           ].map((btn) => (
                             <button
                               key={btn.key}
-                              style={{ textAlign: "left", padding: "8px 12px", borderRadius: "8px", border: "none", fontSize: "11px", background: "transparent", fontWeight: "600", color: "#475569", textTransform: "uppercase", cursor: "pointer", transition: "all 0.2s" }}
+                              style={{
+                                textAlign: isMobile ? "center" : "left",
+                                padding: isMobile ? "6px 8px" : "8px 12px",
+                                borderRadius: "6px",
+                                border: isMobile ? "1px solid #E2E8F0" : "none",
+                                fontSize: "10.5px",
+                                background: isMobile ? "#fff" : "transparent",
+                                fontWeight: "600",
+                                color: "#475569",
+                                textTransform: "uppercase",
+                                cursor: "pointer",
+                                flex: isMobile ? "1 1 calc(33.33% - 6px)" : "none",
+                                transition: "all 0.2s",
+                              }}
                               onClick={() => setPreset(btn.key)}
-                              onMouseOver={(e) => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#0061ff' }}
-                              onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#475569' }}
+                              onMouseOver={(e) => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#0061ff'; }}
+                              onMouseOut={(e) => { e.currentTarget.style.background = isMobile ? '#fff' : 'transparent'; e.currentTarget.style.color = '#475569'; }}
                             >
                               {btn.label}
                             </button>
                           ))}
                         </div>
 
-                        <div style={{ padding: "8px", overflow: "auto", maxWidth: "100%" }}>
+                        <div style={{ padding: isMobile ? "4px" : "8px", overflow: "auto", maxWidth: "100%" }}>
                           <DateRange
                             editableDateInputs={false}
                             onChange={item => {
@@ -1468,15 +1653,15 @@ export default function DashboardRedesignPage() {
                             }}
                             moveRangeOnFirstSelection={false}
                             ranges={range}
-                            months={2}
-                            direction="horizontal"
+                            months={isMobile ? 1 : 2}
+                            direction={isMobile ? "vertical" : "horizontal"}
                             showDateDisplay={false}
                             rangeColors={['#4c84ff']}
                           />
                         </div>
                       </div>
 
-                      <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", padding: "12px 24px", borderTop: "1px solid #E5E7EB", alignItems: "center", backgroundColor: "#F8FAFC" }}>
+                      <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", padding: "10px 16px", borderTop: "1px solid #E5E7EB", alignItems: "center", backgroundColor: "#F8FAFC" }}>
                         <button
                           style={{ background: "none", border: "none", color: "#64748B", fontWeight: "bold", padding: "6px 12px", fontSize: "11px", textTransform: "uppercase", cursor: "pointer" }}
                           onClick={() => setShowCalendar(false)}
@@ -1484,7 +1669,7 @@ export default function DashboardRedesignPage() {
                           Cancel
                         </button>
                         <button
-                          style={{ background: "#0061ff", color: "#fff", border: "none", borderRadius: "9999px", fontWeight: "bold", padding: "6px 20px", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", cursor: "pointer" }}
+                          style={{ background: "#0061ff", color: "#fff", border: "none", borderRadius: "9999px", fontWeight: "bold", padding: "6px 18px", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", cursor: "pointer" }}
                           onClick={() => setShowCalendar(false)}
                         >
                           Apply Range
@@ -1494,7 +1679,7 @@ export default function DashboardRedesignPage() {
                   )}
                 </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: "12px", marginLeft: "auto", flexShrink: 0 }}>
+                <div className="st-filter-actions" style={{ display: "flex", alignItems: "center", gap: "12px", marginLeft: "auto", flexShrink: 0 }}>
                   <button
                     className="st-apply-btn"
                     onClick={handleApplyFilters}
@@ -1505,7 +1690,7 @@ export default function DashboardRedesignPage() {
                   </button>
 
                   {/* Export Buttons */}
-                  <div style={{ display: "flex", gap: "8px" }}>
+                  <div className="st-export-btns" style={{ display: "flex", gap: "8px" }}>
                     <button
                       style={{ display: "flex", alignItems: "center", gap: "6px", backgroundColor: "#FEE2E2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: "8px", padding: "8px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}
                       onClick={handleExportPDF}
@@ -1572,19 +1757,27 @@ export default function DashboardRedesignPage() {
             <>
               {/* ── Campaign Info Banner ── */}
               {search && !isPdfLoading && (
-                <div style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "10px 24px", background: "linear-gradient(90deg, #1E3A8A 0%, #2563EB 100%)",
-                  color: "#fff", margin: "-16px 0 0 0", gap: 16, flexWrap: "wrap"
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4ADE80", boxShadow: "0 0 6px #4ADE80" }} />
-                    <span style={{ fontSize: 14, fontWeight: 700 }}>{search}</span>
-                    <span style={{ fontSize: 11, background: "rgba(255,255,255,0.15)", padding: "2px 10px", borderRadius: 999, fontWeight: 600 }}>
+                <div
+                  className="st-campaign-banner"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "10px 16px",
+                    background: "linear-gradient(90deg, #1E3A8A 0%, #2563EB 100%)",
+                    color: "#fff",
+                    gap: 12,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4ADE80", boxShadow: "0 0 6px #4ADE80", flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, fontWeight: 700, wordBreak: "break-word" }}>{search}</span>
+                    <span style={{ fontSize: 11, background: "rgba(255,255,255,0.15)", padding: "2px 8px", borderRadius: 999, fontWeight: 600, whiteSpace: "nowrap" }}>
                       {format(range[0].startDate, "d MMM yyyy")} – {format(range[0].endDate, "d MMM yyyy")}
                     </span>
                   </div>
-                  <div style={{ display: "flex", gap: 16, fontSize: 12, opacity: 0.85 }}>
+                  <div style={{ display: "flex", gap: 12, fontSize: 12, opacity: 0.9, flexWrap: "wrap" }}>
                     <span>Impressions: <b style={{ color: "#86EFAC" }}>{(globalEffectiveMetrics.impressions || 0).toLocaleString('en-IN')}</b></span>
                     {!isCtvWithAF && (<><span>Clicks: <b style={{ color: "#93C5FD" }}>{(globalEffectiveMetrics.clicks || 0).toLocaleString('en-IN')}</b></span>
                       <span>CTR: <b style={{ color: "#FCD34D" }}>{(globalEffectiveMetrics.ctr || 0).toFixed(2)}%</b></span></>)}
@@ -1830,14 +2023,14 @@ export default function DashboardRedesignPage() {
                 <CreativeDetails creativeData={creativeData} campaignPricing={campaignPricing} globalEffectiveMetrics={globalEffectiveMetrics} selectedAudience={selectedAudience} />
               )}
               {hasPermission("url_table") && (
-                <UrlTable urlData={urlData} campaignPricing={campaignPricing} globalEffectiveMetrics={globalEffectiveMetrics} selectedAudience={selectedAudience} />
+                <UrlTable urlData={urlData} campaignPricing={campaignPricing} globalEffectiveMetrics={globalEffectiveMetrics} selectedAudience={selectedAudience} appsflyerData={appsflyerData} />
               )}
               {hasPermission("city_distribution") && (
                 <DomainDistribution domainData={cityData} campaignPricing={campaignPricing} globalEffectiveMetrics={globalEffectiveMetrics} rawInstallsBreakdown={rawInstallsBreakdown} selectedAudience={selectedAudience} />
               )}
               {
                 !isCtvWithAF && (hasPermission("placement_pos_distribution") || hasPermission("placement_interstitial_distribution")) && (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 16 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
                     {hasPermission("placement_pos_distribution") && <PlacementPositionPanel placementPosData={placementPosData} />}
                     {hasPermission("placement_interstitial_distribution") && <PlacementTypePanel placementTypeData={placementTypeData} />}
                   </div>
@@ -1863,7 +2056,7 @@ export default function DashboardRedesignPage() {
               />
               {
                 !isCtvWithAF && (hasPermission("platform_gender") || hasPermission("platform_age")) && (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 12, margin: "0 16px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12, margin: "0 16px" }}>
                     {hasPermission("platform_gender") && <GenderChart genderData={genderData} />}
                     {hasPermission("platform_age") && <AgeChart ageData={ageData} />}
                   </div>
@@ -2138,15 +2331,155 @@ export default function DashboardRedesignPage() {
           .st-kpi-row { grid-template-columns: 1fr 1fr; }
           .st-metric-row { grid-template-columns: repeat(3, 1fr); }
         }
+
         @media (max-width: 900px) {
+          /* Do NOT keep filter bar sticky on mobile as it covers 180px of screen */
+          .st-filter-bar {
+            position: relative !important;
+            top: auto !important;
+            flex-wrap: wrap !important;
+            gap: 10px !important;
+            padding: 12px 14px !important;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+          }
+          .st-search-wrap {
+            flex: 1 1 100% !important;
+            max-width: 100% !important;
+            min-width: 100% !important;
+            order: 1;
+          }
+          .st-search {
+            height: 38px !important;
+            font-size: 13px !important;
+          }
+          .st-date-wrap {
+            order: 2;
+            flex: 1 1 100% !important;
+            width: 100% !important;
+          }
+          .st-chip {
+            width: 100% !important;
+            height: 38px !important;
+            justify-content: center !important;
+            font-size: 13px !important;
+          }
+          .st-filter-actions {
+            order: 3;
+            width: 100% !important;
+            margin-left: 0 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 8px !important;
+          }
+          .st-apply-btn {
+            width: 100% !important;
+            height: 38px !important;
+            font-size: 13px !important;
+            text-align: center !important;
+          }
+          .st-export-btns {
+            width: 100% !important;
+            display: flex !important;
+            gap: 8px !important;
+          }
+          .st-export-btns button {
+            flex: 1 !important;
+            height: 36px !important;
+            justify-content: center !important;
+            font-size: 12px !important;
+          }
           .st-kpi-row { grid-template-columns: 1fr; }
           .st-metric-row { grid-template-columns: repeat(2, 1fr); }
         }
-        @media (max-width: 700px) {
-          .st-page { gap: 12px; padding-bottom: 32px; }
-          .st-filter-bar { padding: 10px 14px; }
-          .st-panel, .st-kpi-row, .st-metric-row { margin: 0 12px; }
-          .st-metric-row { grid-template-columns: 1fr; }
+
+        @media (min-width: 641px) and (max-width: 900px) {
+          .st-kpi-grid {
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 10px !important;
+            margin: 0 12px !important;
+          }
+        }
+
+        @media (max-width: 768px) {
+          /* Panels and tables on tablets & phones */
+          .st-panel {
+            padding: 12px 10px !important;
+            margin: 0 10px !important;
+            overflow: hidden !important;
+          }
+          /* Eliminate negative margin clipping on all tables in panels */
+          .st-panel > div[style*="overflowX"],
+          .st-panel > div[style*="overflow-x"] {
+            width: 100% !important;
+            margin: 0 !important;
+            -webkit-overflow-scrolling: touch !important;
+          }
+          .st-panel-header {
+            flex-direction: row !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            flex-wrap: wrap !important;
+            gap: 8px !important;
+          }
+          .st-table {
+            min-width: 680px !important;
+          }
+          .st-table th, .st-table td {
+            padding: 8px 8px !important;
+            font-size: 11.5px !important;
+          }
+          .st-table th:first-child, .st-table td:first-child {
+            padding-left: 8px !important;
+          }
+          .st-table th:last-child, .st-table td:last-child {
+            padding-right: 8px !important;
+          }
+          .st-traffic-grid,
+          .st-sec-header {
+            margin-left: 10px !important;
+            margin-right: 10px !important;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .st-page { gap: 10px !important; padding-bottom: 36px !important; }
+          .st-panel, .st-kpi-row, .st-metric-row { margin: 0 8px !important; }
+          .st-kpi-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 8px !important;
+            margin: 0 8px !important;
+          }
+          .st-kpi-card-q {
+            padding: 10px 8px !important;
+          }
+          .st-kpi-num {
+            font-size: 17px !important;
+            letter-spacing: -0.3px !important;
+          }
+          .st-kpi-tag {
+            font-size: 8.5px !important;
+            letter-spacing: 0.04em !important;
+            word-break: break-word !important;
+          }
+          .st-kpi-meta {
+            font-size: 9.5px !important;
+            line-height: 1.3 !important;
+            word-break: break-word !important;
+          }
+          .st-badge-up {
+            font-size: 9px !important;
+            padding: 1px 4px !important;
+          }
+          .st-metric-row { grid-template-columns: 1fr !important; }
+          .st-traffic-grid,
+          .st-sec-header {
+            margin-left: 8px !important;
+            margin-right: 8px !important;
+          }
+          .st-campaign-banner {
+            margin: 0 8px !important;
+            border-radius: 8px;
+          }
         }
       `}</style>
     </div>

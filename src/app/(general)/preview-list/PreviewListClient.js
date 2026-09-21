@@ -371,29 +371,29 @@ const PreviewListClient = () => {
   }
 
   return (
-    <div className="container-fluid py-4">
-      <div className="d-flex justify-content-between mb-4 align-items-center">
+    <div className="container-fluid py-4 px-2 px-sm-3 px-md-4">
+      <div className="d-flex flex-column flex-md-row justify-content-between mb-4 align-items-start align-items-md-center gap-3">
         <div>
           <h4 className="fw-bold mb-1">Preview Campaign</h4>
           <p className="text-muted small mb-0">
             Manage and preview your creative sets
           </p>
         </div>
-        <div className="d-flex align-items-center gap-3">
+        <div className="d-flex flex-column flex-sm-row flex-wrap align-items-stretch align-items-sm-center gap-2 w-100 w-md-auto">
           {/* Audience Filter Dropdown */}
-          <div className="d-flex align-items-center gap-2">
+          <div className="d-flex align-items-center gap-2 flex-grow-1 flex-sm-grow-0">
             <span className="text-muted small fw-semibold text-nowrap">
               Audience:
             </span>
             <select
-              className="form-select form-select-sm"
+              className="form-select form-select-sm flex-grow-1"
               value={selectedAudienceId}
               onChange={(e) => {
                 setPage(1);
                 setSelectedAudienceId(e.target.value);
               }}
               style={{
-                minWidth: "200px",
+                minWidth: "160px",
                 borderRadius: "8px",
                 borderColor: "#dee2e6",
               }}
@@ -413,19 +413,19 @@ const PreviewListClient = () => {
               setPage(1);
               setQuery(searchTerm);
             }}
-            className="d-flex"
+            className="d-flex flex-grow-1 flex-sm-grow-0"
           >
             <input
               type="text"
-              className="form-control form-control-sm"
+              className="form-control form-control-sm flex-grow-1"
               placeholder="Search by name..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ minWidth: "220px", borderRadius: "8px 0 0 8px" }}
+              style={{ minWidth: "140px", borderRadius: "8px 0 0 8px" }}
             />
             <button
               type="submit"
-              className="btn btn-sm btn-light border px-3 text-muted"
+              className="btn btn-sm btn-light border px-3 text-muted flex-shrink-0"
               style={{
                 borderRadius: "0 8px 8px 0",
                 borderColor: "#dee2e6",
@@ -436,7 +436,7 @@ const PreviewListClient = () => {
           </form>
           {session?.user?.role === "super_admin" && (
             <button
-              className="btn btn-primary d-flex align-items-center gap-2 px-3 py-2"
+              className="btn btn-primary d-flex align-items-center justify-content-center gap-2 px-3 py-2 w-100 w-sm-auto flex-shrink-0"
               onClick={() => setView("settings")}
               style={{
                 backgroundColor: "#6b46c1",
