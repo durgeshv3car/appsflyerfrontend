@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useMemo } from "react";
-import { TablePagination } from "./Shared";
+import { TablePagination, distributeInteger, distributeValues, getDistributionWeights } from "./Shared";
 
 const PAGE_SIZE = 10;
 
@@ -172,28 +172,6 @@ export function UrlTable({ urlData: propData, campaignPricing, globalEffectiveMe
       });
     }
 
-    // Distribute Installs and Conversions: clicks if present, otherwise impressions
-    let summedConv = 0;
-    let summedInst = 0;
-    const hasClicks = result.some(g => Number(g.Clicks || 0) > 0);
-    const currentTotalBase = result.reduce((sum, g) => sum + (hasClicks ? Number(g.Clicks || 0) : Number(g.Impressions || 0)), 0);
-
-    const isConvInteger = Number.isInteger(targetConversions);
-    result.forEach((g, idx) => {
-      const metricVal = hasClicks ? Number(g.Clicks || 0) : Number(g.Impressions || 0);
-      const share = currentTotalBase > 0 ? metricVal / currentTotalBase : (result.length > 0 ? 1 / result.length : 0);
-      if (idx === result.length - 1) {
-        g.TotalConversions = isConvInteger ? Math.round(targetConversions - summedConv) : parseFloat((targetConversions - summedConv).toFixed(2));
-        g.Installs = Math.round(targetInstalls - summedInst);
-      } else {
-        const cVal = isConvInteger ? Math.round(targetConversions * share) : parseFloat((targetConversions * share).toFixed(2));
-        g.TotalConversions = cVal;
-        g.Installs = Math.round(targetInstalls * share);
-        summedConv += g.TotalConversions;
-        summedInst += g.Installs;
-      }
-    });
-
     // Distribute AppsFlyer clicks if appsflyerDataLength > 0
     if (appsflyerDataLength > 0 && totalAfClicks > 0) {
       const totalBaseClicks = result.reduce((sum, g) => sum + g.Clicks, 0);
@@ -217,22 +195,31 @@ export function UrlTable({ urlData: propData, campaignPricing, globalEffectiveMe
         }
       } else if (totalBaseClicks === 0) {
         if (result.length > 0) {
-          let summedClicks = 0;
+          const totalImpForClicks = result.reduce((s, g) => s + g.Impressions, 0);
+          const clickWeights = totalImpForClicks > 0 ? result.map(g => g.Impressions) : result.map(() => 1);
+          const afClicksAlloc = distributeInteger(totalAfClicks, clickWeights);
           result.forEach((g, idx) => {
-            let clicksToAdd = 0;
-            if (idx === result.length - 1) {
-              clicksToAdd = totalAfClicks - summedClicks;
-            } else {
-              clicksToAdd = Math.round(totalAfClicks / result.length);
-              summedClicks += clicksToAdd;
-            }
-            g.Clicks = clicksToAdd;
+            g.Clicks = afClicksAlloc[idx] || 0;
           });
         }
       }
     }
 
     result.sort((a, b) => b.Impressions - a.Impressions);
+
+    // Distribute Installs and Conversions: clicks if present (and not CTV), otherwise impressions
+    const isCtv = isCtvWithAF || ctype.includes("CTV");
+    const useClicks = !isCtv && result.some(g => Number(g.Clicks || 0) > 0);
+    const weights = useClicks
+      ? getDistributionWeights(result, g => g.Clicks, g => g.Impressions)
+      : getDistributionWeights(result, () => 0, g => g.Impressions);
+    const instAllocated = distributeInteger(targetInstalls, weights);
+    const convAllocated = distributeValues(targetConversions, weights);
+
+    result.forEach((g, idx) => {
+      g.Installs = instAllocated[idx] || 0;
+      g.TotalConversions = convAllocated[idx] || 0;
+    });
 
     return result.map(g => {
       const imp = g.Impressions;

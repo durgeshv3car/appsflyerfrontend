@@ -819,7 +819,8 @@ export default function DashboardRedesignPage() {
         const d = normalizeDate(item.date);
         if (!afMap[d]) afMap[d] = { installs: 0, afclicks: 0, af_payment_unique: 0, eventCount: 0 };
         afMap[d].installs += (item.installs || 0);
-        afMap[d].eventCount += (item.event_count || item.eventCount || item.eventcount || 0);
+        // Force integer — event_count in DB could be a stale float from an old sync
+        afMap[d].eventCount += Math.round(item.event_count || item.eventCount || item.eventcount || 0);
         afMap[d].afclicks += (item.clicks || 0);
 
         const isOldDataLocal = !item.media_source && !item.event_count && !item.event_value && !item.revenue;
@@ -835,7 +836,8 @@ export default function DashboardRedesignPage() {
                 if (useEventValue === "event_value") {
                   finalVal += valNum;
                 } else {
-                  finalVal += valNum === 0 ? (evt.event_count || 0) : valNum;
+                  // Count mode: always use integer event_count — never the revenue/EUR float
+                  finalVal += (evt.event_count || 0);
                 }
               }
             });
@@ -1041,7 +1043,7 @@ export default function DashboardRedesignPage() {
       totalSpent += spent;
       totalInstalls += rowInstalls;
       totalConversions += rowConversions;
-      totalEventCount += hasAppsflyerData ? (afMap[normalizeDate(rowDate)]?.eventCount || 0) : 0;
+      totalEventCount += hasAppsflyerData ? Math.round(afMap[normalizeDate(rowDate)]?.eventCount || 0) : 0;
       totalRevenue += rev;
       totalReach += rowReach;
       totalVideoViews += rowViews;
@@ -1146,8 +1148,8 @@ export default function DashboardRedesignPage() {
       eCPC: hasAppsflyerData
         ? (totalClicks > 0 ? (totalSpent / totalClicks) : 0)
         : (isCpcDefined
-            ? (Number(anyCpcRate) === 0 ? 0 : (totalClicks > 0 ? (totalSpent / totalClicks) : Number(anyCpcRate)))
-            : (isCpcCampaign && totalClicks > 0 ? (totalSpent / totalClicks) : 0)),
+          ? (Number(anyCpcRate) === 0 ? 0 : (totalClicks > 0 ? (totalSpent / totalClicks) : Number(anyCpcRate)))
+          : (isCpcCampaign && totalClicks > 0 ? (totalSpent / totalClicks) : 0)),
       cvr: totalInstalls > 0 ? (totalInstalls / totalImp) * 100 : 0,
       cpi: totalInstalls > 0 ? (totalSpent / totalInstalls) : 0,
       roas: totalSpent > 0 ? (totalRevenue / totalSpent) : 0,
@@ -1516,38 +1518,38 @@ export default function DashboardRedesignPage() {
                       style={
                         isMobile
                           ? {
-                              position: "fixed",
-                              top: "50%",
-                              left: "50%",
-                              transform: "translate(-50%, -50%)",
-                              width: "calc(100vw - 24px)",
-                              maxWidth: "360px",
-                              maxHeight: "90vh",
-                              overflowY: "auto",
-                              zIndex: 1050,
-                              backgroundColor: "#fff",
-                              borderRadius: 14,
-                              boxShadow: "0 20px 30px -10px rgba(0,0,0,0.3)",
-                              border: "1px solid #E5E7EB",
-                              display: "flex",
-                              flexDirection: "column",
-                            }
+                            position: "fixed",
+                            top: "50%",
+                            left: "50%",
+                            transform: "translate(-50%, -50%)",
+                            width: "calc(100vw - 24px)",
+                            maxWidth: "360px",
+                            maxHeight: "90vh",
+                            overflowY: "auto",
+                            zIndex: 1050,
+                            backgroundColor: "#fff",
+                            borderRadius: 14,
+                            boxShadow: "0 20px 30px -10px rgba(0,0,0,0.3)",
+                            border: "1px solid #E5E7EB",
+                            display: "flex",
+                            flexDirection: "column",
+                          }
                           : {
-                              position: "absolute",
-                              top: "100%",
-                              left: 0,
-                              marginTop: 8,
-                              zIndex: 100,
-                              boxShadow:
-                                "0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)",
-                              borderRadius: 12,
-                              overflow: "hidden",
-                              border: "1px solid #E5E7EB",
-                              backgroundColor: "#fff",
-                              display: "flex",
-                              flexDirection: "column",
-                              minWidth: "820px",
-                            }
+                            position: "absolute",
+                            top: "100%",
+                            left: 0,
+                            marginTop: 8,
+                            zIndex: 100,
+                            boxShadow:
+                              "0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)",
+                            borderRadius: 12,
+                            overflow: "hidden",
+                            border: "1px solid #E5E7EB",
+                            backgroundColor: "#fff",
+                            display: "flex",
+                            flexDirection: "column",
+                            minWidth: "820px",
+                          }
                       }
                     >
                       <style>{`
@@ -1570,23 +1572,23 @@ export default function DashboardRedesignPage() {
                           style={
                             isMobile
                               ? {
-                                  borderBottom: "1px solid #E5E7EB",
-                                  padding: "10px 12px",
-                                  backgroundColor: "#F8FAFC",
-                                  display: "flex",
-                                  flexWrap: "wrap",
-                                  gap: "6px",
-                                  width: "100%",
-                                }
+                                borderBottom: "1px solid #E5E7EB",
+                                padding: "10px 12px",
+                                backgroundColor: "#F8FAFC",
+                                display: "flex",
+                                flexWrap: "wrap",
+                                gap: "6px",
+                                width: "100%",
+                              }
                               : {
-                                  borderLeft: "1px solid #E5E7EB",
-                                  padding: "16px",
-                                  backgroundColor: "#F8FAFC",
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  gap: "4px",
-                                  width: "170px",
-                                }
+                                borderLeft: "1px solid #E5E7EB",
+                                padding: "16px",
+                                backgroundColor: "#F8FAFC",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "4px",
+                                width: "170px",
+                              }
                           }
                         >
                           <label

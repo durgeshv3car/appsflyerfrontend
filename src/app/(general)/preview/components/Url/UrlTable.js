@@ -203,29 +203,6 @@ const UrlTable = ({
     });
   }
 
-  let summedConv = 0;
-  let summedInst = 0;
-
-  const hasClicks = result.some(g => Number(g.Clicks || 0) > 0);
-  const currentTotalBase = result.reduce((sum, g) => sum + (hasClicks ? Number(g.Clicks || 0) : Number(g.Impressions || 0)), 0);
-
-  const isConvInteger = Number.isInteger(targetConversions);
-  result.forEach((g, idx) => {
-    const metricVal = hasClicks ? Number(g.Clicks || 0) : Number(g.Impressions || 0);
-    const share = currentTotalBase > 0 ? metricVal / currentTotalBase : (result.length > 0 ? 1 / result.length : 0);
-    if (idx === result.length - 1) {
-      // Last row gets remainder to avoid rounding drift
-      g.TotalConversions = isConvInteger ? Math.round(targetConversions - summedConv) : parseFloat((targetConversions - summedConv).toFixed(2));
-      g.Installs = Math.round(targetInstalls - summedInst);
-    } else {
-      const cVal = isConvInteger ? Math.round(targetConversions * share) : parseFloat((targetConversions * share).toFixed(2));
-      g.TotalConversions = cVal;
-      g.Installs = Math.round(targetInstalls * share);
-      summedConv += g.TotalConversions;
-      summedInst += g.Installs;
-    }
-  });
-
   // Distribute AppsFlyer clicks if appsflyerDataLength > 0
   if (appsflyerDataLength > 0 && appsflyerData && appsflyerData.length > 0) {
     const totalBaseClicks = result.reduce((sum, g) => sum + g.Clicks, 0);
@@ -249,13 +226,15 @@ const UrlTable = ({
       }
     } else if (totalBaseClicks === 0 && totalAfClicks > 0) {
       if (result.length > 0) {
+        const totalImpForClicks = result.reduce((s, g) => s + g.Impressions, 0);
         let summedClicks = 0;
         result.forEach((g, idx) => {
           let clicksToAdd = 0;
           if (idx === result.length - 1) {
             clicksToAdd = totalAfClicks - summedClicks;
           } else {
-            clicksToAdd = Math.round(totalAfClicks / result.length);
+            const share = totalImpForClicks > 0 ? (g.Impressions / totalImpForClicks) : (1 / result.length);
+            clicksToAdd = Math.round(totalAfClicks * share);
             summedClicks += clicksToAdd;
           }
           g.Clicks = clicksToAdd;
@@ -263,6 +242,33 @@ const UrlTable = ({
       }
     }
   }
+
+  result.sort((a, b) => b.Impressions - a.Impressions);
+
+  // Distribute Installs and Conversions: clicks if present, otherwise impressions
+  let summedConv = 0;
+  let summedInst = 0;
+
+  const isCtv = String(campaignType || appsflyerCampaignType || "").toUpperCase().includes("CTV");
+  const hasClicks = !isCtv && result.some(g => Number(g.Clicks || 0) > 0);
+  const currentTotalBase = result.reduce((sum, g) => sum + (hasClicks ? Number(g.Clicks || 0) : Number(g.Impressions || 0)), 0);
+
+  const isConvInteger = Number.isInteger(targetConversions);
+  result.forEach((g, idx) => {
+    const metricVal = hasClicks ? Number(g.Clicks || 0) : Number(g.Impressions || 0);
+    const share = currentTotalBase > 0 ? metricVal / currentTotalBase : (result.length > 0 ? 1 / result.length : 0);
+    if (idx === result.length - 1) {
+      // Last row gets remainder to avoid rounding drift
+      g.TotalConversions = isConvInteger ? Math.round(targetConversions - summedConv) : parseFloat((targetConversions - summedConv).toFixed(2));
+      g.Installs = Math.round(targetInstalls - summedInst);
+    } else {
+      const cVal = isConvInteger ? Math.round(targetConversions * share) : parseFloat((targetConversions * share).toFixed(2));
+      g.TotalConversions = cVal;
+      g.Installs = Math.round(targetInstalls * share);
+      summedConv += g.TotalConversions;
+      summedInst += g.Installs;
+    }
+  });
 
   // Determine if this is a CPM or CPC campaign from raw pricing
   const anyCpmRate = getPriceForDate(campaignPricing?.cpm, null);

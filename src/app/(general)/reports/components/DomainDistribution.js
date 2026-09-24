@@ -159,37 +159,62 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
     const hasRawInstalls = rawInstallsBreakdown?.city && Object.keys(rawInstallsBreakdown.city).length > 0;
     const globalTargetImp = Number(globalEffectiveMetrics?.impressions || 0);
 
-    // CASE 1: AppsFlyer Data Found -> State Data from rawinstall API (matching appflyer-preview)
+    // CASE 1: AppsFlyer Data Found -> State Data
     if (hasAF) {
       const groups = {};
 
-      if (hasRawInstalls) {
+      if (Array.isArray(propData) && propData.length > 0) {
+        propData.forEach(r => {
+          const rawName = String(r.name || r.City || r.city || r.Domain || r.domain || "Unknown").trim();
+          if (!rawName || rawName.toLowerCase() === "unknown" || rawName.toLowerCase() === "total") return;
+          const stateCode = cityToStateCode[rawName.toLowerCase()] || rawName.toLowerCase();
+          const stateName = stateCodeToName[stateCode] || rawName;
+          const clk = Number(r.Clicks || r.clicks || r.rawClicks || 0);
+          const imp = Number(r.Impressions || r.impressions || r.rawImp || 0);
+          const views = Number(r.Views || r.views || r.VideoViews || 0);
+          const comp = Number(r.completeViewsVideo || r.CompleteViewsVideo || r.complete_views || r.completeViews || 0);
+          const fq = Number(r.firstQuartileViewsVideo || r.FirstQuartileViewsVideo || 0);
+          const mid = Number(r.midpointViewsVideo || r.MidpointViewsVideo || 0);
+          const tq = Number(r.thirdQuartileViewsVideo || r.ThirdQuartileViewsVideo || 0);
+
+          if (!groups[stateName]) {
+            groups[stateName] = {
+              domain: stateName,
+              rawImp: 0,
+              rawClicks: 0,
+              rawViews: 0,
+              rawComplete: 0,
+              rawFirstQ: 0,
+              rawMidpoint: 0,
+              rawThirdQ: 0,
+            };
+          }
+          groups[stateName].rawImp += imp;
+          groups[stateName].rawClicks += clk;
+          groups[stateName].rawViews += views;
+          groups[stateName].rawComplete += comp;
+          groups[stateName].rawFirstQ += fq;
+          groups[stateName].rawMidpoint += mid;
+          groups[stateName].rawThirdQ += tq;
+        });
+      }
+
+      if (Object.keys(groups).length === 0 && hasRawInstalls) {
         Object.entries(rawInstallsBreakdown.city).forEach(([cityKey, count]) => {
-          const stateCode = cityKey.toLowerCase();
+          const stateCode = cityKey.toLowerCase().trim();
           const stateName = stateCodeToName[stateCode] || cityKey.toUpperCase();
           const instVal = Number(count || 0);
           if (instVal > 0) {
             groups[stateName] = {
               domain: stateName,
-              rawInstalls: instVal,
+              rawImp: 0,
+              rawClicks: 0,
+              rawViews: 0,
+              rawComplete: 0,
+              rawFirstQ: 0,
+              rawMidpoint: 0,
+              rawThirdQ: 0,
             };
-          }
-        });
-      }
-
-      if (Object.keys(groups).length === 0 && Array.isArray(propData)) {
-        const hasClicks = propData.some(r => Number(r.Clicks || r.clicks || 0) > 0);
-        propData.forEach(r => {
-          const rawName = String(r.name || r.City || r.city || r.Domain || r.domain || "Unknown").trim();
-          const stateCode = cityToStateCode[rawName.toLowerCase()] || rawName.toLowerCase();
-          const stateName = stateCodeToName[stateCode] || rawName;
-          const clk = Number(r.Clicks || r.clicks || 0);
-          const imp = Number(r.Impressions || r.impressions || 0);
-          const val = hasClicks ? clk : imp;
-          if (!groups[stateName]) {
-            groups[stateName] = { domain: stateName, rawInstalls: val };
-          } else {
-            groups[stateName].rawInstalls += val;
           }
         });
       }
@@ -197,61 +222,49 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
       let stateList = Object.values(groups);
       if (stateList.length === 0) return [];
 
-      const currentSumInst = stateList.reduce((sum, g) => sum + g.rawInstalls, 0);
-      const targetInst = totalInstalls > 0 ? totalInstalls : currentSumInst;
+      // Scale impressions if globalTargetImp > 0
+      const totalImpSum = stateList.reduce((a, r) => a + r.rawImp, 0);
+      if (globalTargetImp > 0 && totalImpSum > 0 && globalTargetImp !== totalImpSum) {
+        let allocatedImp = 0;
+        stateList.forEach((g, idx) => {
+          if (idx === stateList.length - 1) {
+            g.rawImp = Math.max(0, globalTargetImp - allocatedImp);
+          } else {
+            const scaled = Math.round(globalTargetImp * (g.rawImp / totalImpSum));
+            g.rawImp = scaled;
+            allocatedImp += scaled;
+          }
+        });
+      }
 
-      // Sort by initial raw weight
-      stateList.sort((a, b) => b.rawInstalls - a.rawInstalls);
+      // Sort by impressions descending
+      stateList.sort((a, b) => b.rawImp - a.rawImp);
 
-      const weights = stateList.map(g => Number(g.rawInstalls || 0));
-      const instAllocated = distributeInteger(targetInst, weights);
+      // Distribute installs & conversions: by clicks if clicks present (and not CTV), otherwise impressions
+      const isCtv = isCtvWithAF || ctype.includes("CTV");
+      const useClicks = !isCtv && stateList.some(g => Number(g.rawClicks || 0) > 0);
+      const weights = useClicks
+        ? getDistributionWeights(stateList, g => g.rawClicks, g => g.rawImp)
+        : getDistributionWeights(stateList, () => 0, g => g.rawImp);
+      const instAllocated = distributeInteger(totalInstalls, weights);
       const convAllocated = distributeValues(totalConversions, weights);
 
-      stateList = stateList.map((g, idx) => ({
-        ...g,
-        rawInstalls: instAllocated[idx] || 0,
-        rawConversions: convAllocated[idx] || 0,
-      }));
-
-      const propDataArr = Array.isArray(propData) ? propData : [];
-      const totalImpSum = globalTargetImp > 0 ? globalTargetImp : propDataArr.reduce((a, r) => a + Number(r.Impressions || r.impressions || 0), 0);
-      const totalClicksSum = propDataArr.reduce((a, r) => a + Number(r.Clicks || r.clicks || 0), 0);
-      const totalViewsSum = propDataArr.reduce((a, r) => a + Number(r.Views || r.views || r.VideoViews || 0), 0);
-      const totalCompleteSum = propDataArr.reduce((a, r) => a + Number(r.completeViewsVideo || r.CompleteViewsVideo || 0), 0);
-      const totalFirstQSum = propDataArr.reduce((a, r) => a + Number(r.firstQuartileViewsVideo || r.FirstQuartileViewsVideo || 0), 0);
-      const totalMidpointSum = propDataArr.reduce((a, r) => a + Number(r.midpointViewsVideo || r.MidpointViewsVideo || 0), 0);
-      const totalThirdQSum = propDataArr.reduce((a, r) => a + Number(r.thirdQuartileViewsVideo || r.ThirdQuartileViewsVideo || 0), 0);
-
-      let allocatedImp = 0;
-      let allocatedClicks = 0;
-
       return stateList.map((g, idx) => {
-        const share = targetInst > 0 ? (g.rawInstalls / targetInst) : (1 / stateList.length);
-        let imp = 0;
-        let clk = 0;
-
-        if (idx === stateList.length - 1) {
-          imp = Math.max(0, totalImpSum - allocatedImp);
-          clk = Math.max(0, totalClicksSum - allocatedClicks);
-        } else {
-          imp = Math.round(totalImpSum * share);
-          clk = Math.round(totalClicksSum * share);
-          allocatedImp += imp;
-          allocatedClicks += clk;
-        }
-
+        const imp = g.rawImp;
+        const clk = g.rawClicks;
         const ctrVal = imp > 0 ? (clk / imp * 100) : 0;
         const cpmVal = effectiveCpm;
         const spent = (imp / 1000) * cpmVal;
 
-        const vViews = hasVideo ? (totalViewsSum > 0 ? Math.round(totalViewsSum * share) : Math.round(imp * 0.98836)) : 0;
-        const vComplete = hasVideo ? (totalCompleteSum > 0 ? Math.round(totalCompleteSum * share) : Math.round(imp * 0.8846)) : 0;
-        const vFirstQ = hasVideo ? (totalFirstQSum > 0 ? Math.round(totalFirstQSum * share) : Math.round(imp * 0.9474)) : 0;
-        const vMidpoint = hasVideo ? (totalMidpointSum > 0 ? Math.round(totalMidpointSum * share) : Math.round(imp * 0.9222)) : 0;
-        const vThirdQ = hasVideo ? (totalThirdQSum > 0 ? Math.round(totalThirdQSum * share) : Math.round(imp * 0.8999)) : 0;
+        const vViews = hasVideo ? (g.rawViews > 0 ? g.rawViews : Math.round(imp * 0.98836)) : 0;
+        const vComplete = hasVideo ? (g.rawComplete > 0 ? g.rawComplete : Math.round(imp * 0.8846)) : 0;
+        const vFirstQ = hasVideo ? (g.rawFirstQ > 0 ? g.rawFirstQ : Math.round(imp * 0.9474)) : 0;
+        const vMidpoint = hasVideo ? (g.rawMidpoint > 0 ? g.rawMidpoint : Math.round(imp * 0.9222)) : 0;
+        const vThirdQ = hasVideo ? (g.rawThirdQ > 0 ? g.rawThirdQ : Math.round(imp * 0.8999)) : 0;
 
         const cpvVal = vViews > 0 ? spent / vViews : 0;
         const cpcvVal = vComplete > 0 ? spent / vComplete : 0;
+        const inst = instAllocated[idx] || 0;
         const conv = convAllocated[idx] || 0;
 
         return {
@@ -271,9 +284,9 @@ export function DomainDistribution({ domainData: propData, campaignPricing, glob
           rawThirdQ: vThirdQ,
           cpvVal,
           cpcvVal,
-          installs: g.rawInstalls,
+          installs: inst,
           conversions: conv,
-          installsFormatted: g.rawInstalls.toLocaleString('en-IN'),
+          installsFormatted: inst.toLocaleString('en-IN'),
           conversionsFormatted: conv.toLocaleString('en-IN'),
         };
       });

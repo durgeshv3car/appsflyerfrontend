@@ -27,7 +27,7 @@ export const menuList = [
     },
     {
         id: 5,
-        name: "App Report",
+        name: "AppsFlyer Sharing",
         path: `/appflyer-report`,
         icon: 'feather-cast',
     },
@@ -39,13 +39,13 @@ export const menuList = [
     },
      {
         id: 7,
-        name: "Token",
+        name: "AppsFlyer Tokens",
         path: `/token`,
         icon: 'feather-umbrella',
     },
     {
         id: 8,
-        name: "New Appflyer Report",
+        name: "AppsFlyer Sync Data",
         path: `/new-appflyer-report`,
         icon: 'feather-airplay',
     },

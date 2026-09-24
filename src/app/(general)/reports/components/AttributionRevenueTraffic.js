@@ -128,25 +128,16 @@ function buildOperatorShareItems(operatorData, rawInstallsBreakdown, hasAF) {
   return buildShareItems(operatorData, "Operator", "operator");
 }
 
-function buildGeoShareItems(cityData, rawInstallsBreakdown, hasAF, globalEffectiveMetrics) {
+function buildGeoShareItems(cityData, rawInstallsBreakdown, hasAF, globalEffectiveMetrics, isCtvWithAF) {
   if (hasAF) {
     const totalInstalls = Number(globalEffectiveMetrics?.installs || 0);
     const groups = {};
-    if (rawInstallsBreakdown?.city && Object.keys(rawInstallsBreakdown.city).length > 0) {
-      Object.entries(rawInstallsBreakdown.city).forEach(([cityKey, count]) => {
-        const stateCode = cityKey.toLowerCase();
-        const stateName = stateCodeToName[stateCode] || (cityKey.charAt(0).toUpperCase() + cityKey.slice(1));
-        const val = Number(count || 0);
-        if (val > 0) {
-          groups[stateName] = (groups[stateName] || 0) + val;
-        }
-      });
-    }
-
-    if (Object.keys(groups).length === 0 && Array.isArray(cityData)) {
-      const hasClicks = cityData.some(r => Number(r.Clicks || r.clicks || 0) > 0);
+    const isCtv = !!isCtvWithAF;
+    if (Array.isArray(cityData) && cityData.length > 0) {
+      const hasClicks = !isCtv && cityData.some(r => Number(r.Clicks || r.clicks || 0) > 0);
       cityData.forEach(r => {
         const rawName = String(r.name || r.City || r.city || r.Domain || r.domain || "Unknown").trim();
+        if (!rawName || rawName.toLowerCase() === "unknown" || rawName.toLowerCase() === "total") return;
         const stateCode = cityToStateCode[rawName.toLowerCase()] || rawName.toLowerCase();
         const stateName = stateCodeToName[stateCode] || rawName;
         const imp = Number(r.Impressions || r.impressions || 0);
@@ -156,18 +147,29 @@ function buildGeoShareItems(cityData, rawInstallsBreakdown, hasAF, globalEffecti
           groups[stateName] = (groups[stateName] || 0) + weight;
         }
       });
+    }
 
-      if (Object.keys(groups).length > 0 && totalInstalls > 0) {
-        const sorted = Object.entries(groups).sort((a, b) => b[1] - a[1]);
-        const weights = sorted.map(e => e[1]);
-        const instAllocated = distributeInteger(totalInstalls, weights);
-        const scaledGroups = {};
-        sorted.forEach(([name], idx) => {
-          scaledGroups[name] = instAllocated[idx] || 0;
-        });
-        Object.keys(groups).forEach(k => delete groups[k]);
-        Object.assign(groups, scaledGroups);
-      }
+    if (Object.keys(groups).length === 0 && rawInstallsBreakdown?.city && Object.keys(rawInstallsBreakdown.city).length > 0) {
+      Object.entries(rawInstallsBreakdown.city).forEach(([cityKey, count]) => {
+        const stateCode = cityKey.toLowerCase().trim();
+        const stateName = stateCodeToName[stateCode] || (cityKey.charAt(0).toUpperCase() + cityKey.slice(1));
+        const val = Number(count || 0);
+        if (val > 0) {
+          groups[stateName] = (groups[stateName] || 0) + val;
+        }
+      });
+    }
+
+    if (Object.keys(groups).length > 0 && totalInstalls > 0) {
+      const sorted = Object.entries(groups).sort((a, b) => b[1] - a[1]);
+      const weights = sorted.map(e => e[1]);
+      const instAllocated = distributeInteger(totalInstalls, weights);
+      const scaledGroups = {};
+      sorted.forEach(([name], idx) => {
+        scaledGroups[name] = instAllocated[idx] || 0;
+      });
+      Object.keys(groups).forEach(k => delete groups[k]);
+      Object.assign(groups, scaledGroups);
     }
 
     const total = Object.values(groups).reduce((s, v) => s + v, 0);
@@ -201,7 +203,7 @@ export function AttributionRevenueTraffic({ operatorData, browserData, cityData,
   // ── Traffic Breakdown from real API data ──────────────────────────────────
   const operatorItems = showOperator ? buildOperatorShareItems(operatorData, rawInstallsBreakdown, hasAF) : null;
   const browserItems = showBrowser ? buildShareItems(browserData, "Browser", "browser") : null;
-  const geoItems = showGeo ? buildGeoShareItems(cityData, rawInstallsBreakdown, hasAF, globalEffectiveMetrics) : null;
+  const geoItems = showGeo ? buildGeoShareItems(cityData, rawInstallsBreakdown, hasAF, globalEffectiveMetrics, isCtvWithAF) : null;
 
   const countLabel = (items) => items ? `${items.length}` : "–";
 
