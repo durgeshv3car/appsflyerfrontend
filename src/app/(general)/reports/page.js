@@ -1202,16 +1202,13 @@ export default function DashboardRedesignPage() {
 
   const [isPdfLoading, setIsPdfLoading] = useState(false);
   const [isCsvLoading, setIsCsvLoading] = useState(false);
-  const [pdfExportTime, setPdfExportTime] = useState("");
 
   const handleExportPDF = async () => {
     if (isPdfLoading) return;
     try {
-      const nowStr = new Date().toLocaleString("en-IN", { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
-      setPdfExportTime(nowStr);
       setIsPdfLoading(true);
 
-      // Allow UI to update DOM so export buttons are replaced by timestamp
+      // Allow UI to update DOM so filter bar is hidden before capturing canvas
       await new Promise(resolve => setTimeout(resolve, 400));
 
       const { default: jsPDF } = await import("jspdf");
@@ -1409,9 +1406,8 @@ export default function DashboardRedesignPage() {
       ) : (
         <>
           {/* ── Filter Bar ── */}
-          <div className="st-filter-bar">
-            {!isPdfLoading ? (
-              <>
+          {!isPdfLoading && (
+            <div className="st-filter-bar">
                 <div
                   className="st-search-wrap"
                   ref={searchRef}
@@ -1457,7 +1453,7 @@ export default function DashboardRedesignPage() {
                   {isFocused && (
                     <div className="st-dropdown">
                       {!search && <div style={{ padding: "8px 12px", fontSize: 11, fontWeight: 700, color: "#9CA3AF" }}>SELECT A CAMPAIGN</div>}
-                      {(search ? filteredCampaigns : campaignsList.slice(0, 20)).map(c => (
+                      {(search ? filteredCampaigns : campaignsList).map(c => (
                         <div
                           key={c}
                           className="st-dropdown-item"
@@ -1709,16 +1705,8 @@ export default function DashboardRedesignPage() {
                     </button>
                   </div>
                 </div>
-              </>
-            ) : (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", width: "100%" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", backgroundColor: "#F8FAFC", color: "#334155", border: "1px solid #CBD5E1", borderRadius: "8px", padding: "6px 12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" }}>
-                  <span style={{ color: "#2563EB" }}>🕒</span>
-                  <span>Report Generated: <b>{pdfExportTime}</b></span>
-                </div>
               </div>
             )}
-          </div>
 
           {search.trim() !== "" && campaignsList.length > 0 && filteredCampaigns.length === 0 ? (
             <div style={{
@@ -2162,7 +2150,7 @@ export default function DashboardRedesignPage() {
           position: absolute; top: calc(100% + 4px); left: 0; width: 100%;
           background: #fff; border: 1px solid #E5E7EB; border-radius: 8px;
           box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 4px 0; z-index: 50;
-          max-height: 220px; overflow-y: auto;
+          max-height: 300px; overflow-y: auto;
         }
         .st-dropdown-item {
           padding: 6px 10px; font-size: 12px; color: #374151; cursor: pointer;
