@@ -45,10 +45,41 @@ const DAY_INDEX_MAP = {
   6: "Sat",
 };
 
-export function DeliveryByWeekday({ weekData = [], tableData: propTableData = [] }) {
+export function DeliveryByWeekday({ weekData = [], tableData: propTableData = [], globalEffectiveMetrics }) {
+  const targetImpressions = Number(globalEffectiveMetrics?.impressions || 0);
+
   const weekdayList = useMemo(() => {
-    // 1. Try to use backend-computed weekData if available and has impressions
-    if (Array.isArray(weekData) && weekData.length > 0) {
+    let list = [];
+
+    // 1. Try to aggregate from tableData / enrichedTableData first so it matches the date range exactly
+    if (Array.isArray(propTableData) && propTableData.length > 0) {
+      const mapped = {};
+      DAY_ORDER.forEach(d => { mapped[d] = 0; });
+      let hasAnyImp = false;
+
+      propTableData.forEach(r => {
+        const dateStr = r.period || r.Date || r.date || r.startDate;
+        const d = parseDateSafe(dateStr);
+        if (d) {
+          const dayName = DAY_INDEX_MAP[d.getDay()];
+          if (dayName) {
+            const imp = parseSafeNumber(r.rawImp !== undefined ? r.rawImp : (r.Impressions || r.impressions || 0));
+            mapped[dayName] = (mapped[dayName] || 0) + imp;
+            if (imp > 0) hasAnyImp = true;
+          }
+        }
+      });
+
+      if (hasAnyImp) {
+        list = DAY_ORDER.map(day => ({
+          day,
+          impr: mapped[day] || 0,
+        }));
+      }
+    }
+
+    // 2. Try to use backend-computed weekData if tableData didn't have dates
+    if (list.length === 0 && Array.isArray(weekData) && weekData.length > 0) {
       const mapped = {};
       DAY_ORDER.forEach(d => { mapped[d] = 0; });
       let hasAnyWeekImp = false;
@@ -64,43 +95,38 @@ export function DeliveryByWeekday({ weekData = [], tableData: propTableData = []
       });
 
       if (hasAnyWeekImp) {
-        return DAY_ORDER.map(day => ({
+        list = DAY_ORDER.map(day => ({
           day,
           impr: mapped[day] || 0,
         }));
       }
     }
 
-    // 2. Aggregate from tableData / enrichedTableData
-    if (Array.isArray(propTableData) && propTableData.length > 0) {
-      const mapped = {};
-      DAY_ORDER.forEach(d => { mapped[d] = 0; });
-
-      propTableData.forEach(r => {
-        const dateStr = r.period || r.Date || r.date || r.startDate;
-        const d = parseDateSafe(dateStr);
-        if (d) {
-          const dayName = DAY_INDEX_MAP[d.getDay()];
-          if (dayName) {
-            const imp = parseSafeNumber(r.rawImp !== undefined ? r.rawImp : (r.Impressions || r.impressions || 0));
-            mapped[dayName] = (mapped[dayName] || 0) + imp;
-          }
-        }
-      });
-
-      return DAY_ORDER.map(day => ({
-        day,
-        impr: mapped[day] || 0,
-      }));
+    if (list.length === 0) {
+      list = DAY_ORDER.map(day => ({ day, impr: 0 }));
     }
 
-    // 3. Fallback: all zeros (never show hardcoded fake numbers)
-    return DAY_ORDER.map(day => ({ day, impr: 0 }));
-  }, [weekData, propTableData]);
+    // Reconcile to targetImpressions if available
+    const sumImp = list.reduce((s, d) => s + d.impr, 0);
+    if (targetImpressions > 0 && sumImp > 0 && Math.abs(targetImpressions - sumImp) > 0) {
+      let allocated = 0;
+      list.forEach((d, idx) => {
+        if (idx === list.length - 1) {
+          d.impr = Math.max(0, targetImpressions - allocated);
+        } else {
+          const scaled = Math.round(targetImpressions * (d.impr / sumImp));
+          d.impr = scaled;
+          allocated += scaled;
+        }
+      });
+    }
+
+    return list;
+  }, [weekData, propTableData, targetImpressions]);
 
   const totalImpr = useMemo(() => {
-    return weekdayList.reduce((acc, d) => acc + d.impr, 0);
-  }, [weekdayList]);
+    return targetImpressions > 0 ? targetImpressions : weekdayList.reduce((acc, d) => acc + d.impr, 0);
+  }, [weekdayList, targetImpressions]);
 
   const peakDay = useMemo(() => {
     if (totalImpr === 0) return null;

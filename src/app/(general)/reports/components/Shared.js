@@ -105,9 +105,8 @@ export function distributeInteger(total, weights) {
 
   const totalWeight = weights.reduce((s, w) => s + Math.max(0, Number(w || 0)), 0);
   if (totalWeight <= 0) {
-    const res = new Array(weights.length).fill(0);
-    res[0] = totalInt;
-    return res;
+    const equalWeights = new Array(weights.length).fill(1);
+    return distributeInteger(totalInt, equalWeights);
   }
 
   // Quota calculation (Hamilton-Hare largest remainder method)
@@ -132,16 +131,24 @@ export function getDistributionWeights(items, getClicks, getImp) {
   const getClk = getClicks || ((r) => Number(r.clicks || r.Clicks || r.rawClicks || 0));
   const getIm = getImp || ((r) => Number(r.impressions || r.Impressions || r.rawImp || 0));
 
-  const hasClicks = items.some(r => getClk(r) > 0);
-  if (hasClicks) {
-    const weights = items.map(r => Math.max(0, getClk(r)));
-    const totalW = weights.reduce((a, b) => a + b, 0);
-    if (totalW > 0) return weights;
+  const clickWeights = items.map(r => Math.max(0, getClk(r)));
+  const totalClicks = clickWeights.reduce((a, b) => a + b, 0);
+  const itemsWithClicks = clickWeights.filter(w => w > 0).length;
+
+  const impWeights = items.map(r => Math.max(0, getIm(r)));
+  const totalImps = impWeights.reduce((a, b) => a + b, 0);
+  const itemsWithImps = impWeights.filter(w => w > 0).length;
+
+  const clickWeightIsVeryLess = totalClicks < 10
+    || (items.length > 1 && itemsWithClicks <= 1 && itemsWithImps > 1)
+    || (totalImps > 0 && (totalClicks / totalImps) < 0.0005)
+    || (itemsWithImps > 3 && itemsWithClicks / itemsWithImps < 0.2);
+
+  if (totalClicks > 0 && !clickWeightIsVeryLess) {
+    return clickWeights;
   }
 
-  const weights = items.map(r => Math.max(0, getIm(r)));
-  const totalW = weights.reduce((a, b) => a + b, 0);
-  if (totalW > 0) return weights;
+  if (totalImps > 0) return impWeights;
 
   return items.map(() => 1);
 }
@@ -159,9 +166,8 @@ export function distributeValues(total, weights) {
 
   const totalWeight = weights.reduce((s, w) => s + Math.max(0, Number(w || 0)), 0);
   if (totalWeight <= 0) {
-    const res = new Array(weights.length).fill(0);
-    res[0] = parseFloat(numTotal.toFixed(2));
-    return res;
+    const equalWeights = new Array(weights.length).fill(1);
+    return distributeValues(numTotal, equalWeights);
   }
 
   let runningSum = 0;

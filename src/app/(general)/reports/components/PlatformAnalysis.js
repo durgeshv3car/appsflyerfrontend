@@ -15,8 +15,9 @@ const getDeviceIcon = (label) => {
   return "🌐";
 };
 
-export function PlatformAnalysis({ deviceData = [], platformData = [] }) {
+export function PlatformAnalysis({ deviceData = [], platformData = [], globalEffectiveMetrics }) {
   const propData = (Array.isArray(deviceData) && deviceData.length > 0) ? deviceData : platformData;
+  const targetImpressions = Number(globalEffectiveMetrics?.impressions || 0);
 
   const dList = useMemo(() => {
     if (!Array.isArray(propData) || propData.length === 0) return [];
@@ -56,8 +57,25 @@ export function PlatformAnalysis({ deviceData = [], platformData = [] }) {
       groups[title].clk += clk;
     });
 
-    const groupList = Object.values(groups).sort((a, b) => b.imp - a.imp);
-    const totalImp = groupList.reduce((s, g) => s + g.imp, 0);
+    const groupList = Object.values(groups);
+    const sumImp = groupList.reduce((s, g) => s + g.imp, 0);
+
+    if (targetImpressions > 0 && sumImp > 0 && Math.abs(targetImpressions - sumImp) > 0) {
+      let allocatedImp = 0;
+      groupList.forEach((g, idx) => {
+        if (idx === groupList.length - 1) {
+          g.imp = Math.max(0, targetImpressions - allocatedImp);
+        } else {
+          const ratio = g.imp / sumImp;
+          const scaled = Math.round(targetImpressions * ratio);
+          g.imp = scaled;
+          allocatedImp += scaled;
+        }
+      });
+    }
+
+    groupList.sort((a, b) => b.imp - a.imp);
+    const totalImp = targetImpressions > 0 ? targetImpressions : groupList.reduce((s, g) => s + g.imp, 0);
 
     return groupList.map((g, i) => {
       const pct = totalImp > 0 ? (g.imp / totalImp * 100) : 0;
@@ -75,11 +93,11 @@ export function PlatformAnalysis({ deviceData = [], platformData = [] }) {
         icon: getDeviceIcon(g.title),
       };
     });
-  }, [propData]);
+  }, [propData, targetImpressions]);
 
   const totalImpr = useMemo(() => {
-    return dList.reduce((acc, item) => acc + item.imprVal, 0);
-  }, [dList]);
+    return targetImpressions > 0 ? targetImpressions : dList.reduce((acc, item) => acc + item.imprVal, 0);
+  }, [dList, targetImpressions]);
 
   const chartData = {
     labels: dList.map(d => d.label),

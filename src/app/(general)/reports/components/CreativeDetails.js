@@ -22,9 +22,8 @@ const getPriceForDate = (pricingObj, targetDate) => {
       break;
     }
   }
-  if (latestValue === undefined && sortedDates.length > 0) {
-    latestValue = normalizedPricing[sortedDates[0]];
-  }
+  // NOTE: No fallback to first date — if no pricing applies before targetDate, return undefined
+  // so spend is not miscalculated with a future/wrong price rate.
   return latestValue;
 };
 
@@ -35,8 +34,23 @@ export function CreativeDetails({ creativeData: propData, campaignPricing, globa
 
   const hasVideo = !!globalEffectiveMetrics?.hasVideoData;
   const hasAF = !!globalEffectiveMetrics?.hasAppsflyerData;
+  const targetImpressions = Number(globalEffectiveMetrics?.impressions || 0);
+  const targetClicks = Number(globalEffectiveMetrics?.clicks || 0);
+  const targetSpend = Number(globalEffectiveMetrics?.spend || 0);
   const totalInstalls = Number(globalEffectiveMetrics?.installs || 0);
   const totalConversions = Number(globalEffectiveMetrics?.conversions || 0);
+
+  const targetVideoViews = Math.round(Number(globalEffectiveMetrics?.totalViews || globalEffectiveMetrics?.totalVideoViews || 0));
+  const targetVideoComplete = Math.round(Number(globalEffectiveMetrics?.totalVideoComplete || 0));
+  const targetVideoFirstQ = Math.round(Number(globalEffectiveMetrics?.totalVideoFirstQ || 0));
+  const targetVideoMidpoint = Math.round(Number(globalEffectiveMetrics?.totalVideoMidpoint || 0));
+  const targetVideoThirdQ = Math.round(Number(globalEffectiveMetrics?.totalVideoThirdQ || 0));
+
+  const effectiveTargetViews = targetVideoViews > 0 ? targetVideoViews : (targetImpressions > 0 ? Math.round(targetImpressions * 0.98836) : 0);
+  const effectiveTargetComplete = targetVideoComplete > 0 ? targetVideoComplete : (targetImpressions > 0 ? Math.round(targetImpressions * 0.8846) : 0);
+  const effectiveTargetFirstQ = targetVideoFirstQ > 0 ? targetVideoFirstQ : (targetImpressions > 0 ? Math.round(targetImpressions * 0.9474) : 0);
+  const effectiveTargetMidpoint = targetVideoMidpoint > 0 ? targetVideoMidpoint : (targetImpressions > 0 ? Math.round(targetImpressions * 0.9222) : 0);
+  const effectiveTargetThirdQ = targetVideoThirdQ > 0 ? targetVideoThirdQ : (targetImpressions > 0 ? Math.round(targetImpressions * 0.8999) : 0);
 
   const ctype = String(selectedAudience?.campaignType || selectedAudience?.campaign_type || "").toUpperCase();
   const isCtvWithAF = ctype.includes("CTV") && hasAF;
@@ -92,58 +106,276 @@ export function CreativeDetails({ creativeData: propData, campaignPricing, globa
   const isCpcCampaign = hasAF ? true : (isCpcDefined || !!globalEffectiveMetrics?.isCpcCampaign);
 
   const list = useMemo(() => {
-    if (!Array.isArray(propData) || propData.length === 0) return [];
-    const rawList = propData.map(r => {
-      const imp = Number(r.Impressions || r.impressions || 0);
-      const clk = Number(r.Clicks || r.clicks || 0);
-      const rawCtr = imp > 0 && clk > 0 ? (clk / imp * 100) : Number(r.CTR || r.ctr || 0) * (Number(r.CTR || r.ctr || 0) > 1 ? 1 : 100);
-      
-      let spent = 0;
-      let rowCpm = 0;
-      let rowCpc = 0;
+    let sourceData = Array.isArray(propData) ? propData : [];
 
+    // Fallback: If propData is empty but targetImpressions > 0 and dbCreatives has items, use dbCreatives
+    if (sourceData.length === 0 && targetImpressions > 0 && Array.isArray(dbCreatives) && dbCreatives.length > 0) {
+      sourceData = dbCreatives.map(c => ({
+        Creative: c.creativeName || c.name || c.title || "Creative",
+        Impressions: 1,
+        Clicks: 0,
+        fileUrl: c.fileUrl || c.url || c.assetUrl || "",
+        type: c.type || c.creativeType || (hasVideo ? "video" : "banner")
+      }));
+    }
+
+    if (sourceData.length === 0) return [];
+
+    const groups = {};
+
+    sourceData.forEach(r => {
+      const rawName = String(
+        r.creative_name || r.Creative || r.creative || r.CreativeName || 
+        r.Title || r.title || r.name || r.line_item_name || r.LineItem || "Creative"
+      ).trim();
+
+      if (!rawName || rawName.toLowerCase() === "null" || rawName.toLowerCase() === "undefined" || rawName.toLowerCase() === "total:") return;
+
+      // Detect rich-media type from creative name if not already set on the row
+      const detectTypeFromName = (name) => {
+        const n = String(name).toLowerCase();
+        if (n.includes("rich-media") || n.includes("richmedia") || n.includes("rich_media")) return "rich-media";
+        if (n.includes("html5") || n.includes(".zip")) return "rich-media";
+        if (n.includes("ctv") || n.includes("connected tv")) return "ctv";
+        if (n.includes("video") || n.includes(".mp4")) return "video";
+        return null;
+      };
+      if (!r.type && !r.creativeType) {
+        const detectedType = detectTypeFromName(rawName);
+        if (detectedType) r = { ...r, type: detectedType };
+      }
+
+      const imp = Number(r.Impressions || r.impressions || r.rawImp || r.rawImpressions || 0);
+      const clk = Number(r.Clicks || r.clicks || r.rawClicks || 0);
+      const rowDate = r.Date || r.date || "";
+
+      const pCPM = getPriceForDate(campaignPricing?.cpm, rowDate);
+      const pCPC = getPriceForDate(campaignPricing?.cpc, rowDate);
+      const hasRowCpc = pCPC !== undefined && pCPC !== null && !isNaN(Number(pCPC));
+
+      let rowSpent = 0;
       if (hasAF) {
-        rowCpm = effectiveCpm || Number(r.CPM || r.cpm || r.eCPM || 320);
-        spent = (imp / 1000) * rowCpm;
-        rowCpc = clk > 0 ? spent / clk : 0;
+        rowSpent = (imp / 1000) * (effectiveCpm || 320);
       } else {
-        if (anyCpmRate > 0) {
-          spent = (imp / 1000) * anyCpmRate;
-        } else if (isCpcDefined) {
-          spent = clk * Number(anyCpcRate);
+        if (pCPM > 0) {
+          rowSpent = (imp / 1000) * Number(pCPM);
+        } else if (hasRowCpc) {
+          rowSpent = clk * Number(pCPC);
         } else if (globalEffectiveMetrics?.eCPM > 0) {
-          spent = (imp / 1000) * globalEffectiveMetrics.eCPM;
+          rowSpent = (imp / 1000) * globalEffectiveMetrics.eCPM;
         } else if (globalEffectiveMetrics?.eCPC > 0) {
-          spent = clk * globalEffectiveMetrics.eCPC;
+          rowSpent = clk * globalEffectiveMetrics.eCPC;
         } else {
           const rCPM = Number(r.CPM || r.cpm || 0);
           const rCPC = Number(r.CPC || r.cpc || 0);
-          spent = rCPM > 0 ? (imp / 1000) * rCPM : (clk * rCPC);
+          rowSpent = rCPM > 0 ? (imp / 1000) * rCPM : (clk * rCPC);
         }
-
-        rowCpm = isCpmCampaign && imp > 0 ? (spent / imp) * 1000 : 0;
-        rowCpc = isCpcDefined 
-          ? (Number(anyCpcRate) === 0 ? 0 : (clk > 0 ? (spent / clk) : Number(anyCpcRate)))
-          : (isCpcCampaign && clk > 0 ? (spent / clk) : 0);
       }
 
-      const completeViews = hasVideo ? Number(r.completeViewsVideo || r.CompleteViewsVideo || r.complete_views || r.completeViews || Math.round(imp * 0.8846)) : 0;
-      const vViews = hasVideo ? Number(r.Views || r.views || r.VideoViews || completeViews || Math.round(imp * 0.98836)) : 0;
-      const vFirstQ = hasVideo ? Number(r.firstQuartileViewsVideo || r.FirstQuartileViewsVideo || Math.round(imp * 0.9474)) : 0;
-      const vMidpoint = hasVideo ? Number(r.midpointViewsVideo || r.MidpointViewsVideo || Math.round(imp * 0.9222)) : 0;
-      const vThirdQ = hasVideo ? Number(r.thirdQuartileViewsVideo || r.ThirdQuartileViewsVideo || Math.round(imp * 0.8999)) : 0;
-      const cpvVal = vViews > 0 ? spent / vViews : 0;
-      const cpcvVal = completeViews > 0 ? spent / completeViews : 0;
+      const completeViews = hasVideo ? Number(r.completeViewsVideo || r.CompleteViewsVideo || r.complete_views || r.completeViews || r["Complete Views"] || 0) : 0;
+      const vViews = hasVideo ? Number(r.Views || r.views || r.VideoViews || completeViews || 0) : 0;
+      const vFirstQ = hasVideo ? Number(r.firstQuartileViewsVideo || r.FirstQuartileViewsVideo || r["First Quartile Views"] || 0) : 0;
+      const vMidpoint = hasVideo ? Number(r.midpointViewsVideo || r.MidpointViewsVideo || r["Midpoint Views"] || 0) : 0;
+      const vThirdQ = hasVideo ? Number(r.thirdQuartileViewsVideo || r.ThirdQuartileViewsVideo || r["Third Quartile Views"] || 0) : 0;
 
-      const rawName = r.Creative || r.creative || r.CreativeName || r.name || "Creative";
+      if (!groups[rawName]) {
+        groups[rawName] = {
+          name: rawName,
+          rawImpressions: 0,
+          rawClicks: 0,
+          rawSpent: 0,
+          rawViews: 0,
+          rawComplete: 0,
+          rawFirstQ: 0,
+          rawMidpoint: 0,
+          rawThirdQ: 0,
+          firstRow: r
+        };
+      }
+
+      groups[rawName].rawImpressions += imp;
+      groups[rawName].rawClicks += clk;
+      groups[rawName].rawSpent += rowSpent;
+      groups[rawName].rawViews += vViews;
+      groups[rawName].rawComplete += completeViews;
+      groups[rawName].rawFirstQ += vFirstQ;
+      groups[rawName].rawMidpoint += vMidpoint;
+      groups[rawName].rawThirdQ += vThirdQ;
+    });
+
+    const result = Object.values(groups);
+    if (result.length === 0) return [];
+
+    // Scale impressions to match targetImpressions from performance table/KPI summary.
+    // Only scale if the difference is significant (>1% of target OR >1000 absolute diff)
+    // to avoid trivial rounding differences between the two API endpoints causing re-distribution.
+    const totalImpSum = result.reduce((sum, g) => sum + g.rawImpressions, 0);
+    const impDiff = Math.abs(targetImpressions - totalImpSum);
+    const impDiffIsSignificant = targetImpressions > 0 && impDiff > Math.max(1000, targetImpressions * 0.01);
+
+    if (targetImpressions > 0 && totalImpSum > 0 && impDiffIsSignificant) {
+      // Significant mismatch — scale creative impressions proportionally to match KPI total
+      let allocatedImp = 0;
+      result.forEach((g, idx) => {
+        if (idx === result.length - 1) {
+          g.rawImpressions = Math.max(0, targetImpressions - allocatedImp);
+        } else {
+          const ratio = g.rawImpressions / totalImpSum;
+          const scaled = Math.round(targetImpressions * ratio);
+          g.rawImpressions = scaled;
+          allocatedImp += scaled;
+        }
+      });
+    } else if (targetImpressions > 0 && totalImpSum === 0) {
+      // No raw data at all — distribute target impressions equally
+      let allocatedImp = 0;
+      result.forEach((g, idx) => {
+        if (idx === result.length - 1) {
+          g.rawImpressions = Math.max(0, targetImpressions - allocatedImp);
+        } else {
+          const scaled = Math.round(targetImpressions / result.length);
+          g.rawImpressions = scaled;
+          allocatedImp += scaled;
+        }
+      });
+    }
+    // else: totalImpSum matches targetImpressions closely — use raw creative data as-is
+
+    // Scale clicks to match targetClicks from performance table/KPI summary.
+    // Use same significance threshold to avoid trivial API aggregation differences.
+    const totalClicksSum = result.reduce((sum, g) => sum + g.rawClicks, 0);
+    const clicksDiff = Math.abs(targetClicks - totalClicksSum);
+    const clicksDiffIsSignificant = targetClicks > 0 && clicksDiff > Math.max(100, targetClicks * 0.01);
+
+    if (targetClicks > 0 && totalClicksSum > 0 && clicksDiffIsSignificant) {
+      let allocatedClicks = 0;
+      result.forEach((g, idx) => {
+        if (idx === result.length - 1) {
+          g.rawClicks = Math.max(0, targetClicks - allocatedClicks);
+        } else {
+          const ratio = g.rawClicks / totalClicksSum;
+          const scaled = Math.round(targetClicks * ratio);
+          g.rawClicks = scaled;
+          allocatedClicks += scaled;
+        }
+      });
+    } else if (targetClicks > 0 && totalClicksSum === 0) {
+      const clickWeights = getDistributionWeights(result, () => 0, g => g.rawImpressions);
+      const allocatedClicks = distributeInteger(targetClicks, clickWeights);
+      result.forEach((g, idx) => {
+        g.rawClicks = allocatedClicks[idx] || 0;
+      });
+    }
+
+    // Reconcile spend to match targetSpend from performance table/KPI summary
+    const currentSpentSum = result.reduce((sum, g) => sum + g.rawSpent, 0);
+    if (targetSpend > 0 && currentSpentSum > 0 && Math.abs(targetSpend - currentSpentSum) > 0.05) {
+      let allocatedSpend = 0;
+      result.forEach((g, idx) => {
+        if (idx === result.length - 1) {
+          g.rawSpent = Math.max(0, parseFloat((targetSpend - allocatedSpend).toFixed(2)));
+        } else {
+          const ratio = g.rawSpent / currentSpentSum;
+          const scaled = parseFloat((targetSpend * ratio).toFixed(2));
+          g.rawSpent = scaled;
+          allocatedSpend += scaled;
+        }
+      });
+    } else if (targetSpend > 0 && currentSpentSum === 0) {
+      let allocatedSpend = 0;
+      const totalWeight = result.reduce((s, g) => s + (isCpcCampaign && !isCpmCampaign ? g.rawClicks : g.rawImpressions), 0);
+      result.forEach((g, idx) => {
+        if (idx === result.length - 1) {
+          g.rawSpent = Math.max(0, parseFloat((targetSpend - allocatedSpend).toFixed(2)));
+        } else {
+          const weight = isCpcCampaign && !isCpmCampaign ? g.rawClicks : g.rawImpressions;
+          const ratio = totalWeight > 0 ? weight / totalWeight : 1 / result.length;
+          const scaled = parseFloat((targetSpend * ratio).toFixed(2));
+          g.rawSpent = scaled;
+          allocatedSpend += scaled;
+        }
+      });
+    }
+
+    // Reconcile video metrics across creatives
+    if (hasVideo && result.length > 0) {
+      const impWeights = result.map(g => Math.max(0, Number(g.rawImpressions || 0)));
+
+      if (effectiveTargetViews > 0) {
+        const sumRaw = result.reduce((s, g) => s + (g.rawViews || 0), 0);
+        const w = sumRaw > 0 ? result.map(g => Math.max(0, Number(g.rawViews || 0))) : impWeights;
+        const alloc = distributeInteger(effectiveTargetViews, w);
+        result.forEach((g, idx) => { g.rawViews = alloc[idx] || 0; });
+      }
+
+      if (effectiveTargetFirstQ > 0) {
+        const sumRaw = result.reduce((s, g) => s + (g.rawFirstQ || 0), 0);
+        const w = sumRaw > 0 ? result.map(g => Math.max(0, Number(g.rawFirstQ || 0))) : impWeights;
+        const alloc = distributeInteger(effectiveTargetFirstQ, w);
+        result.forEach((g, idx) => { g.rawFirstQ = alloc[idx] || 0; });
+      }
+
+      if (effectiveTargetMidpoint > 0) {
+        const sumRaw = result.reduce((s, g) => s + (g.rawMidpoint || 0), 0);
+        const w = sumRaw > 0 ? result.map(g => Math.max(0, Number(g.rawMidpoint || 0))) : impWeights;
+        const alloc = distributeInteger(effectiveTargetMidpoint, w);
+        result.forEach((g, idx) => { g.rawMidpoint = alloc[idx] || 0; });
+      }
+
+      if (effectiveTargetThirdQ > 0) {
+        const sumRaw = result.reduce((s, g) => s + (g.rawThirdQ || 0), 0);
+        const w = sumRaw > 0 ? result.map(g => Math.max(0, Number(g.rawThirdQ || 0))) : impWeights;
+        const alloc = distributeInteger(effectiveTargetThirdQ, w);
+        result.forEach((g, idx) => { g.rawThirdQ = alloc[idx] || 0; });
+      }
+
+      if (effectiveTargetComplete > 0) {
+        const sumRaw = result.reduce((s, g) => s + (g.rawComplete || 0), 0);
+        const w = sumRaw > 0 ? result.map(g => Math.max(0, Number(g.rawComplete || 0))) : impWeights;
+        const alloc = distributeInteger(effectiveTargetComplete, w);
+        result.forEach((g, idx) => { g.rawComplete = alloc[idx] || 0; });
+      }
+    }
+
+    // Sort by impressions descending
+    result.sort((a, b) => b.rawImpressions - a.rawImpressions);
+
+    const weights = getDistributionWeights(result, r => r.rawClicks, r => r.rawImpressions);
+    const convAllocated = distributeValues(totalConversions, weights);
+    const instAllocated = distributeInteger(totalInstalls, weights);
+
+    return result.map((r, idx) => {
+      const imp = r.rawImpressions;
+      const clk = r.rawClicks;
+      const spent = r.rawSpent;
+      const rawCtr = imp > 0 ? (clk / imp * 100) : 0;
+      const rowCpm = isCpmCampaign && imp > 0 ? (spent / imp) * 1000 : (effectiveCpm || 0);
+      const rowCpc = isCpcDefined 
+        ? (Number(anyCpcRate) === 0 ? 0 : (clk > 0 ? (spent / clk) : Number(anyCpcRate)))
+        : (isCpcCampaign && clk > 0 ? (spent / clk) : 0);
+
+      const cpvVal = r.rawViews > 0 ? spent / r.rawViews : 0;
+      const cpcvVal = r.rawComplete > 0 ? spent / r.rawComplete : 0;
+
+      const rawName = r.name;
       const matched = dbCreatives.find(dbC => {
         const dbName = String(dbC.creativeName || dbC.name || dbC.title || "").toLowerCase().replace(/[^a-z0-9]/g, "");
         const rowName = String(rawName).toLowerCase().replace(/[^a-z0-9]/g, "");
         return dbName && rowName && (dbName === rowName || dbName.includes(rowName) || rowName.includes(dbName));
       });
 
-      const fileUrl = r.fileUrl || r.url || r.assetUrl || r.creativeUrl || r.image || r.video || matched?.fileUrl || matched?.url || matched?.assetUrl || "";
-      const type = r.type || r.creativeType || matched?.type || matched?.creativeType || (hasVideo ? "video" : "banner");
+      const fileUrl = r.firstRow?.fileUrl || r.firstRow?.url || r.firstRow?.assetUrl || r.firstRow?.creativeUrl || r.firstRow?.image || r.firstRow?.video || matched?.fileUrl || matched?.url || matched?.assetUrl || "";
+      // Resolve creative type: prefer DB match, then row type, then detect from name, then fallback
+      const detectRichMedia = (name) => {
+        const n = String(name || "").toLowerCase();
+        if (n.includes("rich-media") || n.includes("richmedia") || n.includes("rich_media") || n.includes("html5") || n.includes(".zip")) return "rich-media";
+        if (n.includes("ctv") || n.includes("connected tv")) return "ctv";
+        return null;
+      };
+      const type = matched?.type || matched?.creativeType || r.firstRow?.type || r.firstRow?.creativeType || detectRichMedia(rawName) || (hasVideo ? "video" : "banner");
+
+      const inst = instAllocated[idx] || 0;
+      const conv = convAllocated[idx] || 0;
 
       return {
         name: rawName,
@@ -159,56 +391,41 @@ export function CreativeDetails({ creativeData: propData, campaignPricing, globa
         rawSpent: spent,
         impressions: imp.toLocaleString('en-IN'),
         clicks: clk.toLocaleString('en-IN'),
-        ctr: rawCtr > 0 ? rawCtr.toFixed(2) + "%" : "0.00%",
+        ctr: rawCtr.toFixed(2) + "%",
         cpmVal: rowCpm,
         cpm: "₹" + rowCpm.toFixed(2),
         cpcVal: rowCpc,
         cpc: "₹" + rowCpc.toFixed(2),
         spentFormatted: "₹" + spent.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-        rawViews: vViews,
-        rawComplete: completeViews,
-        rawFirstQ: vFirstQ,
-        rawMidpoint: vMidpoint,
-        rawThirdQ: vThirdQ,
+        rawViews: r.rawViews,
+        rawComplete: r.rawComplete,
+        rawFirstQ: r.rawFirstQ,
+        rawMidpoint: r.rawMidpoint,
+        rawThirdQ: r.rawThirdQ,
         cpvVal,
         cpcvVal,
-      };
-    });
-
-    const weights = getDistributionWeights(rawList, r => r.rawClicks, r => r.rawImpressions);
-    const convAllocated = distributeValues(totalConversions, weights);
-    const instAllocated = distributeInteger(totalInstalls, weights);
-
-    return rawList.map((r, idx) => {
-      const inst = instAllocated[idx] || 0;
-      const conv = convAllocated[idx] || 0;
-
-      return {
-        ...r,
         installs: inst,
         conversions: conv,
         installsFormatted: inst.toLocaleString('en-IN'),
         conversionsFormatted: conv.toLocaleString('en-IN'),
       };
     });
-  }, [propData, effectiveCpm, anyCpmRate, anyCpcRate, isCpmCampaign, isCpcCampaign, hasAF, hasVideo, totalInstalls, totalConversions, dbCreatives, globalEffectiveMetrics]);
+  }, [propData, dbCreatives, campaignPricing, globalEffectiveMetrics, effectiveCpm, anyCpmRate, anyCpcRate, isCpcDefined, isCpmCampaign, isCpcCampaign, hasAF, hasVideo, targetImpressions, targetClicks, targetSpend, totalInstalls, totalConversions, effectiveTargetViews, effectiveTargetComplete, effectiveTargetFirstQ, effectiveTargetMidpoint, effectiveTargetThirdQ]);
 
   const totals = useMemo(() => {
-    const totalImpr = list.reduce((a, r) => a + r.rawImpressions, 0);
-    const totalClicks = list.reduce((a, r) => a + r.rawClicks, 0);
+    const totalImpr = targetImpressions > 0 ? targetImpressions : list.reduce((a, r) => a + r.rawImpressions, 0);
+    const totalClicks = targetClicks > 0 ? targetClicks : list.reduce((a, r) => a + r.rawClicks, 0);
     const avgCtr = totalImpr > 0 ? (totalClicks / totalImpr * 100).toFixed(2) + "%" : "0.00%";
-    const totalViews = list.reduce((a, r) => a + r.rawViews, 0);
-    const totalComplete = list.reduce((a, r) => a + r.rawComplete, 0);
-    const totalFirstQ = list.reduce((a, r) => a + r.rawFirstQ, 0);
-    const totalMidpoint = list.reduce((a, r) => a + r.rawMidpoint, 0);
-    const totalThirdQ = list.reduce((a, r) => a + r.rawThirdQ, 0);
+    const totalViews = (hasVideo && effectiveTargetViews > 0) ? effectiveTargetViews : list.reduce((a, r) => a + r.rawViews, 0);
+    const totalComplete = (hasVideo && effectiveTargetComplete > 0) ? effectiveTargetComplete : list.reduce((a, r) => a + r.rawComplete, 0);
+    const totalFirstQ = (hasVideo && effectiveTargetFirstQ > 0) ? effectiveTargetFirstQ : list.reduce((a, r) => a + r.rawFirstQ, 0);
+    const totalMidpoint = (hasVideo && effectiveTargetMidpoint > 0) ? effectiveTargetMidpoint : list.reduce((a, r) => a + r.rawMidpoint, 0);
+    const totalThirdQ = (hasVideo && effectiveTargetThirdQ > 0) ? effectiveTargetThirdQ : list.reduce((a, r) => a + r.rawThirdQ, 0);
     
-    const totalSpent = hasAF 
+    const totalSpent = targetSpend > 0 ? targetSpend : (hasAF 
       ? (totalImpr / 1000) * effectiveCpm 
-      : list.reduce((sum, r) => sum + (r.rawSpent || 0), 0);
-    const avgCpm = hasAF 
-      ? "₹" + effectiveCpm.toFixed(2) 
-      : (isCpmCampaign && totalImpr > 0 ? "₹" + ((totalSpent / totalImpr) * 1000).toFixed(2) : "₹0.00");
+      : list.reduce((sum, r) => sum + (r.rawSpent || 0), 0));
+    const avgCpm = isCpmCampaign && totalImpr > 0 ? "₹" + ((totalSpent / totalImpr) * 1000).toFixed(2) : (hasAF ? "₹" + effectiveCpm.toFixed(2) : "₹0.00");
     const avgCpc = isCpcDefined
       ? (Number(anyCpcRate) === 0 ? "₹0.00" : (totalClicks > 0 ? "₹" + (totalSpent / totalClicks).toFixed(2) : "₹" + Number(anyCpcRate).toFixed(2)))
       : (isCpcCampaign && totalClicks > 0 ? "₹" + (totalSpent / totalClicks).toFixed(2) : "₹0.00");
@@ -231,7 +448,7 @@ export function CreativeDetails({ creativeData: propData, campaignPricing, globa
       totalInstalls: totalInstalls.toLocaleString('en-IN'),
       totalConversions: totalConversions.toLocaleString('en-IN'),
     };
-  }, [list, effectiveCpm, hasAF, isCpmCampaign, isCpcCampaign, totalInstalls, totalConversions]);
+  }, [list, targetImpressions, targetClicks, targetSpend, effectiveCpm, hasAF, isCpmCampaign, isCpcCampaign, isCpcDefined, anyCpcRate, totalInstalls, totalConversions, hasVideo, effectiveTargetViews, effectiveTargetComplete, effectiveTargetFirstQ, effectiveTargetMidpoint, effectiveTargetThirdQ]);
 
   const totalPages = Math.ceil(list.length / PAGE_SIZE) || 1;
   const from = list.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;

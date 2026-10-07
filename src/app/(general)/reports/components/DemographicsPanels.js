@@ -2,11 +2,14 @@
 import React, { useMemo } from "react";
 import "@/lib/chart";
 import { Doughnut, Bar } from "react-chartjs-2";
+import { distributeInteger } from "./Shared";
 
 const GENDER_PALETTE = ["#1F6FEB", "#D63384", "#9CA3AF"];
 const AGE_PALETTE = ["#1F6FEB", "#2ECC71", "#8E44AD", "#F1C40F", "#E74C3C", "#2C2C2C", "#0EA5E9", "#F97316"];
 
-export function GenderChart({ genderData = [] }) {
+export function GenderChart({ genderData = [], globalEffectiveMetrics }) {
+  const targetImpressions = Number(globalEffectiveMetrics?.impressions || 0);
+
   const chartData = useMemo(() => {
     let maleTotal = 0;
     let femaleTotal = 0;
@@ -15,7 +18,7 @@ export function GenderChart({ genderData = [] }) {
 
     list.forEach((item) => {
       const gender = String(item.name || item.Gender || item.gender || item.genderName || item.Demographic || "").toLowerCase().trim();
-      const impressions = Number(item.impressions || item.Impressions || item.impressions_count || item.clicks || item.Clicks || 0);
+      const impressions = Number(item.rawImp !== undefined ? item.rawImp : (item.Impressions !== undefined ? item.Impressions : (item.impressions !== undefined ? item.impressions : (item.impressions_count || item.clicks || item.Clicks || 0))));
 
       if (gender.includes("male") && !gender.includes("female") || gender === "m") {
         maleTotal += impressions;
@@ -25,13 +28,17 @@ export function GenderChart({ genderData = [] }) {
     });
 
     const total = maleTotal + femaleTotal;
+    const maleImp = (total > 0 && targetImpressions > 0) ? Math.round(targetImpressions * (maleTotal / total)) : maleTotal;
+    const femaleImp = (total > 0 && targetImpressions > 0) ? Math.max(0, targetImpressions - maleImp) : femaleTotal;
 
     return {
       male: total > 0 ? Math.round((maleTotal / total) * 100) : (list.length > 0 ? 50 : 0),
       female: total > 0 ? Math.round((femaleTotal / total) * 100) : (list.length > 0 ? 50 : 0),
+      maleImpressions: maleImp,
+      femaleImpressions: femaleImp,
       hasData: list.length > 0
     };
-  }, [genderData]);
+  }, [genderData, targetImpressions]);
 
   const data = {
     labels: ["Male", "Female"],
@@ -52,7 +59,11 @@ export function GenderChart({ genderData = [] }) {
       tooltip: {
         enabled: true,
         callbacks: {
-          label: (context) => `${context.label}: ${context.raw}%`
+          label: (context) => {
+            const pct = context.raw;
+            const imps = context.label === "Male" ? chartData.maleImpressions : chartData.femaleImpressions;
+            return `${context.label}: ${pct}%${imps > 0 ? ` (${imps.toLocaleString('en-IN')} impressions)` : ""}`;
+          }
         }
       },
     },
@@ -97,7 +108,9 @@ export function GenderChart({ genderData = [] }) {
   );
 }
 
-export function AgeChart({ ageData = [] }) {
+export function AgeChart({ ageData = [], globalEffectiveMetrics }) {
+  const targetImpressions = Number(globalEffectiveMetrics?.impressions || 0);
+
   const { datasets, groups } = useMemo(() => {
     const list = Array.isArray(ageData) ? ageData : (ageData?.data || ageData?.report || []);
 
@@ -110,7 +123,7 @@ export function AgeChart({ ageData = [] }) {
 
     list.forEach((item, idx) => {
       let rawName = String(item.name || item.Age || item.age || item.ageRange || item.AgeGroup || item.ageGroup || item.Demographic || `Group ${idx + 1}`).trim();
-      const impressions = Number(item.impressions || item.Impressions || item.impressions_count || item.clicks || item.Clicks || 0);
+      const impressions = Number(item.rawImp !== undefined ? item.rawImp : (item.Impressions !== undefined ? item.Impressions : (item.impressions !== undefined ? item.impressions : (item.impressions_count || item.clicks || item.Clicks || 0))));
 
       if (groupMap.has(rawName)) {
         groupMap.get(rawName).value += impressions;
@@ -124,6 +137,17 @@ export function AgeChart({ ageData = [] }) {
     });
 
     const items = Array.from(groupMap.values());
+    const sumImp = items.reduce((s, it) => s + it.value, 0);
+
+    // Reconcile age group impressions to targetImpressions
+    if (targetImpressions > 0 && items.length > 0) {
+      const weights = sumImp > 0 ? items.map(it => it.value) : items.map(() => 1);
+      const allocated = distributeInteger(targetImpressions, weights);
+      items.forEach((item, idx) => {
+        item.value = allocated[idx] || 0;
+      });
+    }
+
     const ds = items.map(item => ({
       label: item.label,
       data: [item.value],
@@ -132,7 +156,7 @@ export function AgeChart({ ageData = [] }) {
     }));
 
     return { datasets: ds, groups: items };
-  }, [ageData]);
+  }, [ageData, targetImpressions]);
 
   const data = {
     labels: ["Programmatic"],
@@ -147,7 +171,12 @@ export function AgeChart({ ageData = [] }) {
       legend: { display: false },
       tooltip: {
         callbacks: {
-          label: (context) => `${context.dataset.label}: ${Number(context.raw).toLocaleString('en-IN')} impressions`
+          label: (context) => {
+            const val = Number(context.raw || 0);
+            const total = targetImpressions > 0 ? targetImpressions : groups.reduce((s, g) => s + g.value, 0);
+            const pct = total > 0 ? ((val / total) * 100).toFixed(1) + "%" : "";
+            return `${context.dataset.label}: ${val.toLocaleString('en-IN')} impressions${pct ? ` (${pct})` : ""}`;
+          }
         }
       },
     },

@@ -5,7 +5,9 @@ import { Doughnut } from "react-chartjs-2";
 
 const PALETTE = ["#2563EB", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899", "#0EA5E9", "#6366F1", "#F43F5E"];
 
-export function PlacementPositionPanel({ placementPosData = [] }) {
+export function PlacementPositionPanel({ placementPosData = [], globalEffectiveMetrics }) {
+  const targetImpressions = Number(globalEffectiveMetrics?.impressions || 0);
+
   const processedData = useMemo(() => {
     const list = Array.isArray(placementPosData) ? placementPosData : (placementPosData?.data || placementPosData?.report || []);
     if (!list || list.length === 0) return [];
@@ -35,8 +37,25 @@ export function PlacementPositionPanel({ placementPosData = [] }) {
       grouped[rawLabel].clk += clk;
     });
 
-    const items = Object.values(grouped).sort((a, b) => b.imp - a.imp);
-    const totalImpressions = items.reduce((acc, it) => acc + it.imp, 0);
+    const items = Object.values(grouped);
+    const sumImp = items.reduce((acc, it) => acc + it.imp, 0);
+
+    if (targetImpressions > 0 && sumImp > 0 && Math.abs(targetImpressions - sumImp) > 0) {
+      let allocatedImp = 0;
+      items.forEach((item, idx) => {
+        if (idx === items.length - 1) {
+          item.imp = Math.max(0, targetImpressions - allocatedImp);
+        } else {
+          const ratio = item.imp / sumImp;
+          const scaled = Math.round(targetImpressions * ratio);
+          item.imp = scaled;
+          allocatedImp += scaled;
+        }
+      });
+    }
+
+    items.sort((a, b) => b.imp - a.imp);
+    const totalImpressions = targetImpressions > 0 ? targetImpressions : items.reduce((acc, it) => acc + it.imp, 0);
 
     return items.map((item, idx) => {
       const ctr = item.imp > 0 && item.clk > 0 ? (item.clk / item.imp * 100).toFixed(2) + "%" : "0.00%";
@@ -50,11 +69,11 @@ export function PlacementPositionPanel({ placementPosData = [] }) {
         color: PALETTE[idx % PALETTE.length]
       };
     });
-  }, [placementPosData]);
+  }, [placementPosData, targetImpressions]);
 
   const totalImpr = useMemo(() => {
-    return processedData.reduce((s, d) => s + d.value, 0);
-  }, [processedData]);
+    return targetImpressions > 0 ? targetImpressions : processedData.reduce((s, d) => s + d.value, 0);
+  }, [processedData, targetImpressions]);
 
   const chartData = {
     labels: processedData.map(d => d.label),
@@ -183,7 +202,9 @@ export function PlacementPositionPanel({ placementPosData = [] }) {
   );
 }
 
-export function PlacementTypePanel({ placementTypeData = [] }) {
+export function PlacementTypePanel({ placementTypeData = [], globalEffectiveMetrics }) {
+  const targetImpressions = Number(globalEffectiveMetrics?.impressions || 0);
+
   const processedData = useMemo(() => {
     const list = Array.isArray(placementTypeData) ? placementTypeData : (placementTypeData?.data || placementTypeData?.report || []);
     if (!list || list.length === 0) return [];
@@ -229,8 +250,25 @@ export function PlacementTypePanel({ placementTypeData = [] }) {
       grouped[label].clk += clk;
     });
 
-    const items = Object.values(grouped).sort((a, b) => b.imp - a.imp);
-    const totalImpressions = items.reduce((acc, it) => acc + it.imp, 0);
+    const items = Object.values(grouped);
+    const sumImp = items.reduce((acc, it) => acc + it.imp, 0);
+
+    if (targetImpressions > 0 && sumImp > 0 && Math.abs(targetImpressions - sumImp) > 0) {
+      let allocatedImp = 0;
+      items.forEach((item, idx) => {
+        if (idx === items.length - 1) {
+          item.imp = Math.max(0, targetImpressions - allocatedImp);
+        } else {
+          const ratio = item.imp / sumImp;
+          const scaled = Math.round(targetImpressions * ratio);
+          item.imp = scaled;
+          allocatedImp += scaled;
+        }
+      });
+    }
+
+    items.sort((a, b) => b.imp - a.imp);
+    const totalImpressions = targetImpressions > 0 ? targetImpressions : items.reduce((acc, it) => acc + it.imp, 0);
 
     return items.map((item, idx) => {
       const ctr = item.imp > 0 && item.clk > 0 ? (item.clk / item.imp * 100).toFixed(2) + "%" : "0.00%";
@@ -244,11 +282,11 @@ export function PlacementTypePanel({ placementTypeData = [] }) {
         color: PALETTE[(idx + 2) % PALETTE.length]
       };
     });
-  }, [placementTypeData]);
+  }, [placementTypeData, targetImpressions]);
 
   const totalImpr = useMemo(() => {
-    return processedData.reduce((s, d) => s + d.value, 0);
-  }, [processedData]);
+    return targetImpressions > 0 ? targetImpressions : processedData.reduce((s, d) => s + d.value, 0);
+  }, [processedData, targetImpressions]);
 
   const chartData = {
     labels: processedData.map(d => d.label),

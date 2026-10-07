@@ -32,6 +32,20 @@ export function UrlTable({ urlData: propData, campaignPricing, globalEffectiveMe
   const targetInstalls = Math.round(Number(globalEffectiveMetrics?.installs || 0));
   const targetConversions = Math.round(Number(globalEffectiveMetrics?.conversions || 0));
   const targetImpressions = Number(globalEffectiveMetrics?.impressions || 0);
+  const targetClicks = Number(globalEffectiveMetrics?.clicks || 0);
+  const targetSpend = Number(globalEffectiveMetrics?.spend || 0);
+
+  const targetVideoViews = Math.round(Number(globalEffectiveMetrics?.totalViews || globalEffectiveMetrics?.totalVideoViews || 0));
+  const targetVideoComplete = Math.round(Number(globalEffectiveMetrics?.totalVideoComplete || 0));
+  const targetVideoFirstQ = Math.round(Number(globalEffectiveMetrics?.totalVideoFirstQ || 0));
+  const targetVideoMidpoint = Math.round(Number(globalEffectiveMetrics?.totalVideoMidpoint || 0));
+  const targetVideoThirdQ = Math.round(Number(globalEffectiveMetrics?.totalVideoThirdQ || 0));
+
+  const effectiveTargetViews = targetVideoViews > 0 ? targetVideoViews : (targetImpressions > 0 ? Math.round(targetImpressions * 0.98836) : 0);
+  const effectiveTargetComplete = targetVideoComplete > 0 ? targetVideoComplete : (targetImpressions > 0 ? Math.round(targetImpressions * 0.8846) : 0);
+  const effectiveTargetFirstQ = targetVideoFirstQ > 0 ? targetVideoFirstQ : (targetImpressions > 0 ? Math.round(targetImpressions * 0.9474) : 0);
+  const effectiveTargetMidpoint = targetVideoMidpoint > 0 ? targetVideoMidpoint : (targetImpressions > 0 ? Math.round(targetImpressions * 0.9222) : 0);
+  const effectiveTargetThirdQ = targetVideoThirdQ > 0 ? targetVideoThirdQ : (targetImpressions > 0 ? Math.round(targetImpressions * 0.8999) : 0);
 
   const ctype = String(selectedAudience?.campaignType || selectedAudience?.campaign_type || "").toUpperCase();
   const isCtvWithAF = ctype.includes("CTV") && hasAF;
@@ -186,8 +200,8 @@ export function UrlTable({ urlData: propData, campaignPricing, globalEffectiveMe
         });
 
         if (result.length > 0) {
-          const targetClicks = totalBaseClicks + totalAfClicks;
-          const diffClicks = targetClicks - summedClicks;
+          const targetClicksCount = totalBaseClicks + totalAfClicks;
+          const diffClicks = targetClicksCount - summedClicks;
           if (diffClicks !== 0) {
             const largest = result.reduce((prev, current) => (prev.Clicks > current.Clicks) ? prev : current);
             largest.Clicks += diffClicks;
@@ -203,6 +217,58 @@ export function UrlTable({ urlData: propData, campaignPricing, globalEffectiveMe
           });
         }
       }
+    }
+
+    // Reconcile clicks to targetClicks if available
+    const totalClicksSum = result.reduce((sum, g) => sum + g.Clicks, 0);
+    if (targetClicks > 0 && totalClicksSum > 0 && Math.abs(targetClicks - totalClicksSum) > 0) {
+      let allocatedClicks = 0;
+      result.forEach((g, idx) => {
+        if (idx === result.length - 1) {
+          g.Clicks = Math.max(0, targetClicks - allocatedClicks);
+        } else {
+          const ratio = g.Clicks / totalClicksSum;
+          const scaled = Math.round(targetClicks * ratio);
+          g.Clicks = scaled;
+          allocatedClicks += scaled;
+        }
+      });
+    } else if (targetClicks > 0 && totalClicksSum === 0) {
+      const clickWeights = getDistributionWeights(result, () => 0, g => g.Impressions);
+      const allocatedClicks = distributeInteger(targetClicks, clickWeights);
+      result.forEach((g, idx) => {
+        g.Clicks = allocatedClicks[idx] || 0;
+      });
+    }
+
+    // Reconcile spend to targetSpend if available
+    const currentSpentSum = result.reduce((sum, g) => sum + g.Spent, 0);
+    if (targetSpend > 0 && currentSpentSum > 0 && Math.abs(targetSpend - currentSpentSum) > 0.05) {
+      let allocatedSpend = 0;
+      result.forEach((g, idx) => {
+        if (idx === result.length - 1) {
+          g.Spent = Math.max(0, parseFloat((targetSpend - allocatedSpend).toFixed(2)));
+        } else {
+          const ratio = g.Spent / currentSpentSum;
+          const scaled = parseFloat((targetSpend * ratio).toFixed(2));
+          g.Spent = scaled;
+          allocatedSpend += scaled;
+        }
+      });
+    } else if (targetSpend > 0 && currentSpentSum === 0) {
+      let allocatedSpend = 0;
+      const totalWeight = result.reduce((s, g) => s + (isCpcCampaign && !isCpmCampaign ? g.Clicks : g.Impressions), 0);
+      result.forEach((g, idx) => {
+        if (idx === result.length - 1) {
+          g.Spent = Math.max(0, parseFloat((targetSpend - allocatedSpend).toFixed(2)));
+        } else {
+          const weight = isCpcCampaign && !isCpmCampaign ? g.Clicks : g.Impressions;
+          const ratio = totalWeight > 0 ? weight / totalWeight : 1 / result.length;
+          const scaled = parseFloat((targetSpend * ratio).toFixed(2));
+          g.Spent = scaled;
+          allocatedSpend += scaled;
+        }
+      });
     }
 
     result.sort((a, b) => b.Impressions - a.Impressions);
@@ -221,21 +287,59 @@ export function UrlTable({ urlData: propData, campaignPricing, globalEffectiveMe
       g.TotalConversions = convAllocated[idx] || 0;
     });
 
+    // Reconcile video metrics across URLs if hasVideo is true
+    if (hasVideo && result.length > 0) {
+      const impWeights = result.map(g => Math.max(0, Number(g.Impressions || 0)));
+
+      if (effectiveTargetViews > 0) {
+        const sumRawViews = result.reduce((s, g) => s + (g.rawViews || 0), 0);
+        const weights = sumRawViews > 0 ? result.map(g => Math.max(0, Number(g.rawViews || 0))) : impWeights;
+        const alloc = distributeInteger(effectiveTargetViews, weights);
+        result.forEach((g, idx) => { g.rawViews = alloc[idx] || 0; });
+      }
+
+      if (effectiveTargetFirstQ > 0) {
+        const sumRawFirstQ = result.reduce((s, g) => s + (g.rawFirstQ || 0), 0);
+        const weights = sumRawFirstQ > 0 ? result.map(g => Math.max(0, Number(g.rawFirstQ || 0))) : impWeights;
+        const alloc = distributeInteger(effectiveTargetFirstQ, weights);
+        result.forEach((g, idx) => { g.rawFirstQ = alloc[idx] || 0; });
+      }
+
+      if (effectiveTargetMidpoint > 0) {
+        const sumRawMidpoint = result.reduce((s, g) => s + (g.rawMidpoint || 0), 0);
+        const weights = sumRawMidpoint > 0 ? result.map(g => Math.max(0, Number(g.rawMidpoint || 0))) : impWeights;
+        const alloc = distributeInteger(effectiveTargetMidpoint, weights);
+        result.forEach((g, idx) => { g.rawMidpoint = alloc[idx] || 0; });
+      }
+
+      if (effectiveTargetThirdQ > 0) {
+        const sumRawThirdQ = result.reduce((s, g) => s + (g.rawThirdQ || 0), 0);
+        const weights = sumRawThirdQ > 0 ? result.map(g => Math.max(0, Number(g.rawThirdQ || 0))) : impWeights;
+        const alloc = distributeInteger(effectiveTargetThirdQ, weights);
+        result.forEach((g, idx) => { g.rawThirdQ = alloc[idx] || 0; });
+      }
+
+      if (effectiveTargetComplete > 0) {
+        const sumRawComplete = result.reduce((s, g) => s + (g.rawComplete || 0), 0);
+        const weights = sumRawComplete > 0 ? result.map(g => Math.max(0, Number(g.rawComplete || 0))) : impWeights;
+        const alloc = distributeInteger(effectiveTargetComplete, weights);
+        result.forEach((g, idx) => { g.rawComplete = alloc[idx] || 0; });
+      }
+    }
+
     return result.map(g => {
       const imp = g.Impressions;
       const clk = g.Clicks;
       const spent = g.Spent;
       const ctrVal = imp > 0 ? (clk / imp) * 100 : 0;
-      const cpmVal = isCpmCampaign ? (imp > 0 ? (spent / imp) * 1000 : 0) : 0;
-      // Only compute a meaningful CPC when the campaign is actually CPC-priced (rate > 0).
-      // For CPM campaigns where CPC rate is 0, show 0 to avoid spend/clicks nonsense.
+      const cpmVal = isCpmCampaign && imp > 0 ? (spent / imp) * 1000 : (effectiveCpm || 0);
       const cpcVal = (isCpcCampaign && !isCpmCampaign && clk > 0) ? (spent / clk) : 0;
 
-      const vViews = hasVideo ? (g.rawViews > 0 ? g.rawViews : Math.round(imp * 0.98836)) : 0;
-      const vComplete = hasVideo ? (g.rawComplete > 0 ? g.rawComplete : Math.round(imp * 0.8846)) : 0;
-      const vFirstQ = hasVideo ? (g.rawFirstQ > 0 ? g.rawFirstQ : Math.round(imp * 0.9474)) : 0;
-      const vMidpoint = hasVideo ? (g.rawMidpoint > 0 ? g.rawMidpoint : Math.round(imp * 0.9222)) : 0;
-      const vThirdQ = hasVideo ? (g.rawThirdQ > 0 ? g.rawThirdQ : Math.round(imp * 0.8999)) : 0;
+      const vViews = hasVideo ? (g.rawViews || 0) : 0;
+      const vComplete = hasVideo ? (g.rawComplete || 0) : 0;
+      const vFirstQ = hasVideo ? (g.rawFirstQ || 0) : 0;
+      const vMidpoint = hasVideo ? (g.rawMidpoint || 0) : 0;
+      const vThirdQ = hasVideo ? (g.rawThirdQ || 0) : 0;
 
       const cpvVal = vViews > 0 ? spent / vViews : 0;
       const cpcvVal = vComplete > 0 ? spent / vComplete : 0;
@@ -245,14 +349,14 @@ export function UrlTable({ urlData: propData, campaignPricing, globalEffectiveMe
         rawImp: imp,
         rawClicks: clk,
         rawSpent: spent,
-        impressions: imp.toLocaleString(),
-        clicks: clk.toLocaleString(),
+        impressions: imp.toLocaleString('en-IN'),
+        clicks: clk.toLocaleString('en-IN'),
         ctr: ctrVal.toFixed(2) + "%",
         cpmVal,
         cpm: "₹" + cpmVal.toFixed(2),
         cpcVal,
         cpc: "₹" + cpcVal.toFixed(2),
-        spentFormatted: "₹" + spent.toFixed(2),
+        spentFormatted: "₹" + spent.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         rawViews: vViews,
         rawComplete: vComplete,
         rawFirstQ: vFirstQ,
@@ -262,44 +366,44 @@ export function UrlTable({ urlData: propData, campaignPricing, globalEffectiveMe
         cpcvVal,
         installs: g.Installs,
         conversions: g.TotalConversions,
-        installsFormatted: Math.round(g.Installs).toLocaleString(),
-        conversionsFormatted: Math.round(g.TotalConversions).toLocaleString(),
+        installsFormatted: Math.round(g.Installs).toLocaleString('en-IN'),
+        conversionsFormatted: Math.round(g.TotalConversions).toLocaleString('en-IN'),
       };
     });
-  }, [propData, campaignPricing, globalEffectiveMetrics, selectedAudience, appsflyerData, effectiveCpm, hasAF, hasVideo, totalAfClicks, targetInstalls, targetConversions, targetImpressions, appsflyerDataLength, isCpmCampaign]);
+  }, [propData, campaignPricing, globalEffectiveMetrics, selectedAudience, appsflyerData, effectiveCpm, hasAF, hasVideo, totalAfClicks, targetInstalls, targetConversions, targetImpressions, targetClicks, targetSpend, appsflyerDataLength, isCpmCampaign, isCpcCampaign, isCpcDefined, effectiveTargetViews, effectiveTargetComplete, effectiveTargetFirstQ, effectiveTargetMidpoint, effectiveTargetThirdQ]);
 
   const totals = useMemo(() => {
-    const totalImpr = list.reduce((a, r) => a + r.rawImp, 0);
-    const totalClicks = list.reduce((a, r) => a + r.rawClicks, 0);
-    const totalSpent = list.reduce((a, r) => a + r.rawSpent, 0);
+    const totalImpr = targetImpressions > 0 ? targetImpressions : list.reduce((a, r) => a + r.rawImp, 0);
+    const totalClicks = targetClicks > 0 ? targetClicks : list.reduce((a, r) => a + r.rawClicks, 0);
+    const totalSpent = targetSpend > 0 ? targetSpend : list.reduce((a, r) => a + r.rawSpent, 0);
     const avgCtr = totalImpr > 0 ? (totalClicks / totalImpr * 100).toFixed(2) + "%" : "0.00%";
-    const avgCpm = isCpmCampaign && totalImpr > 0 ? "₹" + ((totalSpent / totalImpr) * 1000).toFixed(2) : "₹0.00";
+    const avgCpm = isCpmCampaign && totalImpr > 0 ? "₹" + ((totalSpent / totalImpr) * 1000).toFixed(2) : (hasAF ? "₹" + effectiveCpm.toFixed(2) : "₹0.00");
     const avgCpc = (isCpcCampaign && !isCpmCampaign && totalClicks > 0) ? "₹" + (totalSpent / totalClicks).toFixed(2) : "₹0.00";
 
-    const totalViews = list.reduce((a, r) => a + r.rawViews, 0);
-    const totalComplete = list.reduce((a, r) => a + r.rawComplete, 0);
-    const totalFirstQ = list.reduce((a, r) => a + r.rawFirstQ, 0);
-    const totalMidpoint = list.reduce((a, r) => a + r.rawMidpoint, 0);
-    const totalThirdQ = list.reduce((a, r) => a + r.rawThirdQ, 0);
+    const totalViews = (hasVideo && effectiveTargetViews > 0) ? effectiveTargetViews : list.reduce((a, r) => a + r.rawViews, 0);
+    const totalComplete = (hasVideo && effectiveTargetComplete > 0) ? effectiveTargetComplete : list.reduce((a, r) => a + r.rawComplete, 0);
+    const totalFirstQ = (hasVideo && effectiveTargetFirstQ > 0) ? effectiveTargetFirstQ : list.reduce((a, r) => a + r.rawFirstQ, 0);
+    const totalMidpoint = (hasVideo && effectiveTargetMidpoint > 0) ? effectiveTargetMidpoint : list.reduce((a, r) => a + r.rawMidpoint, 0);
+    const totalThirdQ = (hasVideo && effectiveTargetThirdQ > 0) ? effectiveTargetThirdQ : list.reduce((a, r) => a + r.rawThirdQ, 0);
 
     return {
-      totalImpr: totalImpr.toLocaleString(),
-      totalClicks: totalClicks.toLocaleString(),
+      totalImpr: totalImpr.toLocaleString('en-IN'),
+      totalClicks: totalClicks.toLocaleString('en-IN'),
       avgCtr,
       avgCpm,
       avgCpc,
-      totalSpentFormatted: "₹" + totalSpent.toFixed(2),
-      totalViews: totalViews.toLocaleString(),
-      totalComplete: totalComplete.toLocaleString(),
-      totalFirstQ: totalFirstQ.toLocaleString(),
-      totalMidpoint: totalMidpoint.toLocaleString(),
-      totalThirdQ: totalThirdQ.toLocaleString(),
+      totalSpentFormatted: "₹" + totalSpent.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      totalViews: totalViews.toLocaleString('en-IN'),
+      totalComplete: totalComplete.toLocaleString('en-IN'),
+      totalFirstQ: totalFirstQ.toLocaleString('en-IN'),
+      totalMidpoint: totalMidpoint.toLocaleString('en-IN'),
+      totalThirdQ: totalThirdQ.toLocaleString('en-IN'),
       avgCpv: "₹" + (totalViews > 0 ? totalSpent / totalViews : 0).toFixed(2),
       avgCpcv: "₹" + (totalComplete > 0 ? totalSpent / totalComplete : 0).toFixed(2),
-      totalInstalls: targetInstalls.toLocaleString(),
-      totalConversions: targetConversions.toLocaleString(),
+      totalInstalls: targetInstalls.toLocaleString('en-IN'),
+      totalConversions: targetConversions.toLocaleString('en-IN'),
     };
-  }, [list, isCpmCampaign, targetInstalls, targetConversions]);
+  }, [list, isCpmCampaign, isCpcCampaign, targetImpressions, targetClicks, targetSpend, targetInstalls, targetConversions, effectiveCpm, hasAF, hasVideo, effectiveTargetViews, effectiveTargetComplete, effectiveTargetFirstQ, effectiveTargetMidpoint, effectiveTargetThirdQ]);
 
   const totalPages = Math.ceil(list.length / PAGE_SIZE) || 1;
   const startIndex = (currentPage - 1) * PAGE_SIZE;

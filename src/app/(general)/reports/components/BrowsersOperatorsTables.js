@@ -57,188 +57,265 @@ function BrowserTable({
   const hasAF = !!globalEffectiveMetrics?.hasAppsflyerData;
   const totalInstalls = Number(globalEffectiveMetrics?.installs || 0);
   const totalConversions = Number(globalEffectiveMetrics?.conversions || 0);
+  const targetImpressions = Number(globalEffectiveMetrics?.impressions || 0);
+  const targetClicks = Number(globalEffectiveMetrics?.clicks || 0);
+  const targetSpend = Number(globalEffectiveMetrics?.spend || 0);
+
+  const targetVideoViews = Math.round(Number(globalEffectiveMetrics?.totalViews || globalEffectiveMetrics?.totalVideoViews || 0));
+  const targetVideoComplete = Math.round(Number(globalEffectiveMetrics?.totalVideoComplete || 0));
+  const effectiveTargetViews = targetVideoViews > 0 ? targetVideoViews : (targetImpressions > 0 ? Math.round(targetImpressions * 0.98836) : 0);
+  const effectiveTargetComplete = targetVideoComplete > 0 ? targetVideoComplete : (targetImpressions > 0 ? Math.round(targetImpressions * 0.8846) : 0);
 
   const ctype = String(selectedAudience?.campaignType || selectedAudience?.campaign_type || "").toUpperCase();
   const isCtvWithAF = ctype.includes("CTV") && hasAF;
 
   const list = useMemo(() => {
-    // AppsFlyer Raw Installs Breakdown for Operators
-    if (entityKey === "operator" && hasAF && rawInstallsBreakdown?.operator && Object.keys(rawInstallsBreakdown.operator).length > 0) {
-      const groups = {};
+    let resultItems = [];
+    const groups = {};
+
+    if (Array.isArray(rawList) && rawList.length > 0) {
+      rawList.forEach(row => {
+        const title = (entityKey === "browser"
+          ? (row.browser || row.Browser || row.browser_name || row.name || "-")
+          : (row.operator || row.Operator || row.name || row.browser || row.oses || row.os || row.OS || row.browser_name || row.os_name || "-")
+        ).trim();
+
+        const titleLower = title.toLowerCase();
+        if (!title || titleLower === "unknown" || titleLower === "other" || titleLower === "none" || titleLower === "null" || titleLower === "undefined" || title === "-") return;
+
+        const imp = Number(row.rawImp !== undefined ? row.rawImp : (row.Impressions !== undefined ? row.Impressions : (row.impressions !== undefined ? row.impressions : 0)));
+        const cks = Number(row.rawClicks !== undefined ? row.rawClicks : (row.Clicks !== undefined ? row.Clicks : (row.clicks !== undefined ? row.clicks : 0)));
+        const rowDate = row.Date || row.date || "";
+
+        const videoComplete = Number(row.completeViewsVideo || row.CompleteViewsVideo || row["Complete Views"] || 0);
+        const videoFirstQ = Number(row.firstQuartileViewsVideo || row.FirstQuartileViewsVideo || row["First Quartile Views"] || 0);
+        const videoMidpoint = Number(row.midpointViewsVideo || row.MidpointViewsVideo || row["Midpoint Views"] || 0);
+        const videoThirdQ = Number(row.thirdQuartileViewsVideo || row.ThirdQuartileViewsVideo || row["Third Quartile Views"] || 0);
+        const videoViews = Number(row.Views || row.views || row.VideoViews || 0);
+
+        const datePriceCPM = getPriceForDate(campaignPricing?.cpm, rowDate);
+        const datePriceCPC = getPriceForDate(campaignPricing?.cpc, rowDate);
+
+        const hasRowCpm = datePriceCPM !== undefined && datePriceCPM !== null && !isNaN(Number(datePriceCPM));
+        const hasRowCpc = datePriceCPC !== undefined && datePriceCPC !== null && !isNaN(Number(datePriceCPC));
+
+        let rowSpent = 0;
+        if (hasRowCpm && Number(datePriceCPM) > 0) {
+          rowSpent = (imp / 1000) * Number(datePriceCPM);
+        } else if (hasRowCpc) {
+          rowSpent = cks * Number(datePriceCPC);
+        } else if (hasRowCpm) {
+          rowSpent = 0;
+        } else if (globalEffectiveMetrics?.eCPM > 0) {
+          rowSpent = (imp / 1000) * globalEffectiveMetrics.eCPM;
+        } else if (globalEffectiveMetrics?.eCPC > 0) {
+          rowSpent = cks * globalEffectiveMetrics.eCPC;
+        } else {
+          const rCPM = Number(row.CPM || row.cpm || 0);
+          const rCPC = Number(row.CPC || row.cpc || 0);
+          rowSpent = rCPM > 0 ? (imp / 1000) * rCPM : (cks * rCPC);
+        }
+
+        if (!groups[title]) {
+          groups[title] = {
+            name: title,
+            [entityKey]: title,
+            rawImp: 0,
+            rawClicks: 0,
+            rawSpent: 0,
+            videoComplete: 0,
+            videoFirstQ: 0,
+            videoMidpoint: 0,
+            videoThirdQ: 0,
+            videoViews: 0,
+            installs: 0,
+            conversions: 0,
+          };
+        }
+
+        groups[title].rawImp += imp;
+        groups[title].rawClicks += cks;
+        groups[title].rawSpent += rowSpent;
+        groups[title].videoComplete += videoComplete;
+        groups[title].videoFirstQ += videoFirstQ;
+        groups[title].videoMidpoint += videoMidpoint;
+        groups[title].videoThirdQ += videoThirdQ;
+        groups[title].videoViews += videoViews;
+      });
+
+      resultItems = Object.values(groups);
+    }
+
+    // Fallback: if rawList was empty and entityKey is operator, use rawInstallsBreakdown.operator if present
+    if (resultItems.length === 0 && entityKey === "operator" && rawInstallsBreakdown?.operator && Object.keys(rawInstallsBreakdown.operator).length > 0) {
       Object.entries(rawInstallsBreakdown.operator).forEach(([opKey, count]) => {
         const keyLower = opKey.toLowerCase().trim();
         if (keyLower === "unknown" || keyLower === "other" || keyLower === "none" || keyLower === "" || keyLower === "null" || keyLower === "undefined") return;
         const name = operatorNameMap[keyLower] || (opKey.charAt(0).toUpperCase() + opKey.slice(1));
-        const nameLower = name.toLowerCase().trim();
-        if (nameLower === "unknown" || nameLower === "other" || nameLower === "none") return;
         const instVal = Number(count || 0);
-        if (instVal > 0) {
-          groups[name] = (groups[name] || 0) + instVal;
+        if (!groups[name]) {
+          groups[name] = {
+            name,
+            operator: name,
+            rawImp: 0,
+            rawClicks: 0,
+            rawSpent: 0,
+            videoComplete: 0,
+            videoFirstQ: 0,
+            videoMidpoint: 0,
+            videoThirdQ: 0,
+            videoViews: 0,
+            installs: instVal,
+            conversions: 0,
+          };
+        } else {
+          groups[name].installs += instVal;
         }
       });
+      resultItems = Object.values(groups);
+    }
 
-      const entries = Object.entries(groups);
-      if (entries.length > 0) {
-        const currentSumInst = entries.reduce((s, e) => s + e[1], 0);
-        const targetInst = totalInstalls > 0 ? totalInstalls : currentSumInst;
-        const scale = currentSumInst > 0 ? targetInst / currentSumInst : 1;
+    if (resultItems.length === 0) return [];
 
-        const totalImpSum = rawList.reduce((a, r) => a + Number(r.rawImp !== undefined ? r.rawImp : Number(String(r.impressions || 0).replace(/,/g, ''))), 0);
-        const totalClicksSum = rawList.reduce((a, r) => a + Number(r.rawClicks !== undefined ? r.rawClicks : Number(String(r.clicks || 0).replace(/,/g, ''))), 0);
+    // Reconcile Impressions to targetImpressions
+    const sumImp = resultItems.reduce((a, r) => a + r.rawImp, 0);
+    if (targetImpressions > 0 && sumImp > 0 && Math.abs(targetImpressions - sumImp) > 0) {
+      let allocatedImp = 0;
+      resultItems.forEach((g, idx) => {
+        if (idx === resultItems.length - 1) {
+          g.rawImp = Math.max(0, targetImpressions - allocatedImp);
+        } else {
+          const ratio = g.rawImp / sumImp;
+          const scaled = Math.round(targetImpressions * ratio);
+          g.rawImp = scaled;
+          allocatedImp += scaled;
+        }
+      });
+    } else if (targetImpressions > 0 && sumImp === 0) {
+      const share = Math.round(targetImpressions / resultItems.length);
+      resultItems.forEach((g, idx) => {
+        g.rawImp = idx === resultItems.length - 1 ? (targetImpressions - share * (resultItems.length - 1)) : share;
+      });
+    }
 
-        const opWeights = entries.map(e => Number(e[1] || 0));
-        const instAllocated = distributeInteger(targetInst, opWeights);
-        const convAllocated = distributeValues(totalConversions, opWeights);
+    // Reconcile Clicks to targetClicks
+    const sumClicks = resultItems.reduce((a, r) => a + r.rawClicks, 0);
+    if (targetClicks > 0 && sumClicks > 0 && Math.abs(targetClicks - sumClicks) > 0) {
+      let allocatedClicks = 0;
+      resultItems.forEach((g, idx) => {
+        if (idx === resultItems.length - 1) {
+          g.rawClicks = Math.max(0, targetClicks - allocatedClicks);
+        } else {
+          const ratio = g.rawClicks / sumClicks;
+          const scaled = Math.round(targetClicks * ratio);
+          g.rawClicks = scaled;
+          allocatedClicks += scaled;
+        }
+      });
+    } else if (targetClicks > 0 && sumClicks === 0) {
+      const weights = getDistributionWeights(resultItems, () => 0, g => g.rawImp);
+      const allocatedClicks = distributeInteger(targetClicks, weights);
+      resultItems.forEach((g, idx) => {
+        g.rawClicks = allocatedClicks[idx] || 0;
+      });
+    }
 
-        return entries.map(([name, rawInst], idx) => {
-          const inst = instAllocated[idx] || 0;
-          const conv = convAllocated[idx] || 0;
-          const share = targetInst > 0 ? inst / targetInst : (1 / entries.length);
-          const imp = Math.round(totalImpSum * share);
-          const clk = Math.round(totalClicksSum * share);
-          const ctrVal = imp > 0 ? (clk / imp * 100).toFixed(2) + "%" : "0.00%";
+    // Reconcile Spend to targetSpend
+    const sumSpent = resultItems.reduce((a, r) => a + (r.rawSpent || 0), 0);
+    if (targetSpend > 0 && sumSpent > 0 && Math.abs(targetSpend - sumSpent) > 0.05) {
+      let allocatedSpend = 0;
+      resultItems.forEach((g, idx) => {
+        if (idx === resultItems.length - 1) {
+          g.rawSpent = Math.max(0, parseFloat((targetSpend - allocatedSpend).toFixed(2)));
+        } else {
+          const ratio = (g.rawSpent || 0) / sumSpent;
+          const scaled = parseFloat((targetSpend * ratio).toFixed(2));
+          g.rawSpent = scaled;
+          allocatedSpend += scaled;
+        }
+      });
+    } else if (targetSpend > 0 && sumSpent === 0) {
+      let allocatedSpend = 0;
+      const totalWeight = resultItems.reduce((s, g) => s + g.rawImp, 0);
+      resultItems.forEach((g, idx) => {
+        if (idx === resultItems.length - 1) {
+          g.rawSpent = Math.max(0, parseFloat((targetSpend - allocatedSpend).toFixed(2)));
+        } else {
+          const ratio = totalWeight > 0 ? g.rawImp / totalWeight : 1 / resultItems.length;
+          const scaled = parseFloat((targetSpend * ratio).toFixed(2));
+          g.rawSpent = scaled;
+          allocatedSpend += scaled;
+        }
+      });
+    }
 
-          return {
-            operator: name,
-            name,
-            rawImp: imp,
-            rawClicks: clk,
-            impressions: imp.toLocaleString('en-IN'),
-            clicks: clk.toLocaleString('en-IN'),
-            ctr: ctrVal,
-            installs: inst,
-            conversions: conv,
-            installsFormatted: inst.toLocaleString('en-IN'),
-            conversionsFormatted: conv.toLocaleString('en-IN'),
-          };
-        }).sort((a, b) => b.installs - a.installs);
+    resultItems.sort((a, b) => b.rawImp - a.rawImp);
+
+    // Reconcile video metrics across items
+    if (hasVideo && resultItems.length > 0) {
+      const impWeights = resultItems.map(g => Math.max(0, Number(g.rawImp || 0)));
+
+      if (effectiveTargetViews > 0) {
+        const sumRaw = resultItems.reduce((s, g) => s + (g.videoViews || 0), 0);
+        const w = sumRaw > 0 ? resultItems.map(g => Math.max(0, Number(g.videoViews || 0))) : impWeights;
+        const alloc = distributeInteger(effectiveTargetViews, w);
+        resultItems.forEach((g, idx) => { g.videoViews = alloc[idx] || 0; });
+      }
+
+      if (effectiveTargetComplete > 0) {
+        const sumRaw = resultItems.reduce((s, g) => s + (g.videoComplete || 0), 0);
+        const w = sumRaw > 0 ? resultItems.map(g => Math.max(0, Number(g.videoComplete || 0))) : impWeights;
+        const alloc = distributeInteger(effectiveTargetComplete, w);
+        resultItems.forEach((g, idx) => { g.videoComplete = alloc[idx] || 0; });
       }
     }
 
-    if (!Array.isArray(rawList) || rawList.length === 0) return [];
+    // Distribute Installs & Conversions across operators/browsers
+    if (hasAF || totalInstalls > 0 || totalConversions > 0) {
+      const isCtv = isCtvWithAF || ctype.includes("CTV");
+      const totalClicksCount = resultItems.reduce((s, r) => s + Math.max(0, Number(r.rawClicks || 0)), 0);
+      const totalImpsCount = resultItems.reduce((s, r) => s + Math.max(0, Number(r.rawImp || 0)), 0);
+      const itemsWithClicks = resultItems.filter(r => Number(r.rawClicks || 0) > 0).length;
+      const itemsWithImps = resultItems.filter(r => Number(r.rawImp || 0) > 0).length;
 
-    if (hasAF) {
-      const filteredRawList = rawList.filter(r => {
-        const n = (r[entityKey] || r.name || r.operator || r.browser || r.Operator || "").toString().toLowerCase().trim();
-        return n && n !== "unknown" && n !== "other" && n !== "none" && n !== "null" && n !== "undefined";
-      });
+      const clickWeightIsVeryLess = isCtv
+        || totalClicksCount < 10
+        || (resultItems.length > 1 && itemsWithClicks <= 1 && itemsWithImps > 1)
+        || (totalImpsCount > 0 && (totalClicksCount / totalImpsCount) < 0.0005)
+        || (itemsWithImps > 3 && itemsWithClicks / itemsWithImps < 0.2);
 
-      const weights = getDistributionWeights(
-        filteredRawList,
-        r => (r.rawClicks !== undefined ? r.rawClicks : Number(String(r.clicks || 0).replace(/,/g, ''))),
-        r => (r.rawImp !== undefined ? r.rawImp : Number(String(r.impressions || 0).replace(/,/g, '')))
-      );
+      const useClicks = !clickWeightIsVeryLess && totalClicksCount > 0;
+      const weights = useClicks
+        ? resultItems.map(r => Math.max(0, Number(r.rawClicks || 0)))
+        : (totalImpsCount > 0 ? resultItems.map(r => Math.max(0, Number(r.rawImp || 0))) : resultItems.map(() => 1));
+
       const instAllocated = distributeInteger(totalInstalls, weights);
       const convAllocated = distributeValues(totalConversions, weights);
 
-      return filteredRawList.map((r, idx) => {
-        const imp = r.rawImp !== undefined ? r.rawImp : Number(String(r.impressions || 0).replace(/,/g, ''));
-        const clk = r.rawClicks !== undefined ? r.rawClicks : Number(String(r.clicks || 0).replace(/,/g, ''));
-        const inst = instAllocated[idx] || 0;
-        const conv = convAllocated[idx] || 0;
-
-        return {
-          ...r,
-          rawImp: imp,
-          rawClicks: clk,
-          installs: inst,
-          conversions: conv,
-          installsFormatted: inst.toLocaleString('en-IN'),
-          conversionsFormatted: conv.toLocaleString('en-IN'),
-        };
+      resultItems.forEach((g, idx) => {
+        g.installs = instAllocated[idx] || 0;
+        g.conversions = convAllocated[idx] || 0;
       });
     }
 
-    // NON-APPSFLYER: Match Preview BrowserTable & OperatorTable exactly
     const anyCpmRate = getPriceForDate(campaignPricing?.cpm, null);
     const anyCpcRate = getPriceForDate(campaignPricing?.cpc, null);
     const isCpcDefined = anyCpcRate !== undefined && anyCpcRate !== null && !isNaN(Number(anyCpcRate));
     const isCpmCampaign = (anyCpmRate !== undefined && Number(anyCpmRate) > 0) || !!globalEffectiveMetrics?.isCpmCampaign;
     const isCpcCampaign = isCpcDefined || !!globalEffectiveMetrics?.isCpcCampaign;
 
-    const groups = {};
-    rawList.forEach(row => {
-      const title = (entityKey === "browser"
-        ? (row.browser || row.browser_name || row.name || "-")
-        : (row.name || row.browser || row.oses || row.os || row.OS || row.operator || row.browser_name || row.os_name || "-")
-      ).trim();
-      if (!title || title.toLowerCase() === "null" || title.toLowerCase() === "undefined") return;
-
-      const imp = Number(row.rawImp !== undefined ? row.rawImp : (row.Impressions || row.impressions || 0));
-      const cks = Number(row.rawClicks !== undefined ? row.rawClicks : (row.Clicks || row.clicks || 0));
-      const rowDate = row.Date || row.date || "";
-
-      const videoComplete = Number(row.completeViewsVideo || row.CompleteViewsVideo || row["Complete Views"] || 0);
-      const videoFirstQ = Number(row.firstQuartileViewsVideo || row.FirstQuartileViewsVideo || row["First Quartile Views"] || 0);
-      const videoMidpoint = Number(row.midpointViewsVideo || row.MidpointViewsVideo || row["Midpoint Views"] || 0);
-      const videoThirdQ = Number(row.thirdQuartileViewsVideo || row.ThirdQuartileViewsVideo || row["Third Quartile Views"] || 0);
-      const videoViews = Number(row.Views || row.views || row.VideoViews || 0);
-
-      const datePriceCPM = getPriceForDate(campaignPricing?.cpm, rowDate);
-      const datePriceCPC = getPriceForDate(campaignPricing?.cpc, rowDate);
-
-      const hasRowCpm = datePriceCPM !== undefined && datePriceCPM !== null && !isNaN(Number(datePriceCPM));
-      const hasRowCpc = datePriceCPC !== undefined && datePriceCPC !== null && !isNaN(Number(datePriceCPC));
-
-      let rowSpent = 0;
-      if (hasRowCpm && Number(datePriceCPM) > 0) {
-        rowSpent = (imp / 1000) * Number(datePriceCPM);
-      } else if (hasRowCpc) {
-        rowSpent = cks * Number(datePriceCPC);
-      } else if (hasRowCpm) {
-        rowSpent = 0;
-      } else if (globalEffectiveMetrics?.eCPM > 0) {
-        rowSpent = (imp / 1000) * globalEffectiveMetrics.eCPM;
-      } else if (globalEffectiveMetrics?.eCPC > 0) {
-        rowSpent = cks * globalEffectiveMetrics.eCPC;
-      } else {
-        const rCPM = Number(row.CPM || row.cpm || 0);
-        const rCPC = Number(row.CPC || row.cpc || 0);
-        rowSpent = rCPM > 0 ? (imp / 1000) * rCPM : (cks * rCPC);
-      }
-
-      if (!groups[title]) {
-        groups[title] = {
-          name: title,
-          [entityKey]: title,
-          rawImp: 0,
-          rawClicks: 0,
-          rawSpent: 0,
-          videoComplete: 0,
-          videoFirstQ: 0,
-          videoMidpoint: 0,
-          videoThirdQ: 0,
-          videoViews: 0,
-          installs: 0,
-          conversions: 0,
-        };
-      }
-
-      groups[title].rawImp += imp;
-      groups[title].rawClicks += cks;
-      groups[title].rawSpent += rowSpent;
-      groups[title].videoComplete += videoComplete;
-      groups[title].videoFirstQ += videoFirstQ;
-      groups[title].videoMidpoint += videoMidpoint;
-      groups[title].videoThirdQ += videoThirdQ;
-      groups[title].videoViews += videoViews;
-    });
-
-    const result = Object.values(groups);
-    result.sort((a, b) => b.rawImp - a.rawImp);
-
-    return result.map(g => {
+    return resultItems.map(g => {
       const imp = g.rawImp;
       const clk = g.rawClicks;
-      const spent = g.rawSpent;
+      const spent = (targetSpend > 0 && g.rawSpent > 0) ? g.rawSpent : (hasAF ? (imp / 1000) * effectiveCpm : (g.rawSpent || 0));
       const ctrVal = imp > 0 ? (clk / imp * 100).toFixed(2) + "%" : "0.00%";
-      const cpmVal = isCpmCampaign ? (imp > 0 ? (spent / imp) * 1000 : 0) : 0;
+      const cpmVal = isCpmCampaign ? (imp > 0 ? (spent / imp) * 1000 : 0) : (hasAF ? effectiveCpm : 0);
       const cpcVal = isCpcDefined
         ? (Number(anyCpcRate) === 0 ? 0 : (clk > 0 ? spent / clk : Number(anyCpcRate)))
         : (isCpcCampaign && clk > 0 ? spent / clk : 0);
 
-      const vViews = hasVideo ? (g.videoViews > 0 ? g.videoViews : Math.round(imp * 0.98836)) : 0;
-      const vComplete = hasVideo ? (g.videoComplete > 0 ? g.videoComplete : Math.round(imp * 0.8846)) : 0;
+      const vViews = hasVideo ? (g.videoViews || 0) : 0;
+      const vComplete = hasVideo ? (g.videoComplete || 0) : 0;
       const cpvVal = vViews > 0 ? spent / vViews : 0;
       const cpcvVal = vComplete > 0 ? spent / vComplete : 0;
 
@@ -260,7 +337,7 @@ function BrowserTable({
         conversionsFormatted: (g.conversions || 0).toLocaleString('en-IN'),
       };
     });
-  }, [rawList, totalInstalls, totalConversions, entityKey, hasAF, rawInstallsBreakdown, campaignPricing, globalEffectiveMetrics, hasVideo]);
+  }, [rawList, totalInstalls, totalConversions, targetImpressions, targetClicks, targetSpend, entityKey, hasAF, rawInstallsBreakdown, campaignPricing, globalEffectiveMetrics, effectiveCpm, hasVideo, effectiveTargetViews, effectiveTargetComplete, isCtvWithAF, ctype]);
 
   const totalPages = Math.ceil(list.length / PAGE_SIZE) || 1;
   const from = list.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
@@ -268,11 +345,11 @@ function BrowserTable({
   const rows = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const totals = useMemo(() => {
-    const totalImpr = list.reduce((a, r) => a + r.rawImp, 0);
-    const totalClicks = list.reduce((a, r) => a + r.rawClicks, 0);
+    const totalImpr = targetImpressions > 0 ? targetImpressions : list.reduce((a, r) => a + r.rawImp, 0);
+    const totalClicks = targetClicks > 0 ? targetClicks : list.reduce((a, r) => a + r.rawClicks, 0);
     const avgCtr = totalImpr > 0 ? (totalClicks / totalImpr * 100).toFixed(2) + "%" : "0.00%";
-    const totalViews = Math.round(totalImpr * 0.98836);
-    const totalComplete = Math.round(totalImpr * 0.8846);
+    const totalViews = (hasVideo && effectiveTargetViews > 0) ? effectiveTargetViews : list.reduce((a, r) => a + (r.videoViews || 0), 0);
+    const totalComplete = (hasVideo && effectiveTargetComplete > 0) ? effectiveTargetComplete : list.reduce((a, r) => a + (r.videoComplete || 0), 0);
 
     const anyCpmRate = getPriceForDate(campaignPricing?.cpm, null);
     const anyCpcRate = getPriceForDate(campaignPricing?.cpc, null);
@@ -280,12 +357,10 @@ function BrowserTable({
     const isCpmCampaign = (anyCpmRate !== undefined && Number(anyCpmRate) > 0) || !!globalEffectiveMetrics?.isCpmCampaign;
     const isCpcCampaign = isCpcDefined || !!globalEffectiveMetrics?.isCpcCampaign;
 
-    const totalSpent = hasAF 
+    const totalSpent = targetSpend > 0 ? targetSpend : (hasAF 
       ? (totalImpr / 1000) * effectiveCpm 
-      : list.reduce((sum, r) => sum + (r.rawSpent || 0), 0);
-    const avgCpm = hasAF 
-      ? "₹" + effectiveCpm.toFixed(2) 
-      : (isCpmCampaign && totalImpr > 0 ? "₹" + ((totalSpent / totalImpr) * 1000).toFixed(2) : "₹0.00");
+      : list.reduce((sum, r) => sum + (r.rawSpent || 0), 0));
+    const avgCpm = isCpmCampaign && totalImpr > 0 ? "₹" + ((totalSpent / totalImpr) * 1000).toFixed(2) : (hasAF ? "₹" + effectiveCpm.toFixed(2) : "₹0.00");
     const avgCpc = isCpcDefined
       ? (Number(anyCpcRate) === 0 ? "₹0.00" : (totalClicks > 0 ? "₹" + (totalSpent / totalClicks).toFixed(2) : "₹" + Number(anyCpcRate).toFixed(2)))
       : (isCpcCampaign && totalClicks > 0 ? "₹" + (totalSpent / totalClicks).toFixed(2) : "₹0.00");
@@ -304,7 +379,7 @@ function BrowserTable({
       totalInstalls: totalInstalls.toLocaleString('en-IN'),
       totalConversions: totalConversions.toLocaleString('en-IN'),
     };
-  }, [list, effectiveCpm, totalInstalls, totalConversions, hasAF, campaignPricing, globalEffectiveMetrics]);
+  }, [list, targetImpressions, targetClicks, targetSpend, effectiveCpm, totalInstalls, totalConversions, hasAF, campaignPricing, globalEffectiveMetrics, hasVideo, effectiveTargetViews, effectiveTargetComplete]);
 
   return (
     <div className="st-panel" style={{ paddingBottom: 0, overflow: "hidden" }}>

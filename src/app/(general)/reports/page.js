@@ -220,10 +220,20 @@ export default function DashboardRedesignPage() {
         start = startOfMonth(lastMonth);
         end = endOfMonth(lastMonth);
         break;
-      case "all":
-        start = subYears(today, 2);
+      case "all": {
+        // Use audience start date if available, otherwise 5 years back to cover all historical campaign data
+        let audStart = null;
+        if (selectedAudience?.startDate) {
+          const cleanStr = String(selectedAudience.startDate).split("T")[0].replace(/\//g, "-");
+          const p = cleanStr.split("-").map(Number);
+          if (p.length === 3 && !isNaN(p[0])) {
+            audStart = new Date(p[0], p[1] - 1, p[2]);
+          }
+        }
+        start = audStart && !isNaN(audStart.getTime()) && audStart < today ? audStart : subYears(today, 2);
         end = today;
         break;
+      }
       case "clear":
         start = today;
         end = today;
@@ -2007,7 +2017,7 @@ export default function DashboardRedesignPage() {
               })()}
 
               {!isCtvWithAF && hasPermission("creative_performance_graph") && (
-                <CreativePerformanceChart creativeData={creativeData} totalReach={globalEffectiveMetrics.reach} selectedAudience={selectedAudience} hasAppsflyerData={globalEffectiveMetrics.hasAppsflyerData} />
+                <CreativePerformanceChart creativeData={creativeData} totalReach={globalEffectiveMetrics.reach} selectedAudience={selectedAudience} hasAppsflyerData={globalEffectiveMetrics.hasAppsflyerData} globalEffectiveMetrics={globalEffectiveMetrics} />
               )}
               {hasPermission("creative_performance_graph_table") && (
                 <CreativeDetails creativeData={creativeData} campaignPricing={campaignPricing} globalEffectiveMetrics={globalEffectiveMetrics} selectedAudience={selectedAudience} />
@@ -2021,19 +2031,19 @@ export default function DashboardRedesignPage() {
               {
                 !isCtvWithAF && (hasPermission("placement_pos_distribution") || hasPermission("placement_interstitial_distribution")) && (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
-                    {hasPermission("placement_pos_distribution") && <PlacementPositionPanel placementPosData={placementPosData} />}
-                    {hasPermission("placement_interstitial_distribution") && <PlacementTypePanel placementTypeData={placementTypeData} />}
+                    {hasPermission("placement_pos_distribution") && <PlacementPositionPanel placementPosData={placementPosData} globalEffectiveMetrics={globalEffectiveMetrics} />}
+                    {hasPermission("placement_interstitial_distribution") && <PlacementTypePanel placementTypeData={placementTypeData} globalEffectiveMetrics={globalEffectiveMetrics} />}
                   </div>
                 )
               }
               {
                 !isCtvWithAF && (hasPermission("device_distribution") || hasPermission("placement_interstitial_distribution")) && (
-                  <PlatformAnalysis deviceData={deviceData} platformData={placementTypeData} />
+                  <PlatformAnalysis deviceData={deviceData} platformData={placementTypeData} globalEffectiveMetrics={globalEffectiveMetrics} />
                 )
               }
 
               {hasPermission("delivery_by_weekday") && (
-                <DeliveryByWeekday weekData={weekData} tableData={globalEffectiveMetrics.enrichedTableData} />
+                <DeliveryByWeekday weekData={weekData} tableData={globalEffectiveMetrics.enrichedTableData} globalEffectiveMetrics={globalEffectiveMetrics} />
               )}
               <AttributionRevenueTraffic
                 operatorData={operatorData}
@@ -2047,8 +2057,8 @@ export default function DashboardRedesignPage() {
               {
                 !isCtvWithAF && (hasPermission("platform_gender") || hasPermission("platform_age")) && (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12, margin: "0 16px" }}>
-                    {hasPermission("platform_gender") && <GenderChart genderData={genderData} />}
-                    {hasPermission("platform_age") && <AgeChart ageData={ageData} />}
+                    {hasPermission("platform_gender") && <GenderChart genderData={genderData} globalEffectiveMetrics={globalEffectiveMetrics} />}
+                    {hasPermission("platform_age") && <AgeChart ageData={ageData} globalEffectiveMetrics={globalEffectiveMetrics} />}
                   </div>
                 )
               }

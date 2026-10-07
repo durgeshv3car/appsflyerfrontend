@@ -1,33 +1,95 @@
 "use client";
 import React from "react";
 
+import { distributeInteger } from "./Shared";
+
 const COLORS = [
   "#3B82F6", "#6366F1", "#8B5CF6", "#EC4899", "#F43F5E",
   "#10B981", "#F59E0B", "#34D399", "#60A5FA", "#A78BFA"
 ];
 
-export function CreativePerformanceChart({ creativeData: propData, totalReach = 0, selectedAudience, hasAppsflyerData }) {
+export function CreativePerformanceChart({ creativeData: propData, totalReach = 0, selectedAudience, hasAppsflyerData, globalEffectiveMetrics }) {
   const ctype = String(selectedAudience?.campaignType || selectedAudience?.campaign_type || "").toUpperCase();
   const isCtvWithAF = ctype.includes("CTV") && !!hasAppsflyerData;
 
-  const list = Array.isArray(propData) && propData.length > 0
-    ? propData.map((r, i) => {
-        const imp = Number(r.Impressions || r.impressions || 0);
-        const clk = Number(r.Clicks || r.clicks || 0);
-        const ctrRaw = Number(r.CTR || r.ctr || 0);
-        const ctr = ctrRaw > 1 ? ctrRaw : (imp > 0 ? (clk / imp * 100) : 0);
-        return {
-          name: r.Creative || r.creative || r.CreativeName || r.name || `Creative ${i + 1}`,
-          impressions: imp,
-          clicks: clk,
-          ctr: ctr,
-          color: COLORS[i % COLORS.length]
-        };
-      })
-    : [];
+  const targetImpressions = Number(globalEffectiveMetrics?.impressions || 0);
+  const targetClicks = Number(globalEffectiveMetrics?.clicks || 0);
 
-  const totalImp = list.reduce((s, r) => s + r.impressions, 0);
-  const totalClicks = list.reduce((s, r) => s + r.clicks, 0);
+  const list = React.useMemo(() => {
+    if (!Array.isArray(propData) || propData.length === 0) return [];
+    const groups = {};
+    propData.forEach((r, i) => {
+      const name = String(
+        r.creative_name || r.Creative || r.creative || r.CreativeName || 
+        r.Title || r.title || r.name || r.line_item_name || r.LineItem || `Creative ${i + 1}`
+      ).trim();
+      if (!name || name.toLowerCase() === "null" || name.toLowerCase() === "undefined" || name.toLowerCase() === "total:") return;
+      const imp = Number(r.Impressions || r.impressions || r.rawImp || r.rawImpressions || 0);
+      const clk = Number(r.Clicks || r.clicks || r.rawClicks || 0);
+      if (!groups[name]) {
+        groups[name] = { name, impressions: 0, clicks: 0 };
+      }
+      groups[name].impressions += imp;
+      groups[name].clicks += clk;
+    });
+
+    const resultList = Object.values(groups);
+
+    // Reconcile Impressions
+    const sumImp = resultList.reduce((s, c) => s + c.impressions, 0);
+    if (targetImpressions > 0 && sumImp > 0 && Math.abs(targetImpressions - sumImp) > 0) {
+      let allocatedImp = 0;
+      resultList.forEach((c, idx) => {
+        if (idx === resultList.length - 1) {
+          c.impressions = Math.max(0, targetImpressions - allocatedImp);
+        } else {
+          const ratio = c.impressions / sumImp;
+          const scaled = Math.round(targetImpressions * ratio);
+          c.impressions = scaled;
+          allocatedImp += scaled;
+        }
+      });
+    } else if (targetImpressions > 0 && sumImp === 0) {
+      const share = Math.round(targetImpressions / resultList.length);
+      resultList.forEach((c, idx) => {
+        c.impressions = idx === resultList.length - 1 ? (targetImpressions - share * (resultList.length - 1)) : share;
+      });
+    }
+
+    // Reconcile Clicks
+    const sumClicks = resultList.reduce((s, c) => s + c.clicks, 0);
+    if (targetClicks > 0 && sumClicks > 0 && Math.abs(targetClicks - sumClicks) > 0) {
+      let allocatedClicks = 0;
+      resultList.forEach((c, idx) => {
+        if (idx === resultList.length - 1) {
+          c.clicks = Math.max(0, targetClicks - allocatedClicks);
+        } else {
+          const ratio = c.clicks / sumClicks;
+          const scaled = Math.round(targetClicks * ratio);
+          c.clicks = scaled;
+          allocatedClicks += scaled;
+        }
+      });
+    } else if (targetClicks > 0 && sumClicks === 0) {
+      const clickWeights = resultList.map(c => c.impressions);
+      const allocatedClicks = distributeInteger(targetClicks, clickWeights);
+      resultList.forEach((c, idx) => {
+        c.clicks = allocatedClicks[idx] || 0;
+      });
+    }
+
+    return resultList
+      .map((c, i) => ({
+        ...c,
+        ctr: c.impressions > 0 ? Number(((c.clicks / c.impressions) * 100).toFixed(2)) : 0,
+        color: COLORS[i % COLORS.length]
+      }))
+      .filter((c) => c.impressions > 0)
+      .sort((a, b) => b.impressions - a.impressions);
+  }, [propData, targetImpressions, targetClicks]);
+
+  const totalImp = targetImpressions > 0 ? targetImpressions : list.reduce((s, r) => s + r.impressions, 0);
+  const totalClicks = targetClicks > 0 ? targetClicks : list.reduce((s, r) => s + r.clicks, 0);
   const avgCtr = totalImp > 0 ? (totalClicks / totalImp * 100) : 0;
   const displayReach = totalReach > 0 ? totalReach : (totalImp > 0 ? Math.round(totalImp * 0.78) : 0);
 
